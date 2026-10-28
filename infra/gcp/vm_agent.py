@@ -306,7 +306,8 @@ d, e = c.get("data", {}), c.get("eval", {})
 print("HNET_NEEDS " + json.dumps({"source": d.get("source", "hnet"), "dataset": d.get("dataset"),
       "n_train_shards": d.get("n_train_shards"),
       "explicit_paths": bool(d.get("paths") or d.get("byte_paths") or d.get("token_paths")),
-      "val": e.get("val") if (e.get("every") or e.get("at_end", True)) else None}))
+      "val": e.get("val") if (e.get("every") or e.get("at_end", True)) else None,
+      "out_dir": c.get("train", {}).get("out_dir")}))
 """
 
 KERNEL_PROBE = r"""
@@ -321,6 +322,192 @@ except Exception as ex:
     r = {"error": repr(ex)[:200]}
 print("HNET_KERNELS " + json.dumps(r))
 """
+
+
+# ----------------------------------------------------------------------------- GCS (optional)
+SHARD_RE = re.compile(r"_(val|train)_(\d{6})\.")
+CKPT_FILES = ("meta.json", "model.pt")  # a remote step dir is usable only if these are present
+GCLOUD_CANDIDATES = ["/snap/bin/gcloud", "/usr/bin/gcloud", "/usr/lib/google-cloud-sdk/bin/gcloud",
+                     "/opt/google-cloud-sdk/bin/gcloud", "/usr/local/bin/gcloud"]
+
+
+def find_gcloud() -> str | None:
+    for c in GCLOUD_CANDIDATES + [shutil.which("gcloud") or ""]:
+        if c and os.path.exists(c):
+            return c
+    return None
+
+
+def run_rel(out_dir: str) -> str:
+    """Repo-relative run dir -> name under the bucket prefix (runs/tiny/x -> tiny/x)."""
+    parts = [x for x in os.path.normpath(out_dir).split(os.sep) if x not in ("", ".", "..")]
+    if parts and parts[0] == "runs":
+        parts = parts[1:]
+    return "/".join(parts) or "default"
+
+
+def wanted_data_object(rel: str, n_train: int) -> bool:
+    """Which cached objects a run with n_train train shards needs (non-shard files, e.g. reports: always)."""
+    m = SHARD_RE.search(os.path.basename(rel))
+    if not m:
+        return True
+    return m.group(1) == "val" or int(m.group(2)) <= n_train
+
+
+def latest_complete_ckpt(rels: list[str]) -> str | None:
+    """From object paths relative to a run dir, the newest ckpt/step_* dir holding all CKPT_FILES."""
+    steps: dict[str, set] = {}
+    for r in rels:
+        parts = r.split("/")
+        if len(parts) >= 3 and parts[0] == "ckpt" and re.fullmatch(r"step_\d+", parts[1]):
+            steps.setdefault(parts[1], set()).add("/".join(parts[2:]))
+    ok = [k for k, v in steps.items() if all(f in v for f in CKPT_FILES)]
+    return max(ok) if ok else None
+
+
+class Gcs:
+    """Bucket mirror of run dirs + shared data-shard cache. Every call is best effort (logged, never fatal)."""
+
+    def __init__(self, cfg: dict | None, agent: "Agent"):
+        cfg = cfg or {}
+        self.bucket = (cfg.get("bucket") or "").replace("gs://", "").strip("/")
+        self.prefix = (cfg.get("prefix") or "runs/unnamed").strip("/")
+        self.restore_prefix = (cfg.get("restore_prefix") or self.prefix).strip("/")
+        self.data_prefix = (cfg.get("data_prefix") or "data").strip("/")
+        self.every = float(cfg.get("sync_every_s", 300))
+        self.agent = agent
+        self.gcloud = find_gcloud() if self.bucket else None
+        self.log_path = os.path.join(STATE, "gcs.log")
+        self.lock = threading.Lock()
+
+    @property
+    def on(self) -> bool:
+        return bool(self.bucket and self.gcloud)
+
+    def url(self, *parts: str) -> str:
+        return "gs://" + "/".join([self.bucket] + [p.strip("/") for p in parts if p])
+
+    def gc(self, args: list[str], timeout: float = 3600) -> tuple[int, str]:
+        env = {k: v for k, v in os.environ.items() if k not in ("VIRTUAL_ENV", "PYTHONPATH")}
+        env.setdefault("HOME", "/root")
+        env["CLOUDSDK_CORE_DISABLE_PROMPTS"] = "1"
+        try:
+            r = subprocess.run([self.gcloud, *args], capture_output=True, text=True, timeout=timeout, env=env)
+            code, out, err = r.returncode, r.stdout, r.stderr
+        except subprocess.TimeoutExpired:
+            code, out, err = 124, "", "timeout"
+        except OSError as e:
+            code, out, err = 127, "", repr(e)
+        with open(self.log_path, "a") as f:
+            f.write(f"\n$ gcloud {' '.join(args)}  -> {code}\n{err[-2000:]}\n")
+        return code, out
+
+    def ls_sizes(self, url: str) -> dict[str, int]:
+        """{object url: size} under url (recursive); {} if none / error."""
+        code, out = self.gc(["storage", "ls", "-l", url.rstrip("/") + "/**"], timeout=600)
+        res = {}
+        if code != 0:
+            return res
+        for ln in out.splitlines():
+            f = ln.split()
+            if len(f) >= 3 and f[-1].startswith("gs://") and f[0].isdigit():
+                res[f[-1]] = int(f[0])
+        return res
+
+    # ---- data cache ----
+    def restore_data(self, ds: str, n_train: int, root: str) -> int:
+        base = self.url(self.data_prefix, ds) + "/"
+        objs = self.ls_sizes(base)
+        todo: dict[str, list[str]] = {}
+        for u, size in objs.items():
+            rel = u[len(base):]
+            if not rel or rel.endswith("/") or not wanted_data_object(rel, n_train):
+                continue
+            dst = os.path.join(root, ds, rel)
+            if os.path.exists(dst) and os.path.getsize(dst) == size:
+                continue
+            todo.setdefault(os.path.dirname(dst), []).append(u)
+        n = 0
+        for d, urls in todo.items():
+            os.makedirs(d, exist_ok=True)
+            code, _ = self.gc(["storage", "cp", *urls, d + "/"], timeout=3 * 3600)
+            if code == 0:
+                n += len(urls)
+        return n
+
+    def upload_data(self, ds: str, root: str) -> int:
+        base = self.url(self.data_prefix, ds) + "/"
+        have = {u[len(base):]: s for u, s in self.ls_sizes(base).items()}
+        local = os.path.join(root, ds)
+        n = 0
+        for dp, _, files in os.walk(local):
+            for fn in files:
+                if fn.startswith(".") or fn.endswith((".tmp", ".part", ".lock")):
+                    continue
+                full = os.path.join(dp, fn)
+                rel = os.path.relpath(full, local).replace(os.sep, "/")
+                if have.get(rel) == os.path.getsize(full):
+                    continue
+                if self.gc(["storage", "cp", full, base + rel], timeout=3 * 3600)[0] == 0:
+                    n += 1
+        return n
+
+    # ---- run dirs ----
+    def run_dirs(self, roots: list[str]) -> list[str]:
+        out = set()
+        for root in roots:
+            b = root if os.path.isabs(root) else os.path.join(REPO, root)
+            for p in glob.glob(os.path.join(b, "**", "metrics.jsonl"), recursive=True):
+                out.add(os.path.dirname(p))
+        return sorted(out)
+
+    def sync_runs(self, roots: list[str]) -> int:
+        """rsync each run dir (ckpt/ mirrored with deletes so rolling checkpoints do not pile up)."""
+        if not self.on:
+            return 0
+        n = 0
+        with self.lock:
+            for d in self.run_dirs(roots):
+                dst = self.url(self.prefix, run_rel(os.path.relpath(d, REPO)))
+                c1, _ = self.gc(["storage", "rsync", "-r", "--exclude=^ckpt/", d, dst], timeout=3600)
+                ck = os.path.join(d, "ckpt")
+                c2 = 0
+                if glob.glob(os.path.join(ck, "step_*")):
+                    c2, _ = self.gc(["storage", "rsync", "-r", "--delete-unmatched-destination-objects",
+                                     r"--exclude=(^|/)\.tmp_", ck, dst + "/ckpt"], timeout=6 * 3600)
+                n += int(c1 == 0 and c2 == 0)
+            for f in ("cmd.log", "setup.log", "agent_lines.log"):
+                fp = os.path.join(STATE, f)
+                if os.path.exists(fp):
+                    self.gc(["storage", "cp", fp, self.url(self.prefix, "_logs", f)], timeout=600)
+        return n
+
+    def put_text(self, rel: str, text: str):
+        if not self.on:
+            return
+        fp = os.path.join(STATE, "_put.tmp")
+        with open(fp, "w") as f:
+            f.write(text)
+        self.gc(["storage", "cp", fp, self.url(self.prefix, rel)], timeout=600)
+
+    def restore_run(self, out_dir: str) -> str | None:
+        """If the local run has no checkpoint, fetch the newest complete bucket checkpoint (+ jsonl/config)."""
+        local = out_dir if os.path.isabs(out_dir) else os.path.join(REPO, out_dir)
+        if glob.glob(os.path.join(local, "ckpt", "step_*")):
+            return None
+        base = self.url(self.restore_prefix, run_rel(out_dir)) + "/"
+        objs = self.ls_sizes(base)
+        rels = [u[len(base):] for u in objs]
+        step = latest_complete_ckpt(rels)
+        if step is None:
+            return None
+        os.makedirs(os.path.join(local, "ckpt"), exist_ok=True)
+        top = [base + r for r in rels if "/" not in r]
+        if top:
+            self.gc(["storage", "cp", *top, local + "/"], timeout=1800)
+        code, _ = self.gc(["storage", "cp", "-r", base + "ckpt/" + step, os.path.join(local, "ckpt") + "/"],
+                          timeout=6 * 3600)
+        return step if code == 0 else None
 
 
 # ----------------------------------------------------------------------------- agent
@@ -339,6 +526,8 @@ class Agent:
         self.cmd_log = os.path.join(STATE, "cmd.log")
         self.py = sys.executable
         self._stop = threading.Event()
+        self.gcs = Gcs(job.get("gcs"), self)
+        self.out_dirs: list[str] = []
 
     # ---- helpers ----
     def log(self, msg: str):
@@ -572,19 +761,28 @@ class Agent:
         self.info = info
         self.em.emit("HNET_INFO", json.dumps(info, separators=(",", ":")))
 
-    def data_needs(self) -> dict[str, int]:
-        spec = self.job.get("data", "auto")
-        if spec != "auto":
-            return parse_data_spec(spec)
-        needs = []
+    def probe_configs(self) -> list[dict]:
+        """Data/eval/out_dir facts of every `hnet.train.train` call in the command (composed configs)."""
+        if getattr(self, "_probed", None) is not None:
+            return self._probed
+        res = []
         env = self.venv_env()
         for cfg, sets in _train_invocations(self.job["cmd"]):
             o = self.out([self.py, "-c", PROBE, cfg, *sets], timeout=300, env=env, cwd=REPO)
             got = [json.loads(ln.split(" ", 1)[1]) for ln in o.splitlines() if ln.startswith("HNET_NEEDS ")]
             if not got:
-                raise StageError(f"could not read the data section of {cfg} (see setup.log)")
-            needs += got
-        return merge_needs(needs)
+                raise StageError(f"could not read the config {cfg} (see setup.log)")
+            res += got
+        self._probed = res
+        self.out_dirs = [g["out_dir"] for g in res if g.get("out_dir")]
+        return res
+
+    def data_needs(self) -> dict[str, int]:
+        probed = self.probe_configs()
+        spec = self.job.get("data", "auto")
+        if spec != "auto":
+            return parse_data_spec(spec)
+        return merge_needs(probed)
 
     def data(self):
         needs = self.data_needs()
@@ -593,15 +791,23 @@ class Agent:
             self.log("data: nothing to prepare")
             return
         env = self.venv_env()
+        root = env.get("HNET_DATA") or os.path.join(REPO, "data")
         for ds, n in sorted(needs.items()):
             marker = os.path.join(STATE, f"data_{ds}_{n}.done")
             if os.path.exists(marker):
                 self.log(f"data {ds} n_train={n}: cached")
                 continue
             t = time.time()
-            self.log(f"data {ds} n_train={n}: prepare.py")
+            if self.gcs.on:
+                k = self.gcs.restore_data(ds, n, root)
+                self.log(f"data {ds}: {k} files copied from the bucket cache in {time.time() - t:.0f}s")
+            self.log(f"data {ds} n_train={n}: prepare.py (skips valid shards)")
             self.sh([self.py, "scripts/data/prepare.py", "--dataset", ds, "--n-train", str(n)], timeout=6 * 3600,
                     env=env, cwd=REPO)
+            if self.gcs.on:
+                t2 = time.time()
+                k = self.gcs.upload_data(ds, root)
+                self.log(f"data {ds}: {k} new files uploaded to the bucket cache in {time.time() - t2:.0f}s")
             open(marker, "w").write("1")
             self.log(f"data {ds} n_train={n}: done in {time.time() - t:.0f}s")
 
@@ -611,6 +817,13 @@ class Agent:
         self.mirror = Mirror(REPO, self.em, os.path.join(STATE, "mirror.json"), roots,
                              int(self.job.get("metrics_every", 1)))
         self.mirror.scan()  # lines written before a reboot but not yet emitted
+        self.roots = roots
+        if self.gcs.on:
+            for od in dict.fromkeys(self.out_dirs):
+                step = self.gcs.restore_run(od)
+                if step:
+                    self.log(f"restored {od} from {self.gcs.url(self.gcs.restore_prefix, run_rel(od))} ({step})")
+            threading.Thread(target=self.gcs_loop, daemon=True).start()
         with open(self.cmd_log, "ab") as lf:
             lf.write(f"\n===== boot run {time.strftime('%F %T')} =====\n".encode())
             lf.flush()
@@ -627,6 +840,16 @@ class Agent:
         self.mirror.scan()
         return p.returncode
 
+    def gcs_loop(self):
+        while not self._stop.wait(self.gcs.every):
+            if self.stage != "run":
+                return
+            try:
+                n = self.gcs.sync_runs(self.roots)
+                guest_attr("gcs_sync", json.dumps({"t": int(time.time()), "runs": n}))
+            except Exception as e:
+                self.log(f"gcs sync error {e!r}"[:300])
+
     def finish(self, code: int, failed_stage: str | None = None):
         self.stage = "done"
         for ln in tail_lines(self.cmd_log if failed_stage is None else self.setup_log, 30):
@@ -639,6 +862,11 @@ class Agent:
                 "last_eval": {k: v for k, v in e.items() if k in ("step", "tokens_eq", "val/bpb")},
                 "kernels": (self.info or {}).get("hnet_kernels")}
         js = json.dumps(summ, separators=(",", ":"))
+        if self.gcs.on:
+            t = time.time()
+            n = self.gcs.sync_runs(getattr(self, "roots", ["runs"]))
+            self.gcs.put_text("_summary.json", js)
+            self.log(f"final bucket sync: {n} run dir(s) -> {self.gcs.url(self.gcs.prefix)} in {time.time() - t:.0f}s")
         self.em.emit("HNET_SUMMARY", js)
         guest_attr("summary", js)
         guest_attr("exit", str(code))
@@ -651,7 +879,10 @@ class Agent:
         done_path = os.path.join(STATE, "done.json")
         boots = int(open(os.path.join(STATE, "boots")).read() or 0) if os.path.exists(os.path.join(STATE, "boots")) else 0
         open(os.path.join(STATE, "boots"), "w").write(str(boots + 1))
-        self.set_stage("boot", boot=boots + 1, commit=self.job.get("commit"))
+        self.set_stage("boot", boot=boots + 1, commit=self.job.get("commit"),
+                       gcs=self.gcs.url(self.gcs.prefix) if self.gcs.on else None)
+        if self.gcs.bucket and not self.gcs.gcloud:
+            self.log("bucket configured but no gcloud on the VM; serial channel only")
         d = json.load(open(done_path)) if os.path.exists(done_path) else None
         if d is not None and d.get("nonce") == self.job.get("nonce"):
             self.log(f"already finished (exit {d.get('exit')}); not re-running")

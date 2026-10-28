@@ -1,0 +1,18 @@
+# EXP-002: architecture search at ~2M-param (FLOPs-matched to tiny_bpe_2m) scale. PLAN.md §2b.
+# Every run: FineWeb-Edu shard 1, 2048-byte windows (448-token windows for BPE), 64 windows/step, 50M token-equivalents,
+# AdamW peak LR 1.5e-3 with WSD (10% warmup, 20% decay). Screening metric: final val bpb (same val text for all),
+# plus chunk diagnostics (diag.json) against the blog's targets (EXP-001).
+name: exp002_tiny2m
+out_root: runs/search/exp002_tiny2m
+seeds: [0, 1]
+set: []
+runs:
+  - {name: bpe,              config: configs/runs/tiny_bpe_2m.yaml}
+  - {name: paper,            config: configs/runs/tiny_hnet2_2m.yaml}                      # cosine_lookahead, (3,3)
+  - {name: end_linear,       config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.router=end_linear]}
+  - {name: end_mlp,          config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.router=end_mlp]}
+  - {name: end_cosine_shift, config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.router=end_cosine_shift]}
+  - {name: paper_r42,        config: configs/runs/tiny_hnet2_2m_ratios42.yaml}             # blog targets (4,2)
+  - {name: paper_nosmooth,   config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.dechunker=repeat]}
+  - {name: paper_nolrmult,   config: configs/runs/tiny_hnet2_2m.yaml, set: [model.lr_multiplier=null]}
+  - {name: paper_alpha01,    config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.ratio_loss_alpha=0.1]}

@@ -4,11 +4,14 @@
            --cmd "<shell, run in the repo>" [--commit SHA] [--zone auto|Z1,Z2] [--disk-gb 100]
            [--data auto|none|DATASET:N[,..]] [--linger-min 5] [--no-shutdown] [--metrics-every K]
            [--overlay PATH] [--env K=V] [--allow-compile] [--no-kernels] [--price-hr P] [--budget 300] [--launch-cap 25]
-           [--allow-over] [--dry-run]
+           [--allow-over] [--dry-run] [--bucket B|none] [--sa EMAIL|none] [--sync-every-min 5]
+           [--restore-from VM]
   status   N                     instance state, guest attributes, latest HNET_STATUS / stage / exit
   tail     N [-n 60] [--all]     raw serial output fetched since the last tail (offset tracked)
-  sync-metrics N [--out DIR]     pull serial output, rebuild DIR/<run>/metrics.jsonl + eval.jsonl
-                                 (default DIR = runs/gcp/<N>) for hnet.train.plot / hnet.eval.report
+  sync-metrics N [--out DIR]     rebuild DIR/<run>/metrics.jsonl + eval.jsonl (default runs/gcp/<N>) for
+                                 hnet.train.plot / hnet.eval.report: the bucket copy (synced every
+                                 --sync-every-min) plus newer lines from the serial console
+  pull     N RUN [--ckpt latest|all|none] [--out DIR]   run dir incl. checkpoints from the bucket
   watch    N [--interval 60] [--teardown] [--timeout-min M]   sync until HNET_DONE and the VM stopped
   resume   N [--max-hours H] [--rerun] [--cmd C] [--commit SHA]
                                  start a stopped (preempted / capped) VM again; the run resumes.
@@ -17,6 +20,11 @@
   teardown N | --all             delete (with disk) and verify gone; --all = every hnet- VM we own
   ls                             ledger records + live hnet-* instances
   cost     [--budget 300]        uptime x estimated $/h per VM, spend vs budget
+
+Bucket (default gs://neat-dispatch-501718-a5-hnet, HNET_GCP_BUCKET): runs/<vm>/<run>/ (jsonl, config,
+checkpoints, rsynced every few minutes and at the end), runs/<vm>/_logs/, data/<dataset>/ (shard cache:
+new VMs copy shards instead of downloading/converting). A VM whose disk has no checkpoint for a run
+restores the newest complete one from runs/<vm or --restore-from>/<run>/ckpt before starting.
 
 State: <scratchpad>/gcp_state/ (HNET_GCP_STATE_DIR overrides): state.json (ledger), serial/<N>/,
 startup/<N>.sh. gcloud: CLOUDSDK_CONFIG (default <scratchpad>/gcloud); CLOUDSDK_AUTH_ACCESS_TOKEN is
@@ -176,6 +184,15 @@ def cmd_launch(a) -> int:
                            auto_shutdown=not a.no_shutdown, metrics_every=a.metrics_every,
                            kernels=not a.no_kernels, allow_compile=a.allow_compile, env=_parse_env(a.env),
                            watch_dirs=a.watch_dir)
+    bucket = None if (a.bucket or "").lower() in ("", "none") else a.bucket.replace("gs://", "").strip("/")
+    sa = None if (a.sa or "").lower() == "none" else (a.sa or (C.VM_SERVICE_ACCOUNT if bucket else None))
+    if bucket and not sa:
+        _p("[note] --sa none: the VM has no credentials, so the bucket is not used (serial only)")
+        bucket = None
+    if bucket:
+        job["gcs"] = {"bucket": bucket, "prefix": f"runs/{name}",
+                      "restore_prefix": f"runs/{_norm_name(a.restore_from) if a.restore_from else name}",
+                      "data_prefix": "data", "sync_every_s": int(a.sync_every_min * 60)}
     if a.overlay:
         try:
             job["overlay_b64"] = startup.make_overlay(a.overlay, C.REPO_ROOT)
@@ -188,9 +205,11 @@ def cmd_launch(a) -> int:
     spath = sdir / f"{name}.sh"
     spath.write_text(startup.render(job))
     spec = gce.CreateSpec(name=name, machine_type=mt, accelerator=acc, gpu_count=count, spot=a.spot,
-                          max_hours=a.max_hours, disk_gb=disk_gb, startup_path=str(spath))
+                          max_hours=a.max_hours, disk_gb=disk_gb, startup_path=str(spath), service_account=sa)
     zones = C.ZONES[a.gpu.lower()] if a.zone in (None, "", "auto") else a.zone.split(",")
     _p(f"commit {sha[:12]}  cmd: {a.cmd}")
+    _p(f"bucket: {'gs://' + bucket + '/runs/' + name if bucket else 'off (serial console only)'}  "
+       f"service account: {sa or 'none'}")
     _p(f"zones: {', '.join(zones)}")
     if a.dry_run:
         _p("dry run: budget guard OK, nothing created. gcloud args:")
@@ -244,8 +263,15 @@ def _sync(rec: dict, out: str | None = None, quiet: bool = False) -> S.Parsed:
             _p(f"[warn] serial fetch failed ({str(e)[:200]}); using the local copy")
     p = S.parse_text(tr.read_raw())
     out_root = Path(out) if out else C.REPO_ROOT / "runs" / "gcp" / rec["name"]
+    src = "serial"
+    g = _gcs_records(rec, quiet)
+    if g is not None and (g[0] or g[1]):
+        p.metrics = S.merge_sources(g[0], p.metrics)
+        p.evals = S.merge_sources(g[1], p.evals)
+        src = "bucket+serial"
     dirs = S.reconstruct(p, out_root)
     if not quiet:
+        _p(f"  source: {src}")
         for d in dirs:
             rd = next((k for k in set(p.metrics) | set(p.evals) if S.local_run_dir(out_root, k) == d), "?")
             _p(f"  {rd} -> {d}  metrics={len(p.metrics.get(rd, []))} eval={len(p.evals.get(rd, []))}")
@@ -253,6 +279,78 @@ def _sync(rec: dict, out: str | None = None, quiet: bool = False) -> S.Parsed:
             _p(f"  [note] corrupt lines={p.corrupt} gaps={p.gaps} (lost {tr.cur['lost_bytes']} bytes) "
                f"resets={p.resets}")
     return p
+
+
+def _bucket_of(rec: dict) -> str | None:
+    gcs = ((rec.get("meta") or {}).get("job") or {}).get("gcs") or {}
+    return gcs.get("bucket")
+
+
+def _gcs_records(rec: dict, quiet: bool = False) -> tuple[dict, dict] | None:
+    """(metrics, evals) keyed like serial run dirs ('runs/<run>') from gs://B/runs/<vm>/; None if no bucket."""
+    bucket = _bucket_of(rec)
+    if not bucket:
+        return None
+    base = f"gs://{bucket}/runs/{rec['name']}/"
+    try:
+        objs = gce.storage_ls_sizes(base)
+    except gce.GcloudError as e:
+        if not quiet:
+            _p(f"[warn] bucket listing failed ({str(e)[:200]}); serial only")
+        return None
+    want = [u for u in objs if u.endswith(("/metrics.jsonl", "/eval.jsonl")) and "/_logs/" not in u]
+    cache = C.state_dir() / "gcs" / rec["name"]
+    metrics, evals = {}, {}
+    for u in want:
+        rel = u[len(base):]
+        dst = cache / rel
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            gce.storage_cp([u], str(dst), timeout=600)
+        except gce.GcloudError as e:
+            if not quiet:
+                _p(f"[warn] {u}: {str(e)[:200]}")
+            continue
+        run = "runs/" + rel.rsplit("/", 1)[0]
+        recs = S.read_jsonl_text(dst.read_text())
+        (metrics if rel.endswith("metrics.jsonl") else evals)[run] = recs
+    return metrics, evals
+
+
+def cmd_pull(a) -> int:
+    """Copy a run dir (checkpoints included) from the bucket: gs://B/runs/<vm>/<run>/ -> <out>."""
+    st = _state()
+    rec = _rec(st, a.name)
+    bucket = a.bucket or _bucket_of(rec) or C.BUCKET
+    run = a.run.strip("/")
+    if run.startswith("runs/"):
+        run = run[5:]
+    src = f"gs://{bucket}/runs/{rec['name']}/{run}"
+    out = Path(a.out) if a.out else C.REPO_ROOT / "runs" / "gcp" / rec["name"] / run
+    out.mkdir(parents=True, exist_ok=True)
+    objs = gce.storage_ls_sizes(src)
+    if not objs:
+        _p(f"nothing under {src}/")
+        return 1
+    rels = [u[len(src) + 1:] for u in objs]
+    from .vm_agent import latest_complete_ckpt
+    if a.ckpt == "latest":
+        step = latest_complete_ckpt(rels)
+        keep = [r for r in rels if not r.startswith("ckpt/") or (step and r.startswith(f"ckpt/{step}/"))]
+    elif a.ckpt == "none":
+        keep = [r for r in rels if not r.startswith("ckpt/")]
+    else:
+        keep = rels
+    total = sum(objs[f"{src}/{r}"] for r in keep)
+    _p(f"pull {src}/ -> {out}: {len(keep)} objects, {total / 1e6:.1f} MB (ckpt={a.ckpt})")
+    by_dir: dict[str, list[str]] = {}
+    for r in keep:
+        by_dir.setdefault(str((out / r).parent), []).append(f"{src}/{r}")
+    for d, urls in by_dir.items():
+        Path(d).mkdir(parents=True, exist_ok=True)
+        gce.storage_cp(urls, d + "/", timeout=6 * 3600)
+    _p("done")
+    return 0
 
 
 def _fmt_status(p: S.Parsed) -> str:
@@ -392,6 +490,15 @@ def cmd_resume(a) -> int:
                 _p(f"refusing: commit {sha[:12]} is not on any remote branch")
                 return 2
             job["commit"] = sha
+        if a.bucket and a.bucket.lower() != "none" and not job.get("gcs"):
+            job["gcs"] = {"bucket": a.bucket.replace("gs://", "").strip("/"), "prefix": f"runs/{rec['name']}",
+                          "restore_prefix": f"runs/{rec['name']}", "data_prefix": "data", "sync_every_s": 300}
+        if job.get("gcs"):
+            inst = gce.describe(rec["name"], rec["zone"]) or {}
+            if not inst.get("serviceAccounts"):
+                gce.run(["compute", "instances", "set-service-account", rec["name"], f"--zone={rec['zone']}",
+                         f"--service-account={C.VM_SERVICE_ACCOUNT}", f"--scopes={C.VM_SCOPES}"], json_out=False)
+                _p(f"attached service account {C.VM_SERVICE_ACCOUNT} (bucket access)")
         job["nonce"] = startup.job_dict(repo="", commit="", cmd="")["nonce"]
         spath = C.state_dir() / "startup" / f"{rec['name']}.sh"
         spath.parent.mkdir(parents=True, exist_ok=True)
@@ -539,6 +646,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--watch-dir", action="append", help="extra dir (repo-relative) to mirror *.jsonl from")
     s.add_argument("--overlay", action="append",
                    help="repo-relative file/dir shipped with the job and unpacked over the clone (<=128 KB gz)")
+    s.add_argument("--bucket", default=C.BUCKET, help="GCS bucket for run mirrors + data cache ('none' = off)")
+    s.add_argument("--sa", default=None, help="VM service account (default the project SA when a bucket is set; "
+                                              "'none' = no credentials on the VM)")
+    s.add_argument("--sync-every-min", type=float, default=5.0, help="bucket sync period for run dirs")
+    s.add_argument("--restore-from", default=None,
+                   help="VM name whose bucket checkpoints seed this run when the disk has none (default: same name)")
     s.add_argument("--env", action="append")
     s.add_argument("--allow-compile", action="store_true", help="compile causal_conv1d if no wheel (<=10 min)")
     s.add_argument("--no-kernels", action="store_true")
@@ -565,6 +678,14 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--out", default=None)
     s.set_defaults(fn=cmd_sync)
 
+    s = sp.add_parser("pull")
+    s.add_argument("name")
+    s.add_argument("run", help="run dir as on the VM (runs/tiny/x or tiny/x)")
+    s.add_argument("--out", default=None, help="default runs/gcp/<vm>/<run>")
+    s.add_argument("--ckpt", choices=["latest", "all", "none"], default="latest")
+    s.add_argument("--bucket", default=None)
+    s.set_defaults(fn=cmd_pull)
+
     s = sp.add_parser("watch")
     s.add_argument("name")
     s.add_argument("--out", default=None)
@@ -582,6 +703,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--cmd", default=None, help="replace the command (implies --rerun)")
     s.add_argument("--commit", default=None, help="check out another commit first (implies --rerun)")
     s.add_argument("--overlay", action="append", help="ship repo-relative files with the new job (implies --rerun)")
+    s.add_argument("--bucket", default=None, help="add bucket sync to a VM launched without it (with --rerun)")
     s.add_argument("--allow-unpushed", action="store_true")
     s.add_argument("--budget", type=float, default=C.DEFAULT_BUDGET_TOTAL)
     s.add_argument("--launch-cap", type=float, default=C.DEFAULT_LAUNCH_CAP)

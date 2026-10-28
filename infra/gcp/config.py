@@ -23,6 +23,13 @@ DISK_TYPE = "pd-balanced"
 DISK_USD_PER_GB_MONTH = 0.10  # pd-balanced estimate
 HOURS_PER_MONTH = 730.0
 
+# Bucket for run mirrors (gs://B/runs/<vm>/<run>/) and the shared shard cache (gs://B/data/<dataset>/).
+# "none" disables it (serial console only). VMs run as VM_SERVICE_ACCOUNT (scope cloud-platform) when on.
+BUCKET = os.environ.get("HNET_GCP_BUCKET", "neat-dispatch-501718-a5-hnet")
+VM_SERVICE_ACCOUNT = os.environ.get("HNET_GCP_VM_SA",
+                                    "train-eval-automation-sa@neat-dispatch-501718-a5.iam.gserviceaccount.com")
+VM_SCOPES = "cloud-platform"
+
 DEFAULT_BUDGET_TOTAL = float(os.environ.get("HNET_GCP_BUDGET", "300"))
 DEFAULT_LAUNCH_CAP = float(os.environ.get("HNET_GCP_LAUNCH_CAP", "25"))
 

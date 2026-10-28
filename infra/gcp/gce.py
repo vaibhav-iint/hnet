@@ -93,6 +93,7 @@ class CreateSpec:
     image_family: str = C.IMAGE_FAMILY
     image_project: str = C.IMAGE_PROJECT
     labels: dict = field(default_factory=lambda: dict(C.LABELS))
+    service_account: str | None = None  # None -> --no-service-account --no-scopes
     extra_metadata: dict = field(default_factory=dict)
 
 
@@ -107,7 +108,8 @@ def create_args(spec: CreateSpec, zone: str) -> list[str]:
         f"--machine-type={spec.machine_type}",
         f"--image-family={spec.image_family}", f"--image-project={spec.image_project}",
         f"--boot-disk-size={max(spec.disk_gb, C.MIN_DISK_GB)}GB", f"--boot-disk-type={C.DISK_TYPE}",
-        "--no-service-account", "--no-scopes",
+        *([f"--service-account={spec.service_account}", f"--scopes={C.VM_SCOPES}"] if spec.service_account
+          else ["--no-service-account", "--no-scopes"]),
         f"--metadata-from-file=startup-script={spec.startup_path}",
         "--metadata=" + ",".join(f"{k}={v}" for k, v in md.items()),
         "--labels=" + ",".join(f"{k}={v}" for k, v in spec.labels.items()),
@@ -236,3 +238,33 @@ def guest_attributes(name: str, zone: str, path: str = "hnet/") -> dict:
     except GcloudError:
         return {}
     return {f"{a.get('namespace')}/{a.get('key')}": a.get("value") for a in out}
+
+
+# ----------------------------------------------------------------------------- Cloud Storage
+def storage_ls_sizes(url: str) -> dict[str, int]:
+    """{object url: size} for every object under url (recursive); {} when there is none."""
+    try:
+        out, _ = run(["storage", "ls", "-l", url.rstrip("/") + "/**"], json_out=False, timeout=300)
+    except GcloudError as e:
+        if "matched no objects" in e.stderr.lower() or "not found" in e.stderr.lower() or "one or more urls" in e.stderr.lower():
+            return {}
+        raise
+    return parse_ls_sizes(out)
+
+
+def parse_ls_sizes(out: str) -> dict[str, int]:
+    res = {}
+    for ln in (out or "").splitlines():
+        f = ln.split()
+        if len(f) >= 3 and f[-1].startswith("gs://") and f[0].isdigit():
+            res[f[-1]] = int(f[0])
+    return res
+
+
+def storage_cp(srcs: list[str], dst: str, recursive: bool = False, timeout: float = 3600) -> None:
+    run(["storage", "cp", *(["-r"] if recursive else []), *srcs, dst], json_out=False, timeout=timeout)
+
+
+def storage_rsync(src: str, dst: str, exclude: str | None = None, timeout: float = 6 * 3600) -> None:
+    run(["storage", "rsync", "-r", *([f"--exclude={exclude}"] if exclude else []), src, dst], json_out=False,
+        timeout=timeout)

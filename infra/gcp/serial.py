@@ -226,3 +226,30 @@ def reconstruct(p: Parsed, out_root: Path | str) -> list[Path]:
         _write_jsonl(d / "eval.jsonl", p.evals.get(run_dir, []))
         dirs.append(d)
     return dirs
+
+
+def merge_sources(primary: dict, fresher: dict) -> dict:
+    """run_dir -> records: the bucket copy (complete up to its last sync) plus newer serial records."""
+    out = {k: list(v) for k, v in primary.items()}
+    for k, recs in fresher.items():
+        base = out.setdefault(k, [])
+        last = max((r.get("step", -1) for r in base if isinstance(r.get("step"), (int, float))), default=None)
+        for r in recs:
+            if last is None or (isinstance(r.get("step"), (int, float)) and r["step"] > last):
+                _add_record(out, k, r)
+    return out
+
+
+def read_jsonl_text(text: str) -> list[dict]:
+    recs = []
+    for ln in text.splitlines():
+        ln = ln.strip()
+        if not ln:
+            continue
+        try:
+            r = json.loads(ln)
+        except ValueError:
+            continue  # a line being written while the object was uploaded
+        if isinstance(r, dict):
+            recs.append(r)
+    return recs
