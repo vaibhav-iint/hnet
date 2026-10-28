@@ -60,6 +60,10 @@ class ToyLM(nn.Module):
                 if getattr(m, "bias", None) is not None:
                     nn.init.zeros_(m.bias)
 
+    def set_progress(self, frac: float):
+        """Called by the trainer every step with step / total_steps (records the history for tests)."""
+        self.progress_log = getattr(self, "progress_log", []) + [frac]
+
     def stage_of_param(self, name: str) -> int:
         if name.startswith("layers."):
             return 0 if int(name.split(".")[1]) < self.n_layers // 2 else 1

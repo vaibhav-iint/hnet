@@ -140,3 +140,12 @@ def test_muon_hook_trains(tmp_path):
     tr.train()
     m = read_metrics(tmp_path)
     assert m[-1]["loss"] < m[0]["loss"]
+
+
+def test_set_progress_called_every_step(tmp_path):
+    tr = Trainer(load_run_config(base=toy_cfg(tmp_path, steps=8, stop_at_step=5)))
+    tr.train()
+    assert tr.raw.progress_log == [s / 8 for s in range(5)]
+    tr2 = Trainer(load_run_config(base=toy_cfg(tmp_path, steps=8)))  # resume continues the schedule
+    tr2.train()
+    assert tr2.raw.progress_log == [s / 8 for s in range(5, 8)]

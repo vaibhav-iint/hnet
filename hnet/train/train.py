@@ -232,6 +232,7 @@ class Trainer:
                                     self.lc.get("run_name"), cfg, resume=self.resumed_from is not None)
         self._stop_reason: Optional[str] = None
         self._zero = torch.zeros((), device=self.device)
+        self._set_progress = getattr(self.raw, "set_progress", None)  # unwrapped model (not DDP)
         if self.is_main and not dry_run:
             os.makedirs(self.out_dir, exist_ok=True)
             dump_yaml(cfg, os.path.join(self.out_dir, "config.yaml"))
@@ -440,6 +441,8 @@ class Trainer:
                 is_log = ((step + 1) % log_every == 0) or (step + 1 == end_step)
                 lr_factor = self.schedule(step)
                 lr = set_lr(self.opt, lr_factor)
+                if self._set_progress is not None:  # e.g. dense_modded's attention-window warmup
+                    self._set_progress(step / self.total_steps)
                 host = [pf.next() for _ in range(self.accum)]
                 n_tgt = [int((hb["labels"] != IGNORE_INDEX).sum()) for hb in host]
                 n_tgt_step = max(sum(n_tgt), 1)
