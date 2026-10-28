@@ -1,0 +1,12 @@
+data/
+runs/
+checkpoints/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+.venv/
+wandb/
+*.pt
+*.safetensors
+*.bin

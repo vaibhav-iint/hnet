@@ -1,0 +1,22 @@
+# Main run: ~3.7B 2-stage byte-level H-Net, FLOPs/byte-matched to SmolLM3-3B (target 4.36 training GFLOPs/byte).
+# Layout/targets from Cartesia "From Tokens to Bytes I"; widths [inferred] all 2048.
+# Stage-1 attention: MHA + d_intermediate 5504 [inferred: fits the blog's 0.32B stage-1 params]. Verify with hnet.flops.
+model:
+  type: hnet
+  arch_layout: ["m4", ["T1m4", ["T40"], "m4T1"], "m4"]
+  d_model: [2048, 2048, 2048]
+  d_intermediate: [0, 5504, 11008]
+  vocab_size: 256
+  tie_embeddings: false
+  ssm: {d_state: 128, d_conv: 4, expand: 2, headdim: 64, ngroups: 1, chunk_size: 256}
+  attn:
+    num_heads: [16, 16, 16]
+    num_kv_heads: [16, 16, 4]
+    rotary_emb_dim: [64, 64, 128]
+    rope_theta: [10000.0, 10000.0, 50000.0]
+    window_size: [1023, 1023, -1]
+    nope_every: [0, 0, 4]
+  dc: {target_ratios: [4.0, 2.0], ratio_loss_alpha: 0.03, smoothing: true, ste: true}
+  norm_eps: 1.0e-5
+  initializer_range: 0.02
+  lr_multiplier: auto

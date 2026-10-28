@@ -1,0 +1,62 @@
+# Work log
+
+Chronological record of what was done, why, and what came out of it. Newest entries at the bottom.
+Times are UTC. Experiments (anything with a result) are written up in [EXPERIMENTS.md](EXPERIMENTS.md).
+
+---
+
+### 2026-10-28 21:26 · Session start, environment check
+- Dev box: 4 CPU cores, 15 GB RAM, no GPU. Python 3.13.
+- The network policy initially blocked Prime Intellect, Hugging Face, arXiv and cartesia.ai. The user widened it at
+  ~21:37.
+
+### 21:28 · Reference code pulled
+- Cloned goombalab/hnet (official model code, no trainer), huggingface/smollm (SmolLM3 configs and eval suite) and
+  state-spaces/mamba into the scratchpad as read-only references.
+- Confirmed from the official code: BOS = 0xFE and EOS = 0xFF; the router is identity-initialized; the residual
+  projection is zero-initialized; the ratio loss is computed per device.
+
+### 21:33 · Prime CLI checked
+- Prime sandboxes support GPUs and run commands over HTTPS, so no SSH is needed.
+- The first API key the user gave was rejected (`Invalid token`).
+
+### 21:35 · Draft-1 plan, then pause
+- Wrote a shared config module (`hnet/config.py`) and a first interface spec.
+- The user asked for the full plan before any implementation, so implementation paused.
+
+### 21:39 · References read, including rendered charts
+- Downloaded both Cartesia posts and the arXiv HTML. Rendered every figure with headless Chromium and viewed them.
+- Extracted the data behind blog I Fig. 7 from the page's JS bundle into `configs/reference/blog1_fig7_*.csv`.
+- **Finding:** the blog's six tasks are HellaSwag, ARC, PIQA, WinoGrande, CSQA and MMLU.
+- **Finding:** the ">10x" compares a cooled-down H-Net to stable-phase SmolLM3. Stable vs stable gives ~1.7x at 94B
+  tokens and ~3x at 189B (EXP-000).
+- **Finding:** paper App. C LR modulation is λ^s = sqrt(N_GPT · D^S/D^s / ∏_{i<s} N^i).
+- Wrote `PLAN_full_scale.md` (draft 2).
+
+### 21:50 · Second Prime key works; budget reality
+- The team wallet holds $1,842.94. The only listed GPUs are single H200 pods at $5.40/h.
+- The full-scale plan (~$16k+ for the 3.7B run) does not fit.
+
+### 22:00 · Re-scoped to $500 on the user's request
+- `PLAN.md` (draft 3): 125M/350M scale on FineWeb-Edu plus a modded-nanogpt speedrun, ~$455 including margin.
+- Answered the hardware question: any Ampere-or-newer GPU works; 24 GB is enough.
+
+### 22:04 · Implementation started (user: "go ahead with FineWeb-Edu and the modded-nanogpt datasets")
+- Data source: modded-nanogpt's GPT-2-tokenized shards (`kjj0/finewebedu10B-gpt2`, `kjj0/fineweb10B-gpt2`), decoded to
+  bytes per document. Byte and token models therefore see exactly the same documents.
+- Wrote shared infrastructure: `hnet/registry.py` (name → component registries), a modular `DCConfig` (router,
+  chunker, dechunker and aux loss chosen by name per stage), `SeqCtx`, and SPEC v2.
+- Launched 7 parallel workstreams (Opus 5.5 subagents):
+  - A1: Mamba-2 SSD scan and mixer
+  - A2: modular H-Net model
+  - B: FLOPs calculator and matched configs
+  - C: data pipeline
+  - D: trainer and optimizers
+  - E: eval harness
+  - F: Prime infrastructure
+  - G: speedrun port and Muon
+- Per the user, every brief stresses optimization and testing: parity tests, causality tests and benchmarks.
+  Quick 1–10M-parameter loss runs come next, once model and trainer integrate.
+
+### 22:09 · Logbooks started (user request)
+- This file, plus `EXPERIMENTS.md` with figures in `logbook/figures/`. Both are mirrored to a private page.

@@ -1,0 +1,17 @@
+# Tiny 2-stage H-Net for CPU smoke tests (seconds per step on 1 core).
+model:
+  type: hnet
+  arch_layout: ["m2", ["T1m2", ["T2"], "m2T1"], "m2"]
+  d_model: [64, 96, 128]
+  d_intermediate: [0, 256, 384]
+  vocab_size: 256
+  ssm: {d_state: 16, d_conv: 4, expand: 2, headdim: 16, ngroups: 1, chunk_size: 32}
+  attn:
+    num_heads: [4, 4, 4]
+    num_kv_heads: [4, 4, 2]
+    rotary_emb_dim: [8, 12, 32]
+    rope_theta: [10000.0, 10000.0, 50000.0]
+    window_size: [63, 63, -1]
+    nope_every: [0, 0, 2]
+  dc: {target_ratios: [3.0, 2.0], ratio_loss_alpha: 0.03}
+  lr_multiplier: auto
