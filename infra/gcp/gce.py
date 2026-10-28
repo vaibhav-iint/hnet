@@ -268,3 +268,22 @@ def storage_cp(srcs: list[str], dst: str, recursive: bool = False, timeout: floa
 def storage_rsync(src: str, dst: str, exclude: str | None = None, timeout: float = 6 * 3600) -> None:
     run(["storage", "rsync", "-r", *([f"--exclude={exclude}"] if exclude else []), src, dst], json_out=False,
         timeout=timeout)
+
+
+STOP_OPS = ("compute.instances.preempted", "compute.instances.guestTerminate", "stop",
+            "compute.instances.hostError", "compute.instances.terminateOnHostMaintenance")
+
+
+def last_stop_reason(name: str, zone: str) -> str | None:
+    """Why the VM last stopped (preempted / guest shutdown / stop / max-run-duration ...), best effort."""
+    try:
+        ops = run(["compute", "operations", "list", f"--zones={zone}",
+                   f"--filter=targetLink ~ /instances/{name}$"], timeout=120) or []
+    except GcloudError:
+        return None
+    ops = [o for o in ops if o.get("operationType") in STOP_OPS or "Duration" in (o.get("operationType") or "")
+           or "terminat" in (o.get("operationType") or "").lower()]
+    if not ops:
+        return None
+    o = max(ops, key=lambda o: o.get("insertTime", ""))
+    return f"{o.get('operationType')} at {o.get('insertTime')}: {o.get('statusMessage', '')}".strip()

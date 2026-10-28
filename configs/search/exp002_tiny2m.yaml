@@ -1,11 +1,14 @@
 # EXP-002: architecture search at ~2M-param (FLOPs-matched to tiny_bpe_2m) scale. PLAN.md §2b.
 # Every run: FineWeb-Edu shard 1, 2048-byte windows (448-token windows for BPE), 64 windows/step, 50M token-equivalents,
 # AdamW peak LR 1.5e-3 with WSD (10% warmup, 20% decay). Screening metric: final val bpb (same val text for all),
-# plus chunk diagnostics (diag.json) against the blog's targets (EXP-001).
+# plus chunk diagnostics (diag.json) against the blog's targets (EXP-001). Logged on the fly: train metrics every 10
+# steps, val CE/bpb every 250 steps, paper7 task metrics (acc, acc_norm, soft bpb) every 500 steps.
 name: exp002_tiny2m
 out_root: runs/search/exp002_tiny2m
 seeds: [0, 1]
-set: []
+set:
+  - train.compile=false        # tiny models + data-dependent shapes: compile overhead not worth it
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"   # task curves during training
 runs:
   - {name: bpe,              config: configs/runs/tiny_bpe_2m.yaml}
   - {name: paper,            config: configs/runs/tiny_hnet2_2m.yaml}                      # cosine_lookahead, (3,3)

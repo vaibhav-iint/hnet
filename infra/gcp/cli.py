@@ -17,7 +17,8 @@
                                  start a stopped (preempted / capped) VM again; the run resumes.
                                  --rerun/--cmd/--commit push a new job (startup-script metadata) first
   stop     N                     stop a running VM (keeps the disk)
-  teardown N | --all             delete (with disk) and verify gone; --all = every hnet- VM we own
+  teardown N | --all             delete (with disk) and verify gone; --all = every VM in this ledger
+                                 (never VMs outside it, e.g. other people's or hx-*)
   ls                             ledger records + live hnet-* instances
   cost     [--budget 300]        uptime x estimated $/h per VM, spend vs budget
 
@@ -376,6 +377,10 @@ def cmd_status(a) -> int:
     _p(f"{rec['name']}: {rec.get('status')} zone={rec.get('zone')} {rec['machine_type']} "
        f"{'spot' if rec.get('spot') else 'on-demand'} up {L.running_hours(rec):.2f} h "
        f"est ${L.actual_cost(rec):.2f}")
+    if rec.get("status") in L.STOPPED:
+        why = gce.last_stop_reason(rec["name"], rec["zone"])
+        if why:
+            _p(f"last stop: {why}")
     if rec.get("status") in L.RUNNING:
         ga = gce.guest_attributes(rec["name"], rec["zone"])
         if ga:
@@ -441,7 +446,8 @@ def cmd_watch(a) -> int:
         if rec.get("status") in L.STOPPED + ("DELETED",) and rec.get("status") != "STOPPING":
             if p.done is not None or rec.get("status") == "DELETED":
                 break
-            _p("[watch] VM stopped without HNET_DONE (preempted or hit max-run-duration); "
+            why = gce.last_stop_reason(rec["name"], rec["zone"]) or "preempted or hit max-run-duration?"
+            _p(f"[watch] VM stopped without HNET_DONE ({why}); "
                f"`python -m infra.gcp resume {rec['name']}` continues it")
             return 5
         if a.timeout_min and time.time() - t0 > a.timeout_min * 60:
@@ -576,11 +582,14 @@ def cmd_teardown(a) -> int:
         targets = {r["name"]: r for r in st.active()}
         for inst in gce.list_ours():
             labels = inst.get("labels") or {}
-            if labels.get("hnet-owner") != C.LABELS["hnet-owner"]:
-                _p(f"[skip] {inst['name']}: hnet- name but not labelled by infra.gcp")
+            if inst["name"] in targets:
+                targets[inst["name"]]["zone"] = gce.zone_of(inst)
                 continue
-            targets.setdefault(inst["name"], {"name": inst["name"], "zone": gce.zone_of(inst)})
-            targets[inst["name"]]["zone"] = gce.zone_of(inst)
+            if labels.get("hnet-owner") != C.LABELS["hnet-owner"] or not a.include_untracked:
+                _p(f"[skip] {inst['name']}: not in this ledger"
+                   + ("" if labels.get("hnet-owner") == C.LABELS["hnet-owner"] else " and not labelled by infra.gcp"))
+                continue
+            targets[inst["name"]] = {"name": inst["name"], "zone": gce.zone_of(inst)}
         if not targets:
             _p("nothing to tear down")
         for rec in targets.values():
@@ -717,7 +726,9 @@ def build_parser() -> argparse.ArgumentParser:
     s = sp.add_parser("teardown")
     g = s.add_mutually_exclusive_group(required=True)
     g.add_argument("name", nargs="?")
-    g.add_argument("--all", action="store_true")
+    g.add_argument("--all", action="store_true", help="every VM in this ledger that still exists")
+    s.add_argument("--include-untracked", action="store_true",
+                   help="with --all: also hnet-* VMs labelled by infra.gcp but missing from this ledger")
     s.set_defaults(fn=cmd_teardown)
 
     s = sp.add_parser("ls")

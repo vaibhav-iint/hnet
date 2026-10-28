@@ -167,6 +167,7 @@ def parse_text(text: str) -> Parsed:
             continue
         if RESET_MARK in line:
             p.resets += 1
+            p.done, p.status = None, None  # a new boot: older DONE/status no longer describe the VM
             continue
         if "HNET_" not in line:
             continue

@@ -385,6 +385,8 @@ def test_cli_teardown_all_only_ours(monkeypatch):
 
     monkeypatch.setattr(subprocess, "run", FakeGcloud(h))
     assert cli.main(["teardown", "--all"]) == 0
+    assert deleted == []  # not in our ledger: never touched without --include-untracked
+    assert cli.main(["teardown", "--all", "--include-untracked"]) == 0
     assert deleted == ["hnet-x"]
 
 
@@ -594,3 +596,206 @@ def test_stale_local_state_is_reconciled(monkeypatch):
     assert b["segments"][0]["end"] == pytest.approx(t0 + 900, abs=1) and b["segments"][1]["end"] is None
     assert c["status"] == "DELETED" and c["ended_at"]
     assert [r["name"] for r in st.active()] == ["hnet-a", "hnet-b"]
+
+
+# ----------------------------------------------------------------------------- GCS extension
+def test_create_args_with_service_account(tmp_path):
+    a = gce.create_args(_spec(tmp_path, service_account="sa@p.iam.gserviceaccount.com"), "us-central1-a")
+    assert "--service-account=sa@p.iam.gserviceaccount.com" in a and "--scopes=cloud-platform" in a
+    assert "--no-service-account" not in a and "--no-scopes" not in a
+
+
+def test_gcs_helpers():
+    assert VA.run_rel("runs/tiny/x") == "tiny/x" and VA.run_rel("out/y/") == "out/y"
+    assert VA.wanted_data_object("finewebedu_val_000000.bin", 0)
+    assert VA.wanted_data_object("bytes/finewebedu_train_000001.bytes.bin", 1)
+    assert not VA.wanted_data_object("bytes/finewebedu_train_000002.idx.npy", 1)
+    assert VA.wanted_data_object("bytes/convert_report.json", 0)
+    rels = ["metrics.jsonl", "ckpt/step_0000100/meta.json", "ckpt/step_0000100/model.pt",
+            "ckpt/step_0000200/model.pt",  # incomplete (being uploaded / deleted)
+            "ckpt/step_0000050/meta.json", "ckpt/step_0000050/model.pt"]
+    assert VA.latest_complete_ckpt(rels) == "step_0000100"
+    assert VA.latest_complete_ckpt(["metrics.jsonl"]) is None
+    assert gce.parse_ls_sizes("     12  2026-10-28T00:00:00Z  gs://b/x/a.bin\nTOTAL: 1 objects, 12 bytes (12B)\n") \
+        == {"gs://b/x/a.bin": 12}
+
+
+class FakeBucket:
+    """In-memory bucket answering the agent's `gcloud storage` calls (ls -l / cp / rsync)."""
+
+    def __init__(self):
+        self.obj: dict[str, bytes] = {}
+        self.calls = []
+
+    def gc(self, args, timeout=0):
+        self.calls.append(args)
+        verb = args[1]
+        if verb == "ls":
+            pre = args[-1][:-3] if args[-1].endswith("/**") else args[-1]
+            hits = {u: len(b) for u, b in self.obj.items() if u.startswith(pre)}
+            return (0, "".join(f"{s}  2026-01-01T00:00:00Z  {u}\n" for u, s in hits.items())) if hits else (1, "")
+        if verb == "cp":
+            rec = "-r" in args
+            srcs, dst = [a for a in args[2:-1] if a != "-r"], args[-1]
+            for src in srcs:
+                if src.startswith("gs://"):
+                    items = [(u, u[len(src.rsplit("/", 1)[0]) + 1:]) for u in self.obj if u == src or
+                             (rec and u.startswith(src + "/"))]
+                    for u, rel in items:
+                        tgt = os.path.join(dst, rel) if dst.endswith("/") else dst
+                        os.makedirs(os.path.dirname(tgt), exist_ok=True)
+                        open(tgt, "wb").write(self.obj[u])
+                else:
+                    tgt = dst + os.path.basename(src) if dst.endswith("/") else dst
+                    self.obj[tgt] = open(src, "rb").read()
+            return 0, ""
+        if verb == "rsync":
+            src, dst = args[-2], args[-1]
+            excl = [a.split("=", 1)[1] for a in args if a.startswith("--exclude=")]
+            delete = "--delete-unmatched-destination-objects" in args
+            seen = set()
+            for dp, _, fs in os.walk(src):
+                for f in fs:
+                    rel = os.path.relpath(os.path.join(dp, f), src)
+                    if any(re.search(x, rel) for x in excl):
+                        continue
+                    self.obj[f"{dst}/{rel}"] = open(os.path.join(dp, f), "rb").read()
+                    seen.add(f"{dst}/{rel}")
+            if delete:
+                for u in [u for u in self.obj if u.startswith(dst + "/") and u not in seen]:
+                    del self.obj[u]
+            return 0, ""
+        raise AssertionError(args)
+
+
+def _gcs_agent(tmp_path, monkeypatch, bucket, prefix="runs/hnet-a", restore_prefix=None):
+    repo = tmp_path / "repo"
+    repo.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(VA, "REPO", str(repo))
+    monkeypatch.setattr(VA, "STATE", str(tmp_path / "state"))
+    os.makedirs(tmp_path / "state", exist_ok=True)
+    monkeypatch.setattr(VA, "find_gcloud", lambda: "/usr/bin/gcloud")
+    ser = tmp_path / "tty"
+    ser.write_text("")
+    ag = VA.Agent({"gcs": {"bucket": "b", "prefix": prefix, "restore_prefix": restore_prefix or prefix}},
+                  VA.Emitter(dev=str(ser)))
+    monkeypatch.setattr(ag.gcs, "gc", bucket.gc)
+    return ag, repo
+
+
+def test_gcs_data_cache_roundtrip(tmp_path, monkeypatch):
+    bk = FakeBucket()
+    ag, repo = _gcs_agent(tmp_path, monkeypatch, bk)
+    root = tmp_path / "data1"
+    d = root / "finewebedu10B"
+    (d / "bytes").mkdir(parents=True)
+    for n in ("finewebedu_val_000000.bin", "finewebedu_train_000001.bin", "finewebedu_train_000002.bin",
+              "bytes/finewebedu_train_000001.bytes.bin", "bytes/finewebedu_train_000002.bytes.bin",
+              "bytes/convert_report.json"):
+        (d / n).write_bytes(n.encode())
+    assert ag.gcs.upload_data("finewebedu10B", str(root)) == 6
+    assert ag.gcs.upload_data("finewebedu10B", str(root)) == 0  # already cached
+    assert "gs://b/data/finewebedu10B/bytes/finewebedu_train_000002.bytes.bin" in bk.obj
+    # a fresh VM needing 1 train shard copies val + shard 1 + reports, not shard 2
+    root2 = tmp_path / "data2"
+    assert ag.gcs.restore_data("finewebedu10B", 1, str(root2)) == 4
+    got = sorted(str(p.relative_to(root2)) for p in root2.rglob("*") if p.is_file())
+    assert got == ["finewebedu10B/bytes/convert_report.json", "finewebedu10B/bytes/finewebedu_train_000001.bytes.bin",
+                   "finewebedu10B/finewebedu_train_000001.bin", "finewebedu10B/finewebedu_val_000000.bin"]
+    assert ag.gcs.restore_data("finewebedu10B", 1, str(root2)) == 0  # present with the same size
+
+
+def test_gcs_run_sync_and_restore(tmp_path, monkeypatch):
+    bk = FakeBucket()
+    ag, repo = _gcs_agent(tmp_path, monkeypatch, bk)
+    run = repo / "runs" / "tiny" / "x"
+    (run / "ckpt" / "step_0000010").mkdir(parents=True)
+    (run / "ckpt" / ".tmp_step_0000020").mkdir()
+    (run / "metrics.jsonl").write_text('{"step": 10}\n')
+    (run / "config.yaml").write_text("a: 1\n")
+    for f in ("meta.json", "model.pt", "optim.pt"):
+        (run / "ckpt" / "step_0000010" / f).write_text(f)
+    (run / "ckpt" / ".tmp_step_0000020" / "model.pt").write_text("partial")
+    (tmp_path / "state" / "cmd.log").write_text("log\n")
+    assert ag.gcs.sync_runs(["runs"]) == 1
+    keys = sorted(bk.obj)
+    assert "gs://b/runs/hnet-a/tiny/x/metrics.jsonl" in keys and "gs://b/runs/hnet-a/_logs/cmd.log" in keys
+    assert "gs://b/runs/hnet-a/tiny/x/ckpt/step_0000010/model.pt" in keys
+    assert not any(".tmp_" in k for k in keys)
+    # rolling checkpoint replaced locally -> the old one disappears from the bucket too
+    import shutil as _sh
+    _sh.rmtree(run / "ckpt" / "step_0000010")
+    (run / "ckpt" / "step_0000030").mkdir()
+    for f in ("meta.json", "model.pt"):
+        (run / "ckpt" / "step_0000030" / f).write_text(f)
+    ag.gcs.sync_runs(["runs"])
+    assert not any("step_0000010" in k for k in bk.obj) and any("step_0000030" in k for k in bk.obj)
+    # disk gone: a new VM (fresh repo) restores the newest complete checkpoint + jsonl before training
+    ag2, repo2 = _gcs_agent(tmp_path / "vm2", monkeypatch, bk)
+    assert ag2.gcs.restore_run("runs/tiny/x") == "step_0000030"
+    assert (repo2 / "runs/tiny/x/ckpt/step_0000030/model.pt").read_text() == "model.pt"
+    assert (repo2 / "runs/tiny/x/metrics.jsonl").read_text() == '{"step": 10}\n'
+    assert ag2.gcs.restore_run("runs/tiny/x") is None  # local checkpoint present -> nothing to do
+    ag3, _ = _gcs_agent(tmp_path / "vm3", monkeypatch, bk, prefix="runs/hnet-b", restore_prefix="runs/hnet-a")
+    assert ag3.gcs.restore_run("runs/tiny/x") == "step_0000030"
+
+
+def test_sync_metrics_prefers_bucket_then_serial(tmp_path, monkeypatch):
+    st = State(C.state_dir() / "state.json")
+    t = time.time()
+    with st.locked():
+        st.add({"name": "hnet-g", "id": "hnet-g", "zone": "us-central1-a", "machine_type": "g2-standard-8",
+                "spot": True, "price_hr": 0.35, "disk_hr": 0.0, "max_hours": 0.5, "created_at": t, "started_at": t,
+                "status": "RUNNING", "segments": [{"start": t, "deadline": t + 1800, "end": None}],
+                "meta": {"job": {"gcs": {"bucket": "bk"}}}})
+    fs = FakeSerial(cap=500)  # small: the serial buffer lost the early lines
+    fs.write("x" * 600 + "\n")
+    fs.write('HNET_METRIC runs/tiny/t {"step": 30, "bpb": 2.8}\nHNET_METRIC runs/tiny/t {"step": 40, "bpb": 2.7}\n')
+    bucket = {"gs://bk/runs/hnet-g/tiny/t/metrics.jsonl": '{"step": 10, "bpb": 3.0}\n{"step": 20, "bpb": 2.9}\n'
+                                                          '{"step": 30, "bpb": 2.8}\n{"step": 4',
+              "gs://bk/runs/hnet-g/tiny/t/eval.jsonl": '{"step": 20, "val/bpb": 2.95}\n',
+              "gs://bk/runs/hnet-g/_logs/cmd.log": "log"}
+
+    def h(a):
+        if a[1] == "storage" and a[2] == "ls":
+            return 0, "".join(f"{len(v)}  2026-01-01T00:00:00Z  {u}\n" for u, v in bucket.items()), ""
+        if a[1] == "storage" and a[2] == "cp":
+            Path(a[-2] if False else a[-1]).write_text(bucket[a[3]])
+            return 0, "", ""
+        if a[3] == "get-serial-port-output":
+            start = int(next(x for x in a if x.startswith("--start=")).split("=")[1])
+            return 0, json.dumps(fs.fetch(start)), ""
+        raise AssertionError(a)
+
+    monkeypatch.setattr(subprocess, "run", FakeGcloud(h))
+    out = tmp_path / "o"
+    assert cli.main(["sync-metrics", "hnet-g", "--out", str(out)]) == 0
+    m = [json.loads(x) for x in (out / "tiny" / "t" / "metrics.jsonl").read_text().splitlines()]
+    assert [r["step"] for r in m] == [10, 20, 30, 40]  # bucket history + fresher serial line
+    assert json.loads((out / "tiny" / "t" / "eval.jsonl").read_text())["val/bpb"] == 2.95
+
+
+def test_cli_pull_latest_checkpoint(tmp_path, monkeypatch):
+    st = State(C.state_dir() / "state.json")
+    t = time.time()
+    with st.locked():
+        st.add({"name": "hnet-p", "id": "hnet-p", "zone": "z", "machine_type": "g2-standard-8", "spot": True,
+                "price_hr": 0.35, "disk_hr": 0.0, "max_hours": 0.5, "created_at": t, "started_at": t,
+                "status": "TERMINATED", "segments": [], "meta": {"job": {"gcs": {"bucket": "bk"}}}})
+    objs = {f"gs://bk/runs/hnet-p/tiny/t/{r}": r for r in
+            ["metrics.jsonl", "ckpt/step_0000010/meta.json", "ckpt/step_0000010/model.pt",
+             "ckpt/step_0000020/meta.json", "ckpt/step_0000020/model.pt"]}
+    copied = []
+
+    def h(a):
+        if a[2] == "ls":
+            return 0, "".join(f"{len(v)}  2026-01-01T00:00:00Z  {u}\n" for u, v in objs.items()), ""
+        if a[2] == "cp":
+            copied.extend(a[3:-1])
+            return 0, "", ""
+        raise AssertionError(a)
+
+    monkeypatch.setattr(subprocess, "run", FakeGcloud(h))
+    assert cli.main(["pull", "hnet-p", "runs/tiny/t", "--out", str(tmp_path / "o")]) == 0
+    assert sorted(u.rsplit("tiny/t/", 1)[1] for u in copied) == \
+        ["ckpt/step_0000020/meta.json", "ckpt/step_0000020/model.pt", "metrics.jsonl"]
