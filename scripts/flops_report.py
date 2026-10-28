@@ -75,7 +75,7 @@ def main(argv=None):
     hdr = ("| config | layout | params (M) | non-emb (M) | train GFLOPs/byte | bytes/main pos | per-stage GFLOPs/byte"
            " | vs ref |")
     print(hdr)
-    print("|" + "---|" * hdr.count("|")[:-1] if False else "|---|---|---:|---:|---:|---:|---|---:|")
+    print("|---|---|---:|---:|---:|---:|---|---:|")
     for name, cfg, m, r in rows:
         if isinstance(cfg, HNetConfig):
             layout = "/".join(_flat(cfg.arch_layout))
