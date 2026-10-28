@@ -60,3 +60,15 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
 
 ### 22:09 · Logbooks started (user request)
 - This file, plus `EXPERIMENTS.md` with figures in `logbook/figures/`. Both are mirrored to a private page.
+
+### 22:14 · Git repo and logbook page
+- The repo now lives at https://github.com/vaibhav-iint/hnet (branch `main`).
+- First commit `7397824` contains the plan, spec, shared config/registry and logbooks. Agent work is committed after
+  integration and tests, not mid-flight.
+- Logbook page (private): https://claude.ai/artifact/Q9DtCHGtkktYVtPNbx7YUB. Built by `logbook/build_page.py` from
+  the two Markdown files and republished at milestones.
+
+### 22:16 · Commit policy
+- The container is ephemeral, so work-in-progress is snapshotted to `main` whenever I stop. These are commits titled
+  "WIP snapshot" and may contain partial, untested agent code.
+- Tested integration points get a normal commit message and a `milestone-*` tag.
