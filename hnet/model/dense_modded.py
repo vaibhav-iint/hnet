@@ -31,15 +31,14 @@ is also what the record evaluates with.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional
-
 import torch
 import torch.nn.functional as F
 from torch import nn
+from torch.utils.checkpoint import checkpoint
 
 from hnet.config import IGNORE_INDEX, DenseConfig
 from hnet.model.ctx import SeqCtx
+from hnet.model.lm import CE_CHUNK_ELEMENTS, CausalLMOutput
 from hnet.registry import register
 
 BLOCK_SIZE = 128  # FlexAttention block size; the sliding window is counted in these blocks
@@ -58,22 +57,6 @@ DEFAULT_EXTRA = dict(
 
 def rms_norm(x: torch.Tensor, eps: float) -> torch.Tensor:
     return F.rms_norm(x, (x.size(-1),), eps=eps)
-
-
-@dataclass
-class ModdedOutput:
-    """Fields of the SPEC model output (dense models have no routing, so no bpred and zero aux loss).
-
-    TODO(interface): switch to WS-A2's shared output dataclass once hnet/model exports one.
-    """
-
-    logits: Optional[torch.Tensor]
-    loss: Optional[torch.Tensor]
-    ce_sum: Optional[torch.Tensor]
-    n_targets: Optional[torch.Tensor]
-    aux_loss: torch.Tensor
-    stats: dict = field(default_factory=dict)
-    bpred: list = field(default_factory=list)
 
 
 class HalfRotary(nn.Module):
@@ -280,7 +263,9 @@ class ModdedGPT(nn.Module):
     def blocks(self) -> list:
         return list(self.layers)
 
-    def forward(self, input_ids, cu_seqlens=None, max_seqlen=None, labels=None, return_logits=True) -> ModdedOutput:
+    def forward(self, input_ids, cu_seqlens=None, max_seqlen=None, labels=None, return_logits=True) -> CausalLMOutput:
+        """SPEC forward. With ``return_logits=False`` (the trainer) the CE is computed in checkpointed chunks of
+        ~CE_CHUNK_ELEMENTS logits, so the fp32 [T, 50304] logits of a 64K-token window are never materialized."""
         shape = input_ids.shape
         if input_ids.dim() == 2:  # [B, L]: one segment per row
             B, L = shape
@@ -291,24 +276,31 @@ class ModdedGPT(nn.Module):
         ids = input_ids.reshape(-1)
         h = self._backbone(ids, SeqCtx.from_cu_seqlens(cu_seqlens, max_seqlen))
 
-        logits = self.lm_head(h).float()
-        if self.softcap > 0:
-            logits = self.softcap * torch.tanh(logits / self.softcap)
-        loss = ce_sum = n_targets = None
+        out = CausalLMOutput(aux_loss=torch.zeros((), device=ids.device))
+        logits = self._logits(h) if return_logits else None
         if labels is not None:
             labels = labels.reshape(-1)
-            ce_sum = F.cross_entropy(logits, labels, ignore_index=IGNORE_INDEX, reduction="sum")
-            n_targets = (labels != IGNORE_INDEX).sum()
-            loss = ce_sum / n_targets.clamp_min(1)
-        return ModdedOutput(
-            logits=logits.view(*shape, -1) if return_logits else None,
-            loss=loss,
-            ce_sum=ce_sum,
-            n_targets=n_targets,
-            aux_loss=torch.zeros((), device=ids.device),
-        )
+            if logits is not None:
+                out.ce_sum = F.cross_entropy(logits, labels, ignore_index=IGNORE_INDEX, reduction="sum")
+            else:
+                rows = max(1, CE_CHUNK_ELEMENTS // self.cfg.vocab_size)
+                out.ce_sum = sum(checkpoint(self._ce_sum, hs, ys, use_reentrant=False)
+                                 for hs, ys in zip(h.split(rows), labels.split(rows)))
+            out.n_targets = (labels != IGNORE_INDEX).sum()
+            out.loss = out.ce_sum / out.n_targets.clamp_min(1)
+        if logits is not None:
+            out.logits = logits.view(*shape, -1)
+        return out
 
     # ------------------------------------------------------------------ internals
+    def _logits(self, h: torch.Tensor) -> torch.Tensor:
+        """Soft-capped fp32 logits."""
+        logits = self.lm_head(h).float()
+        return self.softcap * torch.tanh(logits / self.softcap) if self.softcap > 0 else logits
+
+    def _ce_sum(self, h: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+        return F.cross_entropy(self._logits(h), labels, ignore_index=IGNORE_INDEX, reduction="sum")
+
     def _backend(self, device) -> str:
         b = self.extra["attn_backend"]
         return ("flex" if device.type == "cuda" else "sdpa") if b == "auto" else b

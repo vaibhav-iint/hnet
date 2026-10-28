@@ -202,7 +202,9 @@ def test_end_router_init_rate():
     h = torch.nn.functional.normalize(torch.randn(4000, 64), dim=-1) * 8  # unit RMS
     for name in ("end_linear", "end_mlp"):
         r = registry.build("router", name, 64, target_ratio=4.0)(h, c)
-        assert abs(r.p.mean().item() - 0.25) < 0.05, name
+        # logits ~ N(logit(1/4), 1.5^2): F = Phi(-1.10 / 1.5) = 0.23, G = E[sigmoid] = 0.30
+        assert abs(r.boundary_mask.float().mean().item() - 0.23) < 0.08, name
+        assert abs(r.p.mean().item() - 0.30) < 0.06, name
 
 
 def test_space_like_and_fixed_pool():

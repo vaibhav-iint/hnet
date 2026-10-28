@@ -231,6 +231,7 @@ class Trainer:
         self.logger = MetricsLogger(self.out_dir, self.is_main and not dry_run, self.lc.get("wandb"),
                                     self.lc.get("run_name"), cfg, resume=self.resumed_from is not None)
         self._stop_reason: Optional[str] = None
+        self._zero = torch.zeros((), device=self.device)
         if self.is_main and not dry_run:
             os.makedirs(self.out_dir, exist_ok=True)
             dump_yaml(cfg, os.path.join(self.out_dir, "config.yaml"))
@@ -455,7 +456,7 @@ class Trainer:
                             ce_sum = _get(out, "loss").float() * n_tgt[m]
                         aux = _get(out, "aux_loss")
                         if not isinstance(aux, torch.Tensor):
-                            aux = torch.tensor(float(aux or 0.0), device=self.device)
+                            aux = self._zero if not aux else torch.tensor(float(aux), device=self.device)
                         loss = ce_sum.float() / n_tgt_step + aux.float() / self.accum
                         loss.backward()
                     acc.add("ce_sum", ce_sum)

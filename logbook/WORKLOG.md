@@ -141,3 +141,12 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
 - Coordinator check: tests for SSD, Mamba-2, FLOPs, data and infra give **183 passed, 20 skipped (CUDA)**.
 - **GPU access:** the user chose to ask Prime to enable GPU sandboxes. Until then, all work is CPU-only (local plus
   CPU sandboxes).
+
+### 23:12 · GPU sandbox probe (user: "I've spawned sandboxes via the API before")
+- Tried to create one 10-minute GPU sandbox. Nothing was created and nothing was charged:
+  - team context, RTX_PRO_6000 → HTTP 403 "GPU VM sandboxes require an explicit account grant and are not included in
+    the CPU VM public beta";
+  - team context, H200_141GB → the same 403;
+  - personal context → refused by our budget guard (personal wallet $0.00); the personal account has no sandboxes.
+- The team's three running sandboxes are CPU-only (4 CPU / 16 GB, `terminal-bench-science`). CPU sandboxes work via
+  the API; GPU sandboxes need Prime to enable them for this team.

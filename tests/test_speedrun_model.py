@@ -148,3 +148,24 @@ def test_record_shape_parameter_count():
     D, Vp = 768, 50304
     expected = 5 * Vp * D + 12 * 12 * D * D - 4 * D * D + 12 * 2 + 11 * 2 + 6
     assert n == expected  # ~275M with embeddings, ~85M in blocks
+
+
+def test_chunked_ce_matches_full_logits(monkeypatch):
+    """return_logits=False (the trainer's call) computes the soft-capped CE in checkpointed chunks."""
+    import hnet.model.dense_modded as dm
+
+    model = randomized(ModdedGPT(tiny_cfg()))
+    ids = torch.randint(0, V, (50,))
+    cu = torch.tensor([0, 20, 50], dtype=torch.int32)
+    labels = packed_labels(ids, cu)
+    full = model(ids, cu, labels=labels)
+    full.loss.backward()
+    grads = {n: p.grad.clone() for n, p in model.named_parameters()}
+    model.zero_grad()
+    monkeypatch.setattr(dm, "CE_CHUNK_ELEMENTS", 7 * V)  # 7-row chunks
+    chunked = model(ids, cu, labels=labels, return_logits=False)
+    assert chunked.logits is None
+    torch.testing.assert_close(chunked.ce_sum, full.ce_sum)
+    chunked.loss.backward()
+    for n, p in model.named_parameters():
+        torch.testing.assert_close(p.grad, grads[n], atol=1e-5, rtol=1e-4, msg=n)
