@@ -1,0 +1,4 @@
+# A3 (data multiplier): 1-stage H-Net, constant LR to 5B tok-eq, permanent checkpoints every 0.5B tok-eq.
+include: [_core.yaml, _const.yaml]
+model: {include: ../models/hnet1_small.yaml, lr_multiplier_n_gpt: data}
+train: {out_dir: runs/core/A3_hnet1_small_const, train_tokens: 5.0e9}

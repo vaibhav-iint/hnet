@@ -1,0 +1,41 @@
+# Shared recipe of the core FineWeb-Edu runs (PLAN.md A/B/C). Not a run file (leading underscore).
+# Paper Sec. 3: AdamW (0.9, 0.95), wd 0.1, WSD = 10% linear warmup + 20% inverse-sqrt (1 - sqrt) decay,
+# 256 sequences x 8192 bytes per step (BPE: 256 x 1792 tokens ~ 0.46M tokens). LR rationale: configs/README.md.
+data:
+  source: hnet
+  dataset: finewebedu10B
+  seq_len: 8192
+  micro_batch: 4          # windows per micro-step per GPU; grad_accum = 256 / (micro_batch x GPUs)
+  batch_bytes: 2097152    # 256 x 8192
+  shuffle_buffer: 0
+  cross_window_label: true
+  num_workers: 1
+  prefetch: 4
+train:
+  seed: 0
+  optimizer: adamw
+  lr: 1.5e-3              # paper rule: GPT-3 Small LR (6e-4) x 2.5; same for BPE and H-Net (lr multipliers apply on top for H-Nets)
+  betas: [0.9, 0.95]
+  eps: 1.0e-8
+  weight_decay: 0.1
+  wd_embeddings: true
+  schedule: {name: wsd, warmup: 0.1, decay: 0.2, decay_shape: inverse_sqrt, min_lr_ratio: 0.0}
+  grad_clip: 1.0
+  precision: bf16
+  compile: blocks
+  activation_checkpointing: false
+  ckpt_every: 1000
+  ckpt_keep: 2
+  resume: auto
+eval:
+  every: 1000
+  at_end: true
+  val: standard           # hnet.data.standard_valset: whole FineWeb-Edu val docs, same text for both kinds
+  val_bytes: 10000000
+  val_byte_seq_len: 8192
+  val_token_seq_len: 1792
+  windows_per_batch: 8
+  downstream: {every: 0, suite: paper7, limit: 1000, n_boot: 200}   # at the end only
+log:
+  every: 10
+  wandb: hnet-smollm3     # used only if WANDB_API_KEY is set

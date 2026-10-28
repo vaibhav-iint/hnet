@@ -1,0 +1,5 @@
+# C1: BPE Transformer, GPT-3 Medium shape (350M), 5B tokens, WSD, peak LR 3e-4.
+include: _core_bpe.yaml
+model: {include: ../models/bpe_medium.yaml}
+data: {micro_batch: 4}
+train: {out_dir: runs/scale/C1_bpe_medium, train_tokens: 5.0e9, lr: 7.5e-4}

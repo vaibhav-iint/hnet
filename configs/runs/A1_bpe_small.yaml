@@ -1,0 +1,4 @@
+# A1: BPE Transformer, GPT-3 Small shape (125M), 10B tokens, WSD. Constant-LR twin: A1_bpe_small_const.yaml.
+include: _core_bpe.yaml
+model: {include: ../models/bpe_small.yaml}
+train: {out_dir: runs/core/A1_bpe_small, train_tokens: 1.0e10}

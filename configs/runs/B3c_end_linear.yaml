@@ -1,0 +1,5 @@
+# B3c_end_linear: causal end-of-chunk router, linear head. A2 with one change, constant LR (same as A2_hnet2_small_const), 2.5B tok-eq;
+# compare with A2_hnet2_small_const at its 2.5B checkpoint.
+include: [_core.yaml, _const.yaml]
+model: {include: ../models/hnet2_small_end_linear.yaml, lr_multiplier_n_gpt: data}
+train: {out_dir: runs/ablations/B3c_end_linear, train_tokens: 2.5e9}

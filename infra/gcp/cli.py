@@ -125,6 +125,23 @@ def missing_configs(cmd: str, sha: str, overlay: list[str]) -> list[str]:
     return out
 
 
+def ignored_code(overlay: list[str]) -> list[str]:
+    """Ignored-but-present files under the code dirs (a too-broad .gitignore silently drops them from clones)."""
+    try:
+        r = subprocess.run(["git", "-C", str(C.REPO_ROOT), "ls-files", "-o", "-i", "--exclude-standard", "--",
+                            "hnet", "scripts", "configs", "infra"], capture_output=True, text=True, timeout=30)
+    except Exception:
+        return []
+    out = []
+    for f in r.stdout.splitlines():
+        if "__pycache__" in f or f.endswith((".pyc", ".pt", ".bin", ".safetensors")):
+            continue
+        if any(f == o.rstrip("/") or f.startswith(o.rstrip("/") + "/") for o in overlay):
+            continue
+        out.append(f)
+    return out
+
+
 # ----------------------------------------------------------------------------- launch
 def _parse_env(items) -> dict:
     out = {}
@@ -176,6 +193,10 @@ def cmd_launch(a) -> int:
     if not pushed and not a.allow_unpushed:
         _p(f"refusing: commit {sha[:12]} is not on any remote branch (push it, or --allow-unpushed)")
         return 2
+    ign = ignored_code(a.overlay or [])
+    if ign:
+        _p(f"[warn] {len(ign)} code/config files exist locally but are .gitignored, so the VM's clone lacks them "
+           f"(e.g. {', '.join(ign[:4])}). Fix .gitignore or pass --overlay for the dirs the command needs.")
     missing = missing_configs(a.cmd, sha, a.overlay or [])
     if missing:
         _p(f"refusing: {', '.join(missing)} not in commit {sha[:12]} (untracked or .gitignored?). "

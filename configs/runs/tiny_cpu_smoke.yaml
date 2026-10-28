@@ -1,0 +1,9 @@
+# CPU smoke test (seconds): tiny H-Net on the trainer's built-in synthetic corpus, no shards needed.
+#   python -m hnet.train.train --config configs/runs/tiny_cpu_smoke.yaml
+include: _core.yaml
+model: {include: ../tiny_cpu.yaml}
+data: {source: synthetic, seq_len: 256, micro_batch: 2, batch_bytes: 1024}
+train: {out_dir: runs/tiny/cpu_smoke, steps: 20, lr: 2.0e-3, precision: fp32, compile: false, device: cpu,
+        ckpt_every: 10, schedule: {name: wsd, warmup: 2, decay: 0.2, decay_shape: inverse_sqrt}}
+eval: {every: 10, downstream: null}
+log: {every: 5, wandb: null}

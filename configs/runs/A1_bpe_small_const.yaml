@@ -1,0 +1,4 @@
+# A1 (data multiplier): BPE 125M, constant LR to 10B tokens, permanent checkpoints every 0.5B tokens.
+include: [_core_bpe.yaml, _const.yaml]
+model: {include: ../models/bpe_small.yaml}
+train: {out_dir: runs/core/A1_bpe_small_const, train_tokens: 1.0e10}

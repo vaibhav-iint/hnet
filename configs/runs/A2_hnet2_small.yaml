@@ -1,0 +1,4 @@
+# A2: 2-stage (3,3)-DC H-Net, FLOPs/byte-matched to A1 (configs/MATCHING.md), 5B tok-eq, WSD.
+include: [_core.yaml]
+model: {include: ../models/hnet2_small.yaml, lr_multiplier_n_gpt: data}
+train: {out_dir: runs/core/A2_hnet2_small, train_tokens: 5.0e9}

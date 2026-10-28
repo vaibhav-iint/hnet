@@ -1,0 +1,7 @@
+# Tiny 2-stage H-Net with the blog's (4,2) targets, re-matched to tiny_bpe_2m (main FFN 896).
+include: _core.yaml
+model: {include: ../models/tiny_hnet2_2m_ratios42.yaml, lr_multiplier_n_gpt: data}
+data: {seq_len: 2048, micro_batch: 64, batch_bytes: 131072, n_train_shards: 1}
+train: {out_dir: runs/tiny/tiny_hnet2_2m_ratios42, train_tokens: 5.0e7, lr: 1.5e-3, ckpt_every: 500}
+eval: {every: 250, val_bytes: 1000000, val_byte_seq_len: 2048, val_token_seq_len: 448, downstream: null}
+log: {every: 10, wandb: null}

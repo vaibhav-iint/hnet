@@ -1,0 +1,4 @@
+# A3: 1-stage 6-DC H-Net, matched to A1, 5B tok-eq, WSD.
+include: [_core.yaml]
+model: {include: ../models/hnet1_small.yaml, lr_multiplier_n_gpt: data}
+train: {out_dir: runs/core/A3_hnet1_small, train_tokens: 5.0e9}

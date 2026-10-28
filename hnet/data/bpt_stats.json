@@ -1,0 +1,20 @@
+{
+ "finewebedu10B": {
+  "split": "val",
+  "n_shards": 1,
+  "text_bytes": 461630945,
+  "text_tokens": 99904179,
+  "bytes_per_token": 4.62073708648364,
+  "stream_bytes_per_token": 4.61822586,
+  "doc_bytes_per_token_p50": 4.693410676670087
+ },
+ "fineweb10B": {
+  "split": "val",
+  "n_shards": 1,
+  "text_bytes": 444731310,
+  "text_tokens": 99856503,
+  "bytes_per_token": 4.453704031674332,
+  "stream_bytes_per_token": 4.45018303,
+  "doc_bytes_per_token_p50": 4.446026528667586
+ }
+}

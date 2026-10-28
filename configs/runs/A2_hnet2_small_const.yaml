@@ -1,0 +1,5 @@
+# A2 (data multiplier): 2-stage H-Net, constant LR to 5B tok-eq, permanent checkpoints every 0.5B tok-eq.
+# Also the reference for the B ablations (compare at its 2.5B checkpoint).
+include: [_core.yaml, _const.yaml]
+model: {include: ../models/hnet2_small.yaml, lr_multiplier_n_gpt: data}
+train: {out_dir: runs/core/A2_hnet2_small_const, train_tokens: 5.0e9}

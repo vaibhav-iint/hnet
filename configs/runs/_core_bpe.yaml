@@ -1,0 +1,9 @@
+# BPE (GPT-2 token) data on top of _core.yaml: 256 x 1792-token windows (~8192 bytes each).
+include: _core.yaml
+data:
+  seq_len: 1792
+  micro_batch: 8
+  batch_bytes: null
+  batch_tokens: 458752    # 256 x 1792
+eval:
+  windows_per_batch: 16

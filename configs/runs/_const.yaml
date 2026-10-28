@@ -1,0 +1,6 @@
+# Constant-LR (stable phase only) variant for the data-multiplier measurement (PLAN 3: compare stable vs stable).
+# Fixed 1000-step warmup (~0.46B tok-eq, about 10% of a 5B run), no decay; permanent checkpoints every 0.5B
+# tok-eq (cooldown branches can be started from them later).
+train:
+  schedule: {name: constant, warmup: 1000}
+  ckpt_every_tokens: 5.0e8

@@ -1,0 +1,5 @@
+# B4_tfenc: Transformer encoder/decoder instead of Mamba-2. A2 with one change, constant LR (same as A2_hnet2_small_const), 2.5B tok-eq;
+# compare with A2_hnet2_small_const at its 2.5B checkpoint.
+include: [_core.yaml, _const.yaml]
+model: {include: ../models/hnet2_small_tfenc.yaml, lr_multiplier_n_gpt: data}
+train: {out_dir: runs/ablations/B4_tfenc, train_tokens: 2.5e9}

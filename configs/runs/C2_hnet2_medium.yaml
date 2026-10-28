@@ -1,0 +1,5 @@
+# C2: 2-stage H-Net matched to C1 (swap the model include for the router chosen by B3), 5B tok-eq, WSD, LR 3e-4.
+include: [_core.yaml]
+model: {include: ../models/hnet2_medium.yaml, lr_multiplier_n_gpt: data}
+data: {micro_batch: 2}
+train: {out_dir: runs/scale/C2_hnet2_medium, train_tokens: 5.0e9, lr: 7.5e-4, activation_checkpointing: true}

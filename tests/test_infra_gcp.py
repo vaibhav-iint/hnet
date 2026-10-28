@@ -227,6 +227,9 @@ def test_tracker_reset_after_restart(tmp_path):
             return {"contents": "", "start": 0, "next": fs2.total}
         return fs2.fetch(start)
 
+    nxt = tr.cur["next"]
+    tr.fetch(lambda start: {"contents": "", "start": 0, "next": 0})  # a stopping VM: empty, not a reset
+    assert tr.cur["resets"] == 0 and tr.cur["next"] == nxt
     tr.fetch(fetch)
     assert tr.cur["resets"] == 1 and tr.cur["next"] == fs2.total
     p = S.parse_text(tr.read_raw())

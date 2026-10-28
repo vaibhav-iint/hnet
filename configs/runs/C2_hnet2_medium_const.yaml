@@ -1,0 +1,5 @@
+# C2 (data multiplier): 2-stage H-Net 350M-eq, constant LR 7.5e-4 to 5B tok-eq, checkpoints every 0.5B tok-eq.
+include: [_core.yaml, _const.yaml]
+model: {include: ../models/hnet2_medium.yaml, lr_multiplier_n_gpt: data}
+data: {micro_batch: 2}
+train: {out_dir: runs/scale/C2_hnet2_medium_const, train_tokens: 5.0e9, lr: 7.5e-4, activation_checkpointing: true}

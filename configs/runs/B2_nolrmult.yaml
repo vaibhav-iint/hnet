@@ -1,0 +1,5 @@
+# B2_nolrmult: no per-stage LR multipliers. A2 with one change, constant LR (same as A2_hnet2_small_const), 2.5B tok-eq;
+# compare with A2_hnet2_small_const at its 2.5B checkpoint.
+include: [_core.yaml, _const.yaml]
+model: {include: ../models/hnet2_small_nolrmult.yaml, lr_multiplier_n_gpt: data}
+train: {out_dir: runs/ablations/B2_nolrmult, train_tokens: 2.5e9}

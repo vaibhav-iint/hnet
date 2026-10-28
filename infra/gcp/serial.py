@@ -57,6 +57,8 @@ class SerialTracker:
             r = fetch_fn(want)
             got, nxt, txt = int(r.get("start", want)), int(r.get("next", want)), r.get("contents") or ""
             self.cur["fetches"] += 1
+            if not txt and nxt == 0 and want > 0:
+                break  # stopping/stopped VM answers with an empty buffer: not a reset, keep our offset
             if nxt < want and got < want:
                 # counter restarted (new boot / buffer reset): start over from what is there now
                 mark = f"\n{RESET_MARK} expected>={want} got next={nxt}\n"

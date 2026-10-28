@@ -1,0 +1,5 @@
+# B3b_end_cosine_shift: causal end-of-chunk router, cosine vs predicted next state. A2 with one change, constant LR (same as A2_hnet2_small_const), 2.5B tok-eq;
+# compare with A2_hnet2_small_const at its 2.5B checkpoint.
+include: [_core.yaml, _const.yaml]
+model: {include: ../models/hnet2_small_end_cosine_shift.yaml, lr_multiplier_n_gpt: data}
+train: {out_dir: runs/ablations/B3b_end_cosine_shift, train_tokens: 2.5e9}
