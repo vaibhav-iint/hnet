@@ -9,5 +9,5 @@ model:
   d_intermediate: 256
   num_heads: 2
   extra: {n_value_embeds: 1, skip_attn_layers: [2], window_tokens: [128, 256]}
-data: {kind: tokens, seq_len: 256, batch_tokens: 1024}
+data: {kind: tokens, seq_len: 256, batch_tokens: 1024, eot: 255}
 train: {out_dir: runs/speedrun/tiny_s1_modded}

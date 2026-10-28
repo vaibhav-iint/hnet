@@ -114,3 +114,15 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
   - (b) attach this session to a folder on the user's computer (Remote Control) so pod SSH runs there;
   - (c) last resort: pods with a self-running custom template.
 - CPU sandboxes (≤16 vCPU, ~$1.1/h) work now and can host the 1–10M architecture search.
+
+### 22:55 · WS-C (data pipeline) finished
+- Byte and token shards are aligned per document (verified byte-identical decoding on all sampled documents); 31
+  tests pass.
+- modded-nanogpt shards split documents at shard edges; the converter carries the fragments across.
+- Measured GPT-2 bytes/token: **FineWeb-Edu 4.621**, FineWeb 4.454. The paper's 1792 tokens ↔ 8192 bytes holds.
+- Speedrun targets in bpb: **1.0667** (3.28 nats/token) and **0.9496** (2.92). These are near-equivalents only:
+  modded-nanogpt also counts `<|endoftext|>` predictions.
+- Val-set protocol: whole documents, split at identical text positions for byte and token models; every byte scored
+  once.
+- Decided that both model types use the loader's cross-window label rule; passed to WS-D.
+- Relayed a bf16-autocast backward bug in `ssd.py`, found by WS-A2, to WS-A1.
