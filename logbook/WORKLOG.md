@@ -71,7 +71,7 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
 ### 22:16 · Commit policy
 - The container is ephemeral, so work-in-progress is snapshotted to `main` whenever I stop. These are commits titled
   "WIP snapshot" and may contain partial, untested agent code.
-- Tested integration points get a normal commit message and a `milestone-*` tag.
+- Tested integration points get a normal commit message and a `milestone-*` branch on the remote (tag pushes are blocked by this session's git proxy; tags exist locally only).
 
 ### 22:30 · Reverse-engineering the blog's router (user: "the blog architecture differs; we'll have to guess")
 - Downloaded the blog's chunk-viewer data bundles and parsed them as data. Running the page JS was refused by the
@@ -209,3 +209,15 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
   read via the serial console, and the VM was deleted after ~4 minutes; no VMs of ours remain.
 - The service account can create GPU VMs but cannot write Cloud Storage. Results would come back via serial console
   and guest attributes unless the user grants bucket access.
+
+### 00:05 · GCP runner workstream (WS-H) launched
+- The repo is public, so VMs `git clone` it at a pinned commit. Results come back by streaming metrics lines to the
+  serial console, which we read via the API and rebuild locally as `metrics.jsonl`.
+- Spot VMs stop (not delete) on preemption so they can resume; every VM has a hard `--max-run-duration`.
+- Separate GCP ledger: $300 total, $25 per launch. The live test is capped at 2 spot VMs, ≤ 30 min each, < $3.
+- Rough cost per 1e18 training FLOPs at ~35% MFU:
+  - A100 spot ≈ $3.7 (~$1.45/h, estimate);
+  - L4 spot ≈ $2–2.5 (~$0.3–0.35/h, estimate);
+  - Prime H200 ≈ $5.
+
+  The $455 plan would cost roughly $260 on A100 spot.
