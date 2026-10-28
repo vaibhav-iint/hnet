@@ -129,3 +129,14 @@ def test_activation_checkpointing_same_losses(tmp_path):
         Trainer(load_run_config(base=toy_cfg(out, steps=4, activation_checkpointing=ac, save_final=False))).train()
         runs[ac] = [r["loss"] for r in read_metrics(out)]
     assert runs[True] == pytest.approx(runs[False], rel=1e-6)
+
+
+def test_muon_hook_trains(tmp_path):
+    pytest.importorskip("hnet.optim.muon")
+    cfg = toy_cfg(tmp_path, steps=10, optimizer="muon", save_final=False, muon={"momentum_warmup_steps": 0})
+    tr = Trainer(load_run_config(base=cfg))
+    kinds = {g["kind"] for g in tr.opt.param_groups}
+    assert "muon" in kinds and {g["lr_mult"] for g in tr.opt.param_groups} == {1.0, 2.0}
+    tr.train()
+    m = read_metrics(tmp_path)
+    assert m[-1]["loss"] < m[0]["loss"]

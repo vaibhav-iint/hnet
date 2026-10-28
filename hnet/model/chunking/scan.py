@@ -9,7 +9,8 @@ import torch.nn.functional as F
 def linear_recurrence(u: torch.Tensor, log_a: torch.Tensor, reset: torch.Tensor, block: int = 64) -> torch.Tensor:
     """Solve ``y_i = a_i * y_{i-1} + u_i`` with ``a_i = exp(log_a_i)``, and ``y_i = u_i`` where ``reset_i``.
 
-    u: [M, D] float; log_a: [M] (<= 0); reset: [M] bool. Returns [M, D] in fp32 (fp64 for fp64 inputs). Differentiable w.r.t. u and log_a.
+    u: [M, D] float; log_a: [M] (<= 0); reset: [M] bool. Returns [M, D] in fp32 (fp64 for fp64 inputs).
+    Differentiable w.r.t. u and log_a.
 
     Blocked algorithm: inside each block of ``block`` positions the solution is a lower-triangular matrix of decay
     products applied to u (one batched matmul); the states carried across blocks satisfy the same recurrence on
