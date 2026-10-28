@@ -137,12 +137,16 @@ class FlopsEstimator:
     def __init__(self, model_cfg, model, seq_len: int, kind: str):
         self.cfg, self.seq_len, self.kind = model_cfg, seq_len, kind
         self.n_stages = getattr(model_cfg, "n_stages", 0) if hasattr(model_cfg, "arch_layout") else 0
-        try:
-            from hnet.flops import model_flops  # WS-B
+        self._mf = None
+        from hnet.config import DenseConfig, HNetConfig
 
-            self._mf = model_flops
-        except ImportError:
-            self._mf = None
+        if isinstance(model_cfg, (HNetConfig, DenseConfig)):
+            try:
+                from hnet.flops import model_flops  # WS-B
+
+                self._mf = model_flops
+            except ImportError:
+                pass
         from hnet.optim.groups import classify_params
 
         self._stage_params = {}

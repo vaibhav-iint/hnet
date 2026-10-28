@@ -104,6 +104,44 @@ def _segsum(a: torch.Tensor) -> torch.Tensor:
     return seg.masked_fill(idx[:, None] < idx[None, :], -math.inf)
 
 
+def _decay_matrix(a: torch.Tensor, drop: torch.Tensor) -> torch.Tensor:
+    """exp(a[..., l] - a[..., s]) for kept (l, s) pairs, exactly 0 where ``drop``. a: [..., Q] -> [..., Q, Q].
+
+    The difference is masked to -inf *before* exp, so dropped (acausal) entries can never overflow.
+    """
+    seg = a[..., :, None] - a[..., None, :]
+    return seg.masked_fill_(drop, -math.inf).exp_()
+
+
+class _IntraChunk(torch.autograd.Function):
+    """Diagonal blocks of SSD: y[l] = sum_s CB[l, s] exp(a[l] - a[s]) xdt[s] over kept pairs (s <= l, same segment).
+
+    CB [b, g, c, Q, Q] (shared by the heads of a group), a [b, g, e, c, Q] (in-chunk cumulative log-decay),
+    xdt [b, g, e, c, Q, p], drop: bool, broadcastable to [b, g, e, c, Q, Q]. Returns [b, g, e, c, Q, p].
+
+    The [b, h, c, Q, Q] decay matrix is recomputed in backward instead of being saved, so autograd keeps no
+    tensor larger than the inputs (this is what makes the pure-torch path memory-lean).
+    """
+
+    @staticmethod
+    def forward(ctx, CB, a, xdt, drop):
+        M = _decay_matrix(a, drop).mul_(CB.unsqueeze(2))
+        ctx.save_for_backward(CB, a, xdt, drop)
+        return M @ xdt
+
+    @staticmethod
+    @torch.autograd.function.once_differentiable
+    def backward(ctx, gy):
+        CB, a, xdt, drop = ctx.saved_tensors
+        decay = _decay_matrix(a, drop)
+        dM = (gy @ xdt.transpose(-1, -2)).mul_(decay)  # dL/dM * decay
+        dCB = dM.sum(dim=2)
+        dseg = dM.mul_(CB.unsqueeze(2))  # dL/d(a_l - a_s) = dL/dM * M
+        da = dseg.sum(dim=-1) - dseg.sum(dim=-2)
+        dxdt = decay.mul_(CB.unsqueeze(2)).transpose(-1, -2) @ gy
+        return dCB, da, dxdt, None
+
+
 def ssd_chunk_scan_torch(
     x: torch.Tensor,
     dt: torch.Tensor,
@@ -121,9 +159,11 @@ def ssd_chunk_scan_torch(
 ):
     """Pure-PyTorch :func:`ssd_chunk_scan` (same arguments and results).
 
-    Notation: b batch, c chunks, l/s positions in a chunk (Q = chunk_size), g groups, e heads per group,
-    p headdim, n d_state. Work is O(L Q (n + p) h) for the intra-chunk part plus O((L/Q)^2 h p n) for the
-    matrix-form chunk recurrence; the largest intermediates are [b, c, h, Q, Q].
+    Notation: b batch, c chunks, l/s positions in a chunk (Q = chunk_size), g groups, e heads per group, p headdim,
+    n d_state. Internally everything is laid out head-major, [b, g, e, c, Q, ...], so each step is one batched
+    matmul. Cost: O(L Q h (n + p)) for the intra-chunk blocks plus O((L/Q)^2 h p n) for the matrix-form chunk
+    recurrence (negligible for Q >= 64 at L <= 16k). Transient memory peaks at a few [b, h, L/Q, Q, Q] tensors;
+    autograd saves only O(L h (p + n)) per call.
     """
     bsz, seqlen, nheads, headdim = x.shape
     ngroups, dstate = B.shape[-2:]
@@ -131,10 +171,9 @@ def ssd_chunk_scan_torch(
     assert dt.shape == (bsz, seqlen, nheads) and A.shape == (nheads,)
     assert B.shape == C.shape == (bsz, seqlen, ngroups, dstate)
     hpg = nheads // ngroups
-    out_dtype = x.dtype
     f = torch.float64 if x.dtype == torch.float64 else torch.float32
 
-    # Time steps and per-position log-decays, fp32.
+    # Time steps, fp32.
     dt = dt.to(f)
     if dt_bias is not None:
         dt = dt + dt_bias.to(f)
@@ -142,78 +181,68 @@ def ssd_chunk_scan_torch(
         dt = F.softplus(dt)  # threshold 20, like the kernel
     dt = dt.clamp(min=dt_limit[0], max=dt_limit[1])
 
-    # Pad to a multiple of chunk_size. Padded positions get dt = 0 (identity decay, no input), and inherit the
-    # last segment id, so the final state is the state after the last real position.
+    # Pad to a multiple of chunk_size. Padded positions get dt = 0 (identity decay, no input) and inherit the last
+    # segment id, so the final state is the state after the last real position.
     pad = (-seqlen) % chunk_size
     nchunks = (seqlen + pad) // chunk_size
+    Q = chunk_size
 
-    def chunked(t):  # [b, L, ...] -> [b, c, Q, ...]
+    def head_major(t, inner):  # [b, L, g * e', *inner] -> [b, g, e', c, Q, *inner] (contiguous)
         if pad:
             t = F.pad(t, (0, 0) * (t.dim() - 2) + (0, pad))
-        return t.reshape(bsz, nchunks, chunk_size, *t.shape[2:])
+        t = t.reshape(bsz, nchunks, Q, ngroups, -1, *inner)
+        return t.permute(0, 3, 4, 1, 2, *range(5, t.dim())).contiguous()
 
-    xc = chunked(x.to(f)).view(bsz, nchunks, chunk_size, ngroups, hpg, headdim)
-    dtc = chunked(dt).view(bsz, nchunks, chunk_size, ngroups, hpg)
-    Bc = chunked(B.to(f))
-    Cc = chunked(C.to(f))
-    xdt = xc * dtc[..., None]  # [b, c, l, g, e, p]
-    # Cumulative log-decay inside each chunk, laid out [b, c, g, e, l].
-    a_cs = (dtc * A.to(f).view(ngroups, hpg)).permute(0, 1, 3, 4, 2).cumsum(dim=-1)
-    a_last = a_cs[..., -1]  # [b, c, g, e]: total log-decay of each chunk
+    xdt = head_major(x * dt[..., None], (headdim,))  # [b, g, e, c, Q, p], fp32 by type promotion
+    Bh = head_major(B.to(f), (dstate,))  # [b, g, 1, c, Q, n]
+    Ch = head_major(C.to(f), (dstate,))
+    a = head_major(dt * A.to(f), ()).cumsum(dim=-1)  # [b, g, e, c, Q]: in-chunk cumulative log-decay
+    a_last = a[..., -1]  # [b, g, e, c]: total log-decay of each chunk
 
-    # Segment masks (None without seq_idx): same[b, c, l, s], at_end[b, c, l] (same segment as the chunk's last
-    # position), from_prev[b, c, l] (same segment as the previous chunk's last position), chunk_eq[b, c, c'].
+    pos = torch.arange(Q, device=x.device)
+    drop = pos[:, None] < pos[None, :]  # [l, s]: acausal pairs
     if seq_idx is not None:
+        # Contiguous segments: position t sees s only if seq_idx[s] == seq_idx[t]; a chunk's state belongs to the
+        # segment of the chunk's last position.
         sid = seq_idx.to(torch.long)
         if pad:
             sid = torch.cat([sid, sid[:, -1:].expand(bsz, pad)], dim=1)
-        sid = sid.view(bsz, nchunks, chunk_size)
-        sid_end = sid[:, :, -1]  # [b, c]
-        same = sid[:, :, :, None] == sid[:, :, None, :]
-        at_end = sid == sid_end[:, :, None]
-        sid_prev_end = torch.cat([sid_end[:, :1], sid_end[:, :-1]], dim=1)
-        from_prev = sid == sid_prev_end[:, :, None]
-        chunk_eq = sid_end[:, :, None] == sid_end[:, None, :]
+        sid = sid.view(bsz, 1, 1, nchunks, Q)
+        sid_end = sid[..., -1]  # [b, 1, 1, c]
+        sid_prev_end = torch.cat([sid_end[..., :1], sid_end[..., :-1]], dim=-1)
+        drop = drop | (sid[..., :, None] != sid[..., None, :])  # [b, 1, 1, c, l, s]
 
-    # 1) Intra-chunk (diagonal blocks): y_l = sum_{s<=l} (C_l . B_s) exp(a_cs_l - a_cs_s) dt_s x_s.
-    pos = torch.arange(chunk_size, device=x.device)
-    keep = pos[:, None] >= pos[None, :]  # [l, s] causal
+    # 1) Intra-chunk (diagonal blocks).
+    CB = Ch.squeeze(2) @ Bh.squeeze(2).transpose(-1, -2)  # [b, g, c, l, s]
+    y = _IntraChunk.apply(CB, a, xdt, drop)
+
+    # 2) Each chunk's own end state: S_c = sum_s exp(a_last - a_s) B_s^T xdt_s, stored as [n, p].
+    decay_to_end = torch.exp(a_last[..., None] - a)
     if seq_idx is not None:
-        keep = keep & same  # [b, c, l, s]
-        keep = keep[:, :, None, None]  # [b, c, 1, 1, l, s]
-    CB = torch.einsum("bclgn,bcsgn->bcgls", Cc, Bc)  # shared by the heads of a group
-    decay = a_cs[..., :, None] - a_cs[..., None, :]  # [b, c, g, e, l, s]
-    decay = torch.exp(decay.masked_fill(~keep, -math.inf))
-    y = torch.einsum("bcgels,bcsgep->bclgep", CB[:, :, :, None] * decay, xdt)
+        decay_to_end = decay_to_end * (sid == sid_end[..., None])
+    states = Bh.transpose(-1, -2) @ (xdt * decay_to_end[..., None])  # [b, g, e, c, n, p]
 
-    # 2) State of each chunk (from its own inputs only): S_c = sum_s exp(a_last - a_cs_s) dt_s x_s B_s^T.
-    decay_to_end = torch.exp(a_last[..., None] - a_cs)  # [b, c, g, e, l]
+    # 3) Chunk recurrence in matrix form: row i is the state entering chunk i (row c is the final state) =
+    #    sum_{j < i} exp(sum of chunk log-decays strictly between j and i) S_j.
+    w = _segsum(F.pad(a_last, (1, 0)))[..., 1:]  # [b, g, e, c + 1, c]
     if seq_idx is not None:
-        decay_to_end = decay_to_end * at_end[:, :, None, None]
-    states = torch.einsum("bclgep,bclgn->bcgepn", xdt * decay_to_end.permute(0, 1, 4, 2, 3)[..., None], Bc)
+        w = w.masked_fill(F.pad(sid_end[..., :, None] != sid_end[..., None, :], (0, 0, 1, 0), value=True), -math.inf)
+    states = (torch.exp(w) @ states.flatten(-2)).unflatten(-1, (dstate, headdim))  # [b, g, e, c + 1, n, p]
 
-    # 3) Inter-chunk recurrence in matrix form. Row i of `w` gives the state entering chunk i (row nchunks =
-    #    final state): sum over earlier chunks j of exp(sum of chunk log-decays strictly between them) S_j.
-    w = _segsum(F.pad(a_last.permute(0, 2, 3, 1), (1, 0)))[..., 1:]  # [b, g, e, c+1, c]
+    # 4) Incoming-state contribution (off-diagonal blocks): y_l += exp(a_l) C_l S_in.
+    decay_in = torch.exp(a)
     if seq_idx is not None:
-        w = w.masked_fill(~F.pad(chunk_eq, (0, 0, 1, 0))[:, None, None], -math.inf)
-    states = torch.einsum("bgeij,bjgepn->bigepn", torch.exp(w), states)  # [b, c+1, g, e, p, n]
+        decay_in = decay_in * (sid == sid_prev_end[..., None])
+    y = torch.addcmul(y, Ch @ states[..., :-1, :, :], decay_in[..., None])
 
-    # 4) Contribution of the incoming state (off-diagonal blocks): y_l += exp(a_cs_l) C_l . S_in.
-    decay_in = torch.exp(a_cs)  # [b, c, g, e, l]
-    if seq_idx is not None:
-        decay_in = decay_in * from_prev[:, :, None, None]
-    y_off = torch.einsum("bclgn,bcgepn->bclgep", Cc, states[:, :-1])
-    y = y + y_off * decay_in.permute(0, 1, 4, 2, 3)[..., None]
-
-    y = y.reshape(bsz, nchunks * chunk_size, nheads, headdim)[:, :seqlen]
+    # Back to [b, L, h, p]; skip connection and gate.
+    y = y.permute(0, 3, 4, 1, 2, 5).reshape(bsz, nchunks * Q, nheads, headdim)[:, :seqlen]
     if D is not None:
-        Df = D.to(f)
-        y = y + x.to(f) * (Df[:, None] if Df.dim() == 1 else Df)
+        y = y + x * (D.to(f)[:, None] if D.dim() == 1 else D.to(f))
     if z is not None:
         y = y * F.silu(z.to(f))
-    y = y.to(out_dtype)
+    y = y.to(x.dtype)
     if return_final_states:
-        final = states[:, -1].reshape(bsz, nheads, headdim, dstate).to(C.dtype)
-        return y, final
+        final = states[..., -1, :, :].transpose(-1, -2).reshape(bsz, nheads, headdim, dstate)
+        return y, final.to(C.dtype)
     return y

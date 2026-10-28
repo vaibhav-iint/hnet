@@ -114,53 +114,44 @@ def evaluate_task(scorer, task: Task, limit: Optional[int] = None, n_boot: int =
     return summarize_task(task, recs, n_boot, seed), recs
 
 
+def _leaf_weights(name, derived, w=1.0):
+    if name in derived:
+        subs = derived[name]
+        return [lw for sname in subs for lw in _leaf_weights(sname, derived, w / len(subs))]
+    return [(name, w)]
+
+
 def _averages(suite: str, tasks: Dict[str, Task], recs: Dict[str, List[dict]], n_boot: int, seed: int) -> dict:
-    """Suite averages and derived tasks (e.g. smollm3 ARC = mean(easy, challenge)), with joint bootstrap CIs."""
+    """Suite averages and derived tasks (e.g. smollm3 ARC = mean(easy, challenge)), with joint bootstrap CIs.
+    ``<avg>/primary`` uses each task's primary metric; ``<avg>/<metric>`` uses that metric where a task has it
+    (accuracy averages fall back to the task's primary metric, e.g. LAMBADA acc; soft_bpb/acc_norm_token
+    averages are skipped unless every task has them)."""
     fns = {name: _stat_fns(tasks[name], recs[name]) for name in tasks}
     derived = DERIVED.get(suite, {})
     out = {"derived": {}, "averages": {}}
-
-    def parts(name, metric, w=1.0):
-        if name in derived:
-            subs = derived[name]
-            return [p for s in subs for p in parts(s, metric, w / len(subs))]
-        if name not in fns:
-            return None
-        m = metric if metric in fns[name] else tasks[name].primary
-        f, n, g = fns[name][m]
-        return [(f, n, g, w)]
-
     for name, subs in derived.items():
-        if all(s in fns for s in subs):
-            out["derived"][name] = {}
-            for m in set(fns[subs[0]]) & set(fns[subs[1]]):
-                out["derived"][name][m] = st.average_ci(parts(name, m), n_boot=n_boot, seed=seed)
+        leaves = _leaf_weights(name, derived)
+        if all(l in fns for l, _ in leaves):
+            common = set.intersection(*[set(fns[l]) for l, _ in leaves])
+            out["derived"][name] = {m: st.average_ci([fns[l][m] + (w,) for l, w in leaves], n_boot=n_boot, seed=seed)
+                                    for m in sorted(common)}
     for avg_name, names in SUITE_AVERAGES.get(suite, {}).items():
-        if not all(parts(n, "acc") is not None for n in names):
+        leaves = [lw for n in names for lw in _leaf_weights(n, derived)]
+        if not all(l in fns for l, _ in leaves):
             continue
-        metric_sets = {"primary": None, "acc_norm_char": "acc_norm_char", "acc_norm_token": "acc_norm_token",
-                       "acc": "acc", "soft_bpb": "soft_bpb"}
-        for label, metric in metric_sets.items():
+        for label in ("primary", "acc", "acc_norm_char", "acc_norm_token", "soft_bpb"):
             comps = []
-            for n in names:
-                if metric is None:
-                    t = tasks[n] if n in tasks else tasks[derived[n][0]]
-                    comps += parts(n, t.primary)
-                else:
-                    ps = parts(n, metric)
-                    # LAMBADA has no acc_norm/soft_bpb: fall back to its primary metric for accuracy averages
-                    if any(metric not in fns[k] for k in _leaves(n, derived)):
-                        if metric in ("soft_bpb", "acc_norm_token"):
-                            comps = None
-                            break
-                    comps += ps
+            for leaf, w in leaves:
+                m = tasks[leaf].primary if label == "primary" else label
+                if m not in fns[leaf]:
+                    if label in ("soft_bpb", "acc_norm_token"):
+                        comps = None
+                        break
+                    m = tasks[leaf].primary
+                comps.append(fns[leaf][m] + (w,))
             if comps:
                 out["averages"][f"{avg_name}/{label}"] = st.average_ci(comps, n_boot=n_boot, seed=seed)
     return out
-
-
-def _leaves(name, derived):
-    return [l for s in derived[name] for l in _leaves(s, derived)] if name in derived else [name]
 
 
 def evaluate_suite(scorer, suite: str, tasks: Optional[List[str]] = None, limit: Optional[int] = None,

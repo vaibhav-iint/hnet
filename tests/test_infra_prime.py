@@ -197,7 +197,7 @@ def test_pod_offers_sorted_and_filtered():
     assert best.gpu_count == 1 and best.price_hr == pytest.approx(5.41)
     sb = O.sandbox_offers(None, offs)
     h200 = [o for o in sb if o.gpu_type == "H200_141GB"][0]
-    assert h200.per_gpu_hr == pytest.approx(5.41) and "unknown" in h200.note
+    assert h200.per_gpu_hr == pytest.approx(40.01 / 8) and "unknown" in h200.note  # cheapest per GPU
     assert "A100_80GB" in O.format_table(offs)
 
 
@@ -239,8 +239,7 @@ def fake(monkeypatch):
     fb = FakeBackend()
     monkeypatch.setattr(cli, "_backend", lambda kind: fb)
     monkeypatch.setattr(cli, "wallet_info", lambda ids=None: {"balance": 1000.0, "billed": {}})
-    monkeypatch.setattr(O, "pod_offers", lambda gpu=None, client=None, include_cpu=False:
-                        FakeAvail and O_offers_cache)
+    monkeypatch.setattr(O, "pod_offers", lambda gpu=None, client=None, include_cpu=False: O_offers_cache)
     return fb
 
 

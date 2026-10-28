@@ -133,8 +133,11 @@ def _flex_block_mask(seq_idx: torch.Tensor, n_blocks: torch.Tensor):
     docs_low = docs.view(nb, BLOCK_SIZE)[:, 0].contiguous()
     docs_high = docs.view(nb, BLOCK_SIZE)[:, -1].contiguous()
 
-    def document_causal(b, h, q_idx, kv_idx):
-        return (q_idx >= kv_idx) & (docs[q_idx] == docs[kv_idx])
+    def document_causal_window(b, h, q_idx, kv_idx):
+        # The window is also enforced by the block structure below (record); repeating it here keeps uncompiled
+        # flex_attention, which ignores block sparsity and evaluates only mask_mod, exact.
+        in_window = q_idx // BLOCK_SIZE - kv_idx // BLOCK_SIZE < n_blocks
+        return (q_idx >= kv_idx) & (docs[q_idx] == docs[kv_idx]) & in_window
 
     def dense_to_ordered(dense: torch.Tensor):
         num = dense.sum(dim=-1, dtype=torch.int32)
@@ -150,7 +153,7 @@ def _flex_block_mask(seq_idx: torch.Tensor, n_blocks: torch.Tensor):
     full = (q_blk > kv_blk) & window & one_doc  # whole block visible: no mask_mod evaluation needed
     kv_num, kv_idx = dense_to_ordered(partial & ~full)
     full_num, full_idx = dense_to_ordered(full)
-    return BlockMask.from_kv_blocks(kv_num, kv_idx, full_num, full_idx, BLOCK_SIZE=BLOCK_SIZE, mask_mod=document_causal)
+    return BlockMask.from_kv_blocks(kv_num, kv_idx, full_num, full_idx, BLOCK_SIZE=BLOCK_SIZE, mask_mod=document_causal_window)
 
 
 _FLEX = None

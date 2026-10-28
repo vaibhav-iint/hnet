@@ -130,6 +130,8 @@ def param_groups(
         s = d["stage"]
         if mults is None:
             m = 1.0
+        elif len(mults) == 1:  # dense / isotropic: one multiplier for everything
+            m = float(mults[0])
         else:
             assert s < len(mults), f"param {name} has stage {s} but only {len(mults)} lr multipliers"
             m = float(mults[s])

@@ -173,40 +173,52 @@ def mlp_flops(d: int, f: int, cv: FlopsConvention) -> float:
     return 6 * d * round_up(f) + (5 * d if cv.count_elementwise else 0)
 
 
-# Router parameter / FLOP counts by registry name: name -> fn(d, kwargs) -> (params, forward FLOPs per position).
-# cosine_lookahead = paper (q/k projections, d x d each, no bias). MLP routers: fc1 d->h (+bias), fc2 h->1 (+bias).
-# Names not listed here are counted by instantiating the registered router on the meta device (no memory);
-# tests/test_flops.py::test_params_match_model checks every config against hnet.model.build_model.
-def _mlp_router(d, kw):
-    h = kw.get("d_hidden") or d
-    return d * h + h + h + 1, 2 * (d * h + h)
+# Router parameter / FLOP counts. Routers are tiny and their implementations evolve, so the exact parameter count is
+# taken from the registered implementation built on the meta device (no memory, no weights) when hnet.model is
+# importable; FLOPs per position = 2 x params (all router params are matmul weights, biases are negligible).
+# ROUTER_COUNTS is the fallback without hnet.model: name -> fn(d, kwargs) -> params.
+def _mlp_router(default_hidden):
+    def f(d, kw):
+        h = kw.get("d_hidden") or default_hidden(d)
+        return d * h + h + h + 1
+
+    return f
 
 
 ROUTER_COUNTS = {
-    "cosine_lookahead": lambda d, kw: (2 * d * d, 4 * d * d),
-    "end_cosine_shift": lambda d, kw: (2 * d * d, 4 * d * d),  # TODO(interface): assumed q/k like the paper
-    "causal_end_of_chunk": _mlp_router,
-    "end_mlp": _mlp_router,
-    "end_linear": lambda d, kw: (d + 1, 2 * d),
-    "fixed_pool": lambda d, kw: (0, 0),
-    "space_like": lambda d, kw: (0, 0),
-    "external": lambda d, kw: (0, 0),
+    "cosine_lookahead": lambda d, kw: 2 * d * d,
+    "end_cosine_shift": lambda d, kw: 2 * d * d,
+    "causal_end_of_chunk": _mlp_router(lambda d: max(d // 4, 16)),
+    "end_mlp": _mlp_router(lambda d: max(d // 4, 16)),
+    "end_linear": lambda d, kw: d + 1,
+    "fixed_pool": lambda d, kw: 0,
+    "space_like": lambda d, kw: 0,
+    "external": lambda d, kw: 0,
 }
+_ROUTER_CACHE: dict = {}
+
+
+def _router_from_registry(name, d, kwargs, target_ratio):
+    key = (name, d, repr(sorted((kwargs or {}).items())), target_ratio)
+    if key not in _ROUTER_CACHE:
+        try:
+            import torch
+
+            import hnet.model  # noqa: F401  (registers the built-in routers)
+            from hnet.registry import build
+
+            with torch.device("meta"):
+                r = build("router", name, d, target_ratio=target_ratio, **(kwargs or {}))
+            _ROUTER_CACHE[key] = sum(x.numel() for x in r.parameters())
+        except Exception:  # hnet.model not available (or router not registered): use the table
+            _ROUTER_CACHE[key] = None
+    return _ROUTER_CACHE[key]
 
 
 def _router_counts(name: str, d: int, kwargs: dict, target_ratio=None):
-    if name in ROUTER_COUNTS:
-        return ROUTER_COUNTS[name](d, kwargs or {})
-    try:  # exact count from the registered implementation, built on the meta device
-        import torch
-
-        from hnet.registry import build
-
-        with torch.device("meta"):
-            r = build("router", name, d, target_ratio=target_ratio, **(kwargs or {}))
-        p = sum(x.numel() for x in r.parameters())
-    except Exception:  # pragma: no cover - unknown router and no implementation available
-        p = 2 * d * d
+    p = _router_from_registry(name, d, kwargs, target_ratio)
+    if p is None:
+        p = ROUTER_COUNTS[name](d, kwargs or {}) if name in ROUTER_COUNTS else 2 * d * d
     return p, 2 * p
 
 

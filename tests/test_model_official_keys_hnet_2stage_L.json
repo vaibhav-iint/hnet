@@ -1,0 +1,1170 @@
+{
+"embeddings.weight": [
+256,
+1024
+],
+"backbone.encoder.layers.0.mixer.dt_bias": [
+32
+],
+"backbone.encoder.layers.0.mixer.A_log": [
+32
+],
+"backbone.encoder.layers.0.mixer.D": [
+32
+],
+"backbone.encoder.layers.0.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.encoder.layers.0.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.encoder.layers.0.mixer.conv1d.bias": [
+2304
+],
+"backbone.encoder.layers.0.mixer.norm.weight": [
+2048
+],
+"backbone.encoder.layers.0.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.encoder.layers.0.norm1.weight": [
+1024
+],
+"backbone.encoder.layers.1.mixer.dt_bias": [
+32
+],
+"backbone.encoder.layers.1.mixer.A_log": [
+32
+],
+"backbone.encoder.layers.1.mixer.D": [
+32
+],
+"backbone.encoder.layers.1.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.encoder.layers.1.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.encoder.layers.1.mixer.conv1d.bias": [
+2304
+],
+"backbone.encoder.layers.1.mixer.norm.weight": [
+2048
+],
+"backbone.encoder.layers.1.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.encoder.layers.1.norm1.weight": [
+1024
+],
+"backbone.encoder.layers.2.mixer.dt_bias": [
+32
+],
+"backbone.encoder.layers.2.mixer.A_log": [
+32
+],
+"backbone.encoder.layers.2.mixer.D": [
+32
+],
+"backbone.encoder.layers.2.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.encoder.layers.2.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.encoder.layers.2.mixer.conv1d.bias": [
+2304
+],
+"backbone.encoder.layers.2.mixer.norm.weight": [
+2048
+],
+"backbone.encoder.layers.2.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.encoder.layers.2.norm1.weight": [
+1024
+],
+"backbone.encoder.layers.3.mixer.dt_bias": [
+32
+],
+"backbone.encoder.layers.3.mixer.A_log": [
+32
+],
+"backbone.encoder.layers.3.mixer.D": [
+32
+],
+"backbone.encoder.layers.3.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.encoder.layers.3.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.encoder.layers.3.mixer.conv1d.bias": [
+2304
+],
+"backbone.encoder.layers.3.mixer.norm.weight": [
+2048
+],
+"backbone.encoder.layers.3.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.encoder.layers.3.norm1.weight": [
+1024
+],
+"backbone.encoder.rmsnorm.weight": [
+1024
+],
+"backbone.main_network.encoder.layers.0.mixer.Wqkv.weight": [
+3072,
+1024
+],
+"backbone.main_network.encoder.layers.0.mixer.out_proj.weight": [
+1024,
+1024
+],
+"backbone.main_network.encoder.layers.0.norm1.weight": [
+1024
+],
+"backbone.main_network.encoder.layers.0.mlp.fc1.weight": [
+5632,
+1024
+],
+"backbone.main_network.encoder.layers.0.mlp.fc2.weight": [
+1024,
+2816
+],
+"backbone.main_network.encoder.layers.0.norm2.weight": [
+1024
+],
+"backbone.main_network.encoder.layers.1.mixer.dt_bias": [
+32
+],
+"backbone.main_network.encoder.layers.1.mixer.A_log": [
+32
+],
+"backbone.main_network.encoder.layers.1.mixer.D": [
+32
+],
+"backbone.main_network.encoder.layers.1.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.main_network.encoder.layers.1.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.main_network.encoder.layers.1.mixer.conv1d.bias": [
+2304
+],
+"backbone.main_network.encoder.layers.1.mixer.norm.weight": [
+2048
+],
+"backbone.main_network.encoder.layers.1.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.main_network.encoder.layers.1.norm1.weight": [
+1024
+],
+"backbone.main_network.encoder.layers.2.mixer.dt_bias": [
+32
+],
+"backbone.main_network.encoder.layers.2.mixer.A_log": [
+32
+],
+"backbone.main_network.encoder.layers.2.mixer.D": [
+32
+],
+"backbone.main_network.encoder.layers.2.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.main_network.encoder.layers.2.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.main_network.encoder.layers.2.mixer.conv1d.bias": [
+2304
+],
+"backbone.main_network.encoder.layers.2.mixer.norm.weight": [
+2048
+],
+"backbone.main_network.encoder.layers.2.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.main_network.encoder.layers.2.norm1.weight": [
+1024
+],
+"backbone.main_network.encoder.layers.3.mixer.dt_bias": [
+32
+],
+"backbone.main_network.encoder.layers.3.mixer.A_log": [
+32
+],
+"backbone.main_network.encoder.layers.3.mixer.D": [
+32
+],
+"backbone.main_network.encoder.layers.3.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.main_network.encoder.layers.3.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.main_network.encoder.layers.3.mixer.conv1d.bias": [
+2304
+],
+"backbone.main_network.encoder.layers.3.mixer.norm.weight": [
+2048
+],
+"backbone.main_network.encoder.layers.3.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.main_network.encoder.layers.3.norm1.weight": [
+1024
+],
+"backbone.main_network.encoder.layers.4.mixer.dt_bias": [
+32
+],
+"backbone.main_network.encoder.layers.4.mixer.A_log": [
+32
+],
+"backbone.main_network.encoder.layers.4.mixer.D": [
+32
+],
+"backbone.main_network.encoder.layers.4.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.main_network.encoder.layers.4.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.main_network.encoder.layers.4.mixer.conv1d.bias": [
+2304
+],
+"backbone.main_network.encoder.layers.4.mixer.norm.weight": [
+2048
+],
+"backbone.main_network.encoder.layers.4.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.main_network.encoder.layers.4.norm1.weight": [
+1024
+],
+"backbone.main_network.encoder.rmsnorm.weight": [
+1024
+],
+"backbone.main_network.main_network.pad_dimension": [
+512
+],
+"backbone.main_network.main_network.main_network.layers.0.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.0.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.0.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.0.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.0.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.0.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.1.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.1.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.1.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.1.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.1.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.1.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.2.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.2.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.2.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.2.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.2.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.2.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.3.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.3.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.3.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.3.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.3.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.3.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.4.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.4.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.4.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.4.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.4.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.4.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.5.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.5.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.5.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.5.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.5.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.5.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.6.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.6.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.6.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.6.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.6.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.6.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.7.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.7.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.7.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.7.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.7.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.7.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.8.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.8.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.8.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.8.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.8.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.8.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.9.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.9.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.9.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.9.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.9.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.9.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.10.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.10.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.10.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.10.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.10.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.10.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.11.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.11.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.11.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.11.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.11.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.11.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.12.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.12.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.12.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.12.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.12.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.12.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.13.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.13.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.13.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.13.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.13.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.13.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.14.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.14.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.14.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.14.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.14.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.14.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.15.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.15.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.15.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.15.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.15.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.15.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.16.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.16.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.16.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.16.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.16.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.16.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.17.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.17.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.17.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.17.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.17.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.17.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.18.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.18.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.18.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.18.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.18.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.18.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.19.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.19.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.19.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.19.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.19.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.19.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.20.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.20.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.20.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.20.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.20.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.20.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.21.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.21.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.21.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.21.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.21.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.21.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.22.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.22.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.22.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.22.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.22.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.22.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.23.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.23.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.23.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.23.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.23.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.23.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.24.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.24.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.24.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.24.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.24.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.24.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.25.mixer.Wqkv.weight": [
+4608,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.25.mixer.out_proj.weight": [
+1536,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.25.norm1.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.layers.25.mlp.fc1.weight": [
+8192,
+1536
+],
+"backbone.main_network.main_network.main_network.layers.25.mlp.fc2.weight": [
+1536,
+4096
+],
+"backbone.main_network.main_network.main_network.layers.25.norm2.weight": [
+1536
+],
+"backbone.main_network.main_network.main_network.rmsnorm.weight": [
+1536
+],
+"backbone.main_network.decoder.layers.0.mixer.dt_bias": [
+32
+],
+"backbone.main_network.decoder.layers.0.mixer.A_log": [
+32
+],
+"backbone.main_network.decoder.layers.0.mixer.D": [
+32
+],
+"backbone.main_network.decoder.layers.0.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.main_network.decoder.layers.0.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.main_network.decoder.layers.0.mixer.conv1d.bias": [
+2304
+],
+"backbone.main_network.decoder.layers.0.mixer.norm.weight": [
+2048
+],
+"backbone.main_network.decoder.layers.0.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.main_network.decoder.layers.0.norm1.weight": [
+1024
+],
+"backbone.main_network.decoder.layers.1.mixer.dt_bias": [
+32
+],
+"backbone.main_network.decoder.layers.1.mixer.A_log": [
+32
+],
+"backbone.main_network.decoder.layers.1.mixer.D": [
+32
+],
+"backbone.main_network.decoder.layers.1.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.main_network.decoder.layers.1.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.main_network.decoder.layers.1.mixer.conv1d.bias": [
+2304
+],
+"backbone.main_network.decoder.layers.1.mixer.norm.weight": [
+2048
+],
+"backbone.main_network.decoder.layers.1.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.main_network.decoder.layers.1.norm1.weight": [
+1024
+],
+"backbone.main_network.decoder.layers.2.mixer.dt_bias": [
+32
+],
+"backbone.main_network.decoder.layers.2.mixer.A_log": [
+32
+],
+"backbone.main_network.decoder.layers.2.mixer.D": [
+32
+],
+"backbone.main_network.decoder.layers.2.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.main_network.decoder.layers.2.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.main_network.decoder.layers.2.mixer.conv1d.bias": [
+2304
+],
+"backbone.main_network.decoder.layers.2.mixer.norm.weight": [
+2048
+],
+"backbone.main_network.decoder.layers.2.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.main_network.decoder.layers.2.norm1.weight": [
+1024
+],
+"backbone.main_network.decoder.layers.3.mixer.dt_bias": [
+32
+],
+"backbone.main_network.decoder.layers.3.mixer.A_log": [
+32
+],
+"backbone.main_network.decoder.layers.3.mixer.D": [
+32
+],
+"backbone.main_network.decoder.layers.3.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.main_network.decoder.layers.3.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.main_network.decoder.layers.3.mixer.conv1d.bias": [
+2304
+],
+"backbone.main_network.decoder.layers.3.mixer.norm.weight": [
+2048
+],
+"backbone.main_network.decoder.layers.3.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.main_network.decoder.layers.3.norm1.weight": [
+1024
+],
+"backbone.main_network.decoder.layers.4.mixer.Wqkv.weight": [
+3072,
+1024
+],
+"backbone.main_network.decoder.layers.4.mixer.out_proj.weight": [
+1024,
+1024
+],
+"backbone.main_network.decoder.layers.4.norm1.weight": [
+1024
+],
+"backbone.main_network.decoder.layers.4.mlp.fc1.weight": [
+5632,
+1024
+],
+"backbone.main_network.decoder.layers.4.mlp.fc2.weight": [
+1024,
+2816
+],
+"backbone.main_network.decoder.layers.4.norm2.weight": [
+1024
+],
+"backbone.main_network.decoder.rmsnorm.weight": [
+1024
+],
+"backbone.main_network.routing_module.q_proj_layer.weight": [
+1024,
+1024
+],
+"backbone.main_network.routing_module.k_proj_layer.weight": [
+1024,
+1024
+],
+"backbone.main_network.residual_proj.weight": [
+1024,
+1024
+],
+"backbone.main_network.residual_proj.bias": [
+1024
+],
+"backbone.decoder.layers.0.mixer.dt_bias": [
+32
+],
+"backbone.decoder.layers.0.mixer.A_log": [
+32
+],
+"backbone.decoder.layers.0.mixer.D": [
+32
+],
+"backbone.decoder.layers.0.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.decoder.layers.0.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.decoder.layers.0.mixer.conv1d.bias": [
+2304
+],
+"backbone.decoder.layers.0.mixer.norm.weight": [
+2048
+],
+"backbone.decoder.layers.0.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.decoder.layers.0.norm1.weight": [
+1024
+],
+"backbone.decoder.layers.1.mixer.dt_bias": [
+32
+],
+"backbone.decoder.layers.1.mixer.A_log": [
+32
+],
+"backbone.decoder.layers.1.mixer.D": [
+32
+],
+"backbone.decoder.layers.1.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.decoder.layers.1.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.decoder.layers.1.mixer.conv1d.bias": [
+2304
+],
+"backbone.decoder.layers.1.mixer.norm.weight": [
+2048
+],
+"backbone.decoder.layers.1.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.decoder.layers.1.norm1.weight": [
+1024
+],
+"backbone.decoder.layers.2.mixer.dt_bias": [
+32
+],
+"backbone.decoder.layers.2.mixer.A_log": [
+32
+],
+"backbone.decoder.layers.2.mixer.D": [
+32
+],
+"backbone.decoder.layers.2.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.decoder.layers.2.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.decoder.layers.2.mixer.conv1d.bias": [
+2304
+],
+"backbone.decoder.layers.2.mixer.norm.weight": [
+2048
+],
+"backbone.decoder.layers.2.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.decoder.layers.2.norm1.weight": [
+1024
+],
+"backbone.decoder.layers.3.mixer.dt_bias": [
+32
+],
+"backbone.decoder.layers.3.mixer.A_log": [
+32
+],
+"backbone.decoder.layers.3.mixer.D": [
+32
+],
+"backbone.decoder.layers.3.mixer.in_proj.weight": [
+4384,
+1024
+],
+"backbone.decoder.layers.3.mixer.conv1d.weight": [
+2304,
+1,
+4
+],
+"backbone.decoder.layers.3.mixer.conv1d.bias": [
+2304
+],
+"backbone.decoder.layers.3.mixer.norm.weight": [
+2048
+],
+"backbone.decoder.layers.3.mixer.out_proj.weight": [
+1024,
+2048
+],
+"backbone.decoder.layers.3.norm1.weight": [
+1024
+],
+"backbone.decoder.rmsnorm.weight": [
+1024
+],
+"backbone.routing_module.q_proj_layer.weight": [
+1024,
+1024
+],
+"backbone.routing_module.k_proj_layer.weight": [
+1024,
+1024
+],
+"backbone.residual_proj.weight": [
+1024,
+1024
+],
+"backbone.residual_proj.bias": [
+1024
+],
+"lm_head.weight": [
+256,
+1024
+]
+}

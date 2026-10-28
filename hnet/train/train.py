@@ -445,14 +445,15 @@ class Trainer:
                     host_acc["n_targets"] += n_tgt[m]
                     host_acc["n_bytes"] += nbytes
                     host_acc["tokens"] += ntok
+                if is_log:  # pre-clip per-stage norms, log steps only
+                    for k, v in grad_norms_by_stage(self.stage_params).items():
+                        stats_acc.add(k, v)
                 if grad_clip > 0:
                     gn = torch.nn.utils.clip_grad_norm_(self.all_params, grad_clip, foreach=True)
                 elif is_log:
                     gn = torch.nn.utils.get_total_norm([p.grad for p in self.all_params if p.grad is not None])
                 if is_log:
                     stats_acc.add("grad_norm", gn)
-                    for k, v in grad_norms_by_stage(self.stage_params).items():
-                        stats_acc.add(k, v)
                 self.opt.step()
                 self.opt.zero_grad(set_to_none=True)
                 self.step += 1

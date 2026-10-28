@@ -15,7 +15,7 @@ def root_expr(root: str) -> str:
 
 
 def new_run_id(cmd: str, now: float | None = None) -> str:
-    ts = time.strftime("%Y%m%d-%H%M%S", time.gmtime(now or time.time()))
+    ts = time.strftime("%Y%m%d-%H%M%S", time.gmtime(time.time() if now is None else now))
     words = re.findall(r"[A-Za-z0-9]+", " ".join(cmd.split()[:4]))
     slug = "-".join(w for w in words if w not in ("python", "m", "bash", "sh"))[:24].strip("-")
     return f"{ts}-{slug}" if slug else ts
