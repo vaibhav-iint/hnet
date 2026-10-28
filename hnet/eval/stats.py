@@ -74,13 +74,19 @@ def ratio_ci(num, den, **kw):
 
 
 def average_ci(stats: Sequence[tuple], n_boot: int = 1000, seed: int = 0, alpha: float = 0.05):
-    """``stats``: list of (stat_fn(indices) -> float, n_items, groups-or-None) per task. CI of their mean."""
+    """``stats``: list of (stat_fn(indices) -> float, n_items, groups-or-None[, weight]) per task.
+    CI of the weighted mean of the task statistics; each task's items are resampled independently."""
+    stats = [tuple(s) + (1.0,) * (4 - len(s)) for s in stats]
+    w = np.array([s[3] for s in stats], dtype=float)
+    w = w / w.sum()
     rng = np.random.default_rng(seed)
-    point = float(np.mean([f(np.arange(n)) for f, n, _ in stats]))
-    strata = [_strata(g) for _, _, g in stats]
+    point = float(np.dot(w, [f(np.arange(n)) for f, n, _, _ in stats]))
+    if n_boot <= 0:
+        return {"value": point, "lo": float("nan"), "hi": float("nan"), "se": float("nan")}
+    strata = [_strata(g) for _, _, g, _ in stats]
     bs = np.empty(n_boot)
     for b in range(n_boot):
-        bs[b] = np.mean([f(_resample(rng, n, s)) for (f, n, _), s in zip(stats, strata)])
+        bs[b] = np.dot(w, [f(_resample(rng, n, s)) for (f, n, _, _), s in zip(stats, strata)])
     lo, hi = np.nanquantile(bs, [alpha / 2, 1 - alpha / 2])
     return {"value": point, "lo": float(lo), "hi": float(hi), "se": float(np.nanstd(bs, ddof=1))}
 

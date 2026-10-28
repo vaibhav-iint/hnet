@@ -1,11 +1,12 @@
-"""Paper routing module (eq. 4; goombalab/hnet ``RoutingModule``), registered as ``cosine_lookahead``.
+"""Cosine routers: the paper routing module (eq. 4; goombalab/hnet ``RoutingModule``) and its end-semantics twin.
 
     p_t = clamp((1 - cos(W_q h_{t-1}, W_k h_t)) / 2, 0, 1),     p = 1 at every segment start.
 
-Position t is selected when p_t > 0.5 and starts a new chunk; the chunk vector is h at the chunk's *first*
-position. The decision for t uses h_t, i.e. a chunk boundary is drawn only after the first byte of the next
-chunk has been seen ("lookahead" / LH-Net in Cartesia's terminology). Projections are identity-initialized and
-flagged ``_no_reinit`` so ``init_weights`` keeps them.
+* ``cosine_lookahead`` (paper default, "start" semantics): a selected t is the first byte of a chunk, so a chunk is
+  closed only after the first byte of the next chunk has been seen (LH-Net).
+* ``end_cosine_shift`` ("end" semantics): the same formula, but a selected t is the last byte of a chunk.
+
+Projections are identity-initialized (official) and flagged ``_no_reinit`` so ``init_weights`` keeps them.
 """
 
 from __future__ import annotations
@@ -27,6 +28,8 @@ class CosineLookaheadRouter(nn.Module):
     """``forward(h [T, D], ctx) -> RouterOutput``. Projections run in the ambient (autocast) dtype; the cosine
     and probabilities are computed in fp32."""
 
+    boundary_semantics = "start"
+
     def __init__(self, d_model: int, target_ratio: Optional[float] = None):
         super().__init__()
         self.q_proj_layer = nn.Linear(d_model, d_model, bias=False)
@@ -41,4 +44,9 @@ class CosineLookaheadRouter(nn.Module):
         q = F.normalize(self.q_proj_layer(h[:-1]).float(), dim=-1)
         k = F.normalize(self.k_proj_layer(h[1:]).float(), dim=-1)
         p = ((1 - (q * k).sum(-1)) / 2).clamp(0.0, 1.0)
-        return router_output(F.pad(p, (1, 0), value=1.0), ctx)
+        return router_output(F.pad(p, (1, 0), value=1.0), ctx, self.boundary_semantics)
+
+
+@register("router", "end_cosine_shift")
+class EndCosineShiftRouter(CosineLookaheadRouter):
+    boundary_semantics = "end"
