@@ -424,7 +424,10 @@ class Agent:
             for m in tf.getmembers():
                 if m.name.startswith("/") or ".." in m.name.split("/") or not (m.isfile() or m.isdir()):
                     continue
-                tf.extract(m, REPO)
+                try:
+                    tf.extract(m, REPO, filter="data")
+                except TypeError:  # python without extraction filters
+                    tf.extract(m, REPO)
                 names.append(m.name)
         self.log(f"overlay: {len([n for n in names if not n.endswith('/')])} entries -> {REPO}")
 

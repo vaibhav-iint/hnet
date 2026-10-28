@@ -559,3 +559,38 @@ def test_overlay_roundtrip_and_missing_config_check(tmp_path, monkeypatch):
         assert cli.missing_configs(cmd, sha, []) == ["configs/does_not_exist.yaml"]
         assert cli.missing_configs(cmd, sha, ["configs"]) == []
         assert cli.missing_configs("python -m hnet.train.train --config configs/README.md", sha, []) == []
+
+
+def test_stale_local_state_is_reconciled(monkeypatch):
+    """Local ledger says RUNNING (e.g. the controller restarted) but the VM is TERMINATED / restarted / gone."""
+    def iso(t):
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t))
+    t0 = time.time() - 7200
+    st = State(C.state_dir() / "state.json")
+    with st.locked():
+        for n in ("hnet-a", "hnet-b", "hnet-c"):
+            st.add({"name": n, "id": n, "zone": "us-central1-a", "machine_type": "g2-standard-8", "spot": True,
+                    "price_hr": 1.0, "disk_hr": 0.0, "max_hours": 0.5, "created_at": t0, "started_at": t0,
+                    "status": "RUNNING", "segments": [{"start": t0, "deadline": t0 + 1800, "end": None}]})
+    obs = {"hnet-a": (0, json.dumps({"status": "TERMINATED", "lastStopTimestamp": iso(t0 + 600)}), ""),
+           "hnet-b": (0, json.dumps({"status": "RUNNING", "lastStartTimestamp": iso(t0 + 3600),
+                                     "lastStopTimestamp": iso(t0 + 900)}), ""),
+           "hnet-c": (1, "", NOTFOUND)}
+
+    def h(a):
+        if a[3] == "describe":
+            return obs[a[4]]
+        if a[3] == "list":
+            return 0, "[]", ""
+        raise AssertionError(a)
+
+    monkeypatch.setattr(subprocess, "run", FakeGcloud(h))
+    assert cli.main(["ls"]) == 0
+    st = State(C.state_dir() / "state.json")
+    a, b, c = (st.get(n) for n in ("hnet-a", "hnet-b", "hnet-c"))
+    assert a["status"] == "TERMINATED" and a["segments"][0]["end"] == pytest.approx(t0 + 600, abs=1)
+    assert L.actual_cost(a) == pytest.approx(600 / 3600, abs=2 / 3600) and not a.get("ended_at")
+    assert b["status"] == "RUNNING" and len(b["segments"]) == 2
+    assert b["segments"][0]["end"] == pytest.approx(t0 + 900, abs=1) and b["segments"][1]["end"] is None
+    assert c["status"] == "DELETED" and c["ended_at"]
+    assert [r["name"] for r in st.active()] == ["hnet-a", "hnet-b"]

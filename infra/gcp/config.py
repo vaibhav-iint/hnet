@@ -27,14 +27,28 @@ DEFAULT_BUDGET_TOTAL = float(os.environ.get("HNET_GCP_BUDGET", "300"))
 DEFAULT_LAUNCH_CAP = float(os.environ.get("HNET_GCP_LAUNCH_CAP", "25"))
 
 
+def _scratchpads() -> list[Path]:
+    """The session scratchpad; its parent dir name depends on the agent's cwd, so also glob siblings."""
+    out = [_SCRATCHPAD] if _SCRATCHPAD.is_dir() else []
+    for p in sorted(Path("/tmp/claude-0").glob(f"*/{_SCRATCHPAD.parent.name}/scratchpad")):
+        if p not in out:
+            out.append(p)
+    return out
+
+
 def state_dir() -> Path:
     env = os.environ.get("HNET_GCP_STATE_DIR")
     if env:
         p = Path(env)
-    elif _SCRATCHPAD.is_dir():
-        p = _SCRATCHPAD / "gcp_state"
     else:
-        p = Path.home() / ".cache" / "hnet-gcp"
+        pads = _scratchpads()
+        existing = [s / "gcp_state" for s in pads if (s / "gcp_state" / "state.json").exists()]
+        if existing:
+            p = existing[0]
+        elif pads:
+            p = pads[0] / "gcp_state"
+        else:
+            p = Path.home() / ".cache" / "hnet-gcp"
     p.mkdir(parents=True, exist_ok=True)
     return p
 
@@ -43,8 +57,10 @@ def gcloud_config_dir() -> str | None:
     """CLOUDSDK_CONFIG to use: the env value, else the scratchpad gcloud dir if present."""
     if os.environ.get("CLOUDSDK_CONFIG"):
         return os.environ["CLOUDSDK_CONFIG"]
-    d = _SCRATCHPAD / "gcloud"
-    return str(d) if d.is_dir() else None
+    for s in _scratchpads():
+        if (s / "gcloud").is_dir():
+            return str(s / "gcloud")
+    return None
 
 
 # ---- machine shapes: gpu kind -> count -> (machine type, accelerator flag or None) ----

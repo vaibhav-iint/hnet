@@ -102,6 +102,11 @@ def apply_observation(rec: dict, inst: dict | None, now: float | None = None) ->
     rec["status"] = st
     last_start = parse_ts(inst.get("lastStartTimestamp"))
     last_stop = parse_ts(inst.get("lastStopTimestamp"))
+    if st in RUNNING and seg and last_start and last_start > seg["start"] + 120:
+        # stale local state: the VM stopped and was started again while we were not looking
+        end = last_stop if (last_stop and seg["start"] - 300 <= last_stop <= last_start) else last_start
+        seg["end"] = min(end, seg.get("deadline") or end)
+        seg = None
     if st in STOPPED and seg:
         end = last_stop if (last_stop and last_stop >= seg["start"] - 300) else now
         seg["end"] = min(end, seg.get("deadline") or end)
