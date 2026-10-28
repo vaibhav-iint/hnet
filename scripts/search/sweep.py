@@ -16,7 +16,8 @@ Spec file::
 Each run trains with ``python -m hnet.train.train`` into ``<out_root>/<name>_s<seed>``; finished runs (a
 ``done.json`` marker) are skipped, so the sweep can be re-launched after a preemption. After training, H-Net runs get
 ``diag.json`` (hnet.analysis.chunks on FineWeb-Edu val documents) and every run dir is mirrored to ``--gcs`` if given.
-``<out_root>/sweep_status.json`` records the state of every run.
+``<out_root>/sweep_status.json`` records the state of every run. The sweep first runs ``fairness.py`` (same data,
+bytes, FLOPs/byte, optimizer, schedule, eval for every run) and refuses to start if it fails.
 """
 
 from __future__ import annotations
@@ -94,8 +95,14 @@ def main(argv=None):
     ap.add_argument("--only", default=None, help="comma-separated run names (without seed suffix)")
     ap.add_argument("--gcs", default=None, help="gs:// prefix to mirror run dirs to")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--allow-unfair", action="store_true", help="run even if scripts/search/fairness.py fails")
     a = ap.parse_args(argv)
     spec = yaml.safe_load(open(a.spec))
+    from fairness import main as fairness_main  # apples-to-apples gate (writes <out_root>/fairness.md)
+
+    if fairness_main([a.spec]) != 0 and not a.allow_unfair:
+        print("[sweep] fairness check failed; refusing to run (see fairness.md, or pass --allow-unfair)", flush=True)
+        return 2
     jobs = expand(spec, set(a.only.split(",")) if a.only else None)
     Path(spec["out_root"]).mkdir(parents=True, exist_ok=True)
     status_path = Path(spec["out_root"]) / "sweep_status.json"
