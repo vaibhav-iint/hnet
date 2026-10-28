@@ -9,7 +9,7 @@ import torch.nn.functional as F
 def linear_recurrence(u: torch.Tensor, log_a: torch.Tensor, reset: torch.Tensor, block: int = 64) -> torch.Tensor:
     """Solve ``y_i = a_i * y_{i-1} + u_i`` with ``a_i = exp(log_a_i)``, and ``y_i = u_i`` where ``reset_i``.
 
-    u: [M, D] float; log_a: [M] (<= 0); reset: [M] bool. Returns fp32 [M, D]. Differentiable w.r.t. u and log_a.
+    u: [M, D] float; log_a: [M] (<= 0); reset: [M] bool. Returns [M, D] in fp32 (fp64 for fp64 inputs). Differentiable w.r.t. u and log_a.
 
     Blocked algorithm: inside each block of ``block`` positions the solution is a lower-triangular matrix of decay
     products applied to u (one batched matmul); the states carried across blocks satisfy the same recurrence on
@@ -18,13 +18,14 @@ def linear_recurrence(u: torch.Tensor, log_a: torch.Tensor, reset: torch.Tensor,
     M, D = u.shape
     nb = -(-M // block)
     pad = nb * block - M
-    u = F.pad(u.float(), (0, 0, 0, pad)).view(nb, block, D)
-    cum = F.pad(log_a.float(), (0, pad)).view(nb, block).cumsum(-1)
+    dtype = torch.promote_types(u.dtype, torch.float32)
+    u = F.pad(u.to(dtype), (0, 0, 0, pad)).view(nb, block, D)
+    cum = F.pad(log_a.to(dtype), (0, pad)).view(nb, block).cumsum(-1)
     n_resets = F.pad(reset, (0, pad)).view(nb, block).long().cumsum(-1)
     # L[b, i, k] = prod_{m=k+1..i} a_m for k <= i with no reset in (k, i]; else 0.
     tril = torch.ones(block, block, dtype=torch.bool, device=u.device).tril()
     keep = tril & (n_resets[:, :, None] == n_resets[:, None, :])
-    neg_inf = torch.tensor(float("-inf"), device=u.device)
+    neg_inf = torch.tensor(float("-inf"), device=u.device, dtype=dtype)
     L = torch.where(keep, cum[:, :, None] - cum[:, None, :], neg_inf).exp()
     y = torch.bmm(L, u)  # zero state entering each block
     if nb > 1:

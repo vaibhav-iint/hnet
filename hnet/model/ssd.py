@@ -107,10 +107,13 @@ def _segsum(a: torch.Tensor) -> torch.Tensor:
 def _decay_matrix(a: torch.Tensor, drop: torch.Tensor) -> torch.Tensor:
     """exp(a[..., l] - a[..., s]) for kept (l, s) pairs, exactly 0 where ``drop``. a: [..., Q] -> [..., Q, Q].
 
-    The difference is masked to -inf *before* exp, so dropped (acausal) entries can never overflow.
+    The exponent is clamped to +-80 (fp32) / +-700 (fp64) before exp: this changes nothing representable
+    (exp(-80) ~ 2e-35) but keeps exp off its very slow denormal/underflow path on CPU, and makes dropped
+    (acausal, possibly large positive) entries finite before they are zeroed.
     """
+    lim = 700.0 if a.dtype == torch.float64 else 80.0
     seg = a[..., :, None] - a[..., None, :]
-    return seg.masked_fill_(drop, -math.inf).exp_()
+    return seg.clamp_(-lim, lim).exp_().masked_fill_(drop, 0.0)
 
 
 class _IntraChunk(torch.autograd.Function):

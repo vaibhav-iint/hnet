@@ -304,7 +304,7 @@ def cmd_setup(a) -> int:
 
 def cmd_run(a) -> int:
     st, rec = _rec(a.name)
-    argv = a.cmd[1:] if a.cmd and a.cmd[0] == "--" else a.cmd
+    argv = a.cmd
     if not argv:
         _p("nothing to run")
         return 2
@@ -317,7 +317,10 @@ def cmd_run(a) -> int:
 
 def cmd_exec(a) -> int:
     _, rec = _rec(a.name)
-    argv = a.cmd[1:] if a.cmd and a.cmd[0] == "--" else a.cmd
+    argv = a.cmd
+    if not argv:
+        _p("nothing to run")
+        return 2
     cmd = argv[0] if len(argv) == 1 else shlex.join(argv)
     r = _backend(rec["kind"]).exec(rec["id"], f"cd {remote.root_expr(rec['remote_root'])} 2>/dev/null; {cmd}",
                                     timeout=a.timeout)
@@ -473,7 +476,7 @@ def cmd_teardown(a) -> int:
             ok = False
         tgt = {r["id"] for r in targets}
         bad = [x for x in left if x["id"] in tgt]
-        _p(f"verify {kind}s: {len(left)} active with our label/prefix"
+        _p(f"verify {kind} list: {len(left)} active with our label/prefix"
            + (f"; NOT GONE: {bad}" if bad else ""))
         ok &= not bad
     return 0 if ok else 1
@@ -548,13 +551,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--env", action="append")
     s.add_argument("--wait", action="store_true")
     s.add_argument("--wait-timeout", type=float, default=3600)
-    s.add_argument("cmd", nargs=argparse.REMAINDER)
+    s.add_argument("cmd", nargs="*")
     s.set_defaults(fn=cmd_run)
 
     s = sp.add_parser("exec")
     s.add_argument("name")
     s.add_argument("--timeout", type=int, default=300)
-    s.add_argument("cmd", nargs=argparse.REMAINDER)
+    s.add_argument("cmd", nargs="*")
     s.set_defaults(fn=cmd_exec)
 
     s = sp.add_parser("tail")
@@ -593,5 +596,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv=None) -> int:
     C.load_credentials()
+    argv = list(sys.argv[1:] if argv is None else argv)
+    tail = None
+    if "--" in argv:  # everything after the first `--` is the remote command (run / exec)
+        i = argv.index("--")
+        argv, tail = argv[:i], argv[i + 1:]
     a = build_parser().parse_args(argv)
+    if tail is not None:
+        a.cmd = tail
     return int(a.fn(a) or 0)

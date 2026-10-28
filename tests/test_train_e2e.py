@@ -120,3 +120,12 @@ def test_tiny_dense_trains(tmp_path):
     Trainer(load_run_config(base=cfg)).train()
     m = read_metrics(tmp_path)
     assert m[-1]["loss"] < m[0]["loss"] - 0.5
+
+
+def test_activation_checkpointing_same_losses(tmp_path):
+    runs = {}
+    for ac in (False, True):
+        out = tmp_path / str(ac)
+        Trainer(load_run_config(base=toy_cfg(out, steps=4, activation_checkpointing=ac, save_final=False))).train()
+        runs[ac] = [r["loss"] for r in read_metrics(out)]
+    assert runs[True] == pytest.approx(runs[False], rel=1e-6)

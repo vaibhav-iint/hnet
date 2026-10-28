@@ -16,7 +16,7 @@ model:
     rope_theta: [10000.0, 10000.0, 50000.0]
     window_size: [1023, 1023, -1]
     nope_every: [0, 0, 4]
-  dc: {target_ratios: [4.0, 2.0], ratio_loss_alpha: 0.03, smoothing: true, ste: true}
+  dc: {target_ratios: [4.0, 2.0], ratio_loss_alpha: 0.03, dechunker: ema, ste: true}
   norm_eps: 1.0e-5
   initializer_range: 0.02
   lr_multiplier: auto

@@ -84,3 +84,18 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
   ablation and tiny configs.
 - PLAN.md §2b: 1–10M architecture search over boundary semantics, router function, ratios, smoothing, α and
   optimizer, ~$20.
+
+### 22:45 · WS-B (FLOPs + matched configs) finished
+- `hnet/flops.py` with three counting conventions. Paper Table 2 is reproduced only by App. B taken literally
+  (forward only, non-causal attention, embedding counted). The blog's Fig. 8 needs causal-halved attention and no
+  embedding.
+- Our matching rule (causal attention, LM head counted, embedding not) is applied to all 28 configs. 80 tests pass,
+  including exact param counts against the real model.
+- The 3.7B stage-1 guess (FFN 5504, MHA) reproduces the blog's 0.32B params and 0.52 GFLOPs/byte; GQA + FFN ≈ 6400
+  is indistinguishable.
+- **Decision:** at 125M, the paper's L width pattern leaves a 5-layer main net (58% of FLOPs at byte level). Switched
+  the small and speedrun H-Nets to the XL width pattern (outer = ½ and ¾ of main → 11-layer main); the L pattern stays
+  as an ablation. (4,2) variants get re-matched. WS-B was resumed to regenerate the configs.
+- Note for the tiny runs: tiny BPE models are dominated by the 50K-vocab LM head, so FLOPs-matched tiny H-Nets have
+  3–4x the parameters.
+- Fixed `configs/hnet_3p7b_smollm3.yaml` (it had an invalid `dc.smoothing` key).

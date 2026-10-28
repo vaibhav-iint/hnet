@@ -272,7 +272,7 @@ def test_cli_launch_guard_and_teardown(fake, capsys):
     assert fake.instances[rid]["status"] == "TERMINATED"
     assert State().get("hnet-t")["ended_at"] is not None
     out = capsys.readouterr().out
-    assert "verified gone" in out and "verify sandboxs: 0 active" in out
+    assert "verified gone" in out and "verify sandbox list: 0 active" in out
 
 
 def test_teardown_all_catches_untracked_labeled(fake, capsys):
