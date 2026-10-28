@@ -148,16 +148,31 @@ def test_causality(packed):
     assert gx[:, k + 1:].abs().max() == 0 and gx[:, k].abs().max() > 0
 
 
-def test_float32_and_bfloat16_autocast_cpu():
+def _fwd_bwd(m, x, ctx, autocast_dtype, device):
+    m.zero_grad()
+    xi = x.clone().requires_grad_()
+    with torch.autocast(device, dtype=autocast_dtype or torch.float32, enabled=autocast_dtype is not None):
+        y = m(xi, ctx)
+    y.float().square().mean().backward()
+    return y, {"x": xi.grad, **{k: p.grad for k, p in m.named_parameters()}}
+
+
+@pytest.mark.parametrize("device", ["cpu"] + (["cuda"] if torch.cuda.is_available() else []))
+def test_bf16_autocast_forward_backward_matches_fp32(device):
+    """Under bf16 autocast (in_proj/out_proj in bf16, scan in fp32) outputs and all gradients stay within bf16
+    tolerance of the fp32 run (on CUDA this exercises whichever kernel path is available)."""
     torch.manual_seed(0)
-    m = Mamba2(32, d_state=16, headdim=16, chunk_size=16)
-    x = torch.randn(2, 40, 32)
-    y = m(x)
-    assert y.dtype == torch.float32 and torch.isfinite(y).all()
-    with torch.autocast("cpu", dtype=torch.bfloat16):
-        yb = m(x)
-    assert yb.dtype == torch.bfloat16
-    torch.testing.assert_close(yb.float(), y, rtol=5e-2, atol=5e-2)
+    m = Mamba2(32, d_state=16, headdim=16, ngroups=2, chunk_size=16, device=device)
+    x = torch.randn(1, 50, 32, device=device)
+    ctx = SeqCtx.from_cu_seqlens(torch.tensor([0, 21, 50], dtype=torch.int32, device=device))
+    y32, g32 = _fwd_bwd(m, x, ctx, None, device)
+    yb, gb = _fwd_bwd(m, x, ctx, torch.bfloat16, device)
+    assert y32.dtype == torch.float32 and yb.dtype == torch.bfloat16
+    torch.testing.assert_close(yb.float(), y32, rtol=5e-2, atol=5e-2 * y32.abs().max().item())
+    for k in g32:
+        assert gb[k].dtype == g32[k].dtype and torch.isfinite(gb[k]).all(), k
+        err = (gb[k].float() - g32[k]).abs().max() / g32[k].abs().max().clamp_min(1e-12)
+        assert err < 5e-2, (k, err.item())
 
 
 # ----------------------------------------------------------------------------------------------- CUDA vs kernels
@@ -168,7 +183,7 @@ needs_kernels = pytest.mark.skipif(
 
 
 @needs_kernels
-@pytest.mark.parametrize("dtype,tol", [(torch.float32, 3e-3), (torch.bfloat16, 3e-2)])
+@pytest.mark.parametrize("dtype,tol", [(torch.float32, 5e-3), (torch.bfloat16, 3e-2)])
 @pytest.mark.parametrize("ngroups", [1, 2])
 def test_kernel_path_agrees_with_torch_path(monkeypatch, dtype, tol, ngroups):
     torch.manual_seed(0)

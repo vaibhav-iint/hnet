@@ -1,13 +1,11 @@
-# CPU smoke test of S1: tiny modded GPT on synthetic word tokens (vocab 256 covers the corpus's ids and EOT 255).
-include: _tiny_cpu.yaml
+# CPU smoke test of s1_modded.yaml: tiny modded GPT on synthetic word tokens (vocab 256 covers ids and EOT 255).
+include: [s1_modded.yaml, _tiny_cpu.yaml]
 model:
-  type: dense
-  variant: modded
   vocab_size: 256
   d_model: 64
   n_layers: 4
   d_intermediate: 256
   num_heads: 2
   extra: {n_value_embeds: 1, skip_attn_layers: [2], window_tokens: [128, 256]}
-data: {kind: tokens, seq_len: 256, batch_tokens: 1024, eot: 255}
+data: {seq_len: 256, batch_tokens: 1024, eot: 255}
 train: {out_dir: runs/speedrun/tiny_s1_modded}

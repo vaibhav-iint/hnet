@@ -20,6 +20,7 @@ computes in fp32 (fp64 for fp64 inputs) regardless of the input dtype.
 
 from __future__ import annotations
 
+import functools
 import math
 import os
 from typing import Optional, Tuple
@@ -104,6 +105,11 @@ def _segsum(a: torch.Tensor) -> torch.Tensor:
     return seg.masked_fill(idx[:, None] < idx[None, :], -math.inf)
 
 
+def _no_autocast(t: torch.Tensor):
+    """Context that disables autocast on t's device: the torch scan must run its matmuls in fp32."""
+    return torch.autocast(device_type=t.device.type, enabled=False)
+
+
 def _decay_matrix(a: torch.Tensor, drop: torch.Tensor) -> torch.Tensor:
     """exp(a[..., l] - a[..., s]) for kept (l, s) pairs, exactly 0 where ``drop``. a: [..., Q] -> [..., Q, Q].
 
@@ -128,6 +134,7 @@ class _IntraChunk(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, CB, a, xdt, drop):
+        # Called from ssd_chunk_scan_torch, i.e. with autocast already disabled.
         M = _decay_matrix(a, drop).mul_(CB.unsqueeze(2))
         ctx.save_for_backward(CB, a, xdt, drop)
         return M @ xdt
@@ -136,6 +143,11 @@ class _IntraChunk(torch.autograd.Function):
     @torch.autograd.function.once_differentiable
     def backward(ctx, gy):
         CB, a, xdt, drop = ctx.saved_tensors
+        with _no_autocast(xdt):  # backward may run inside the caller's autocast region
+            return _IntraChunk._backward(CB, a, xdt, drop, gy.to(xdt.dtype))
+
+    @staticmethod
+    def _backward(CB, a, xdt, drop, gy):
         decay = _decay_matrix(a, drop)
         dM = (gy @ xdt.transpose(-1, -2)).mul_(decay)  # dL/dM * decay
         dCB = dM.sum(dim=2)
@@ -145,6 +157,18 @@ class _IntraChunk(torch.autograd.Function):
         return dCB, da, dxdt, None
 
 
+def _autocast_disabled(fn):
+    """Run ``fn(x, ...)`` with autocast disabled on x's device (its matmuls must stay fp32)."""
+
+    @functools.wraps(fn)
+    def wrapper(x, *args, **kwargs):
+        with _no_autocast(x):
+            return fn(x, *args, **kwargs)
+
+    return wrapper
+
+
+@_autocast_disabled
 def ssd_chunk_scan_torch(
     x: torch.Tensor,
     dt: torch.Tensor,
@@ -161,6 +185,9 @@ def ssd_chunk_scan_torch(
     return_final_states: bool = False,
 ):
     """Pure-PyTorch :func:`ssd_chunk_scan` (same arguments and results).
+
+    Runs with autocast disabled: inputs of any float dtype are upcast to fp32 (fp64 stays fp64) and the result is
+    returned in x's dtype, so under ``torch.autocast`` it accumulates in fp32 like the kernel.
 
     Notation: b batch, c chunks, l/s positions in a chunk (Q = chunk_size), g groups, e heads per group, p headdim,
     n d_state. Internally everything is laid out head-major, [b, g, e, c, Q, ...], so each step is one batched

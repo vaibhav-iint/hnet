@@ -7,6 +7,8 @@ Composition rules
 * Section level: ``model: {include: configs/models/hnet_2stage_125m.yaml, dc: {router: ...}}``. If the
   included file has a top-level key equal to the section name (``model:``), that sub-dict is used, else the
   whole file. Local keys override (deep merge; lists are replaced, not merged).
+* A dict whose ``name`` differs from the one it overrides (e.g. ``schedule: {name: constant}`` over a ``wsd``
+  schedule) replaces it instead of merging, so stale keys do not leak between components.
 * Paths are resolved relative to the including file's directory first, then to the current directory,
   then to the repository root. Includes nest.
 
@@ -29,7 +31,8 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__fi
 def deep_merge(base: dict, over: dict) -> dict:
     out = copy.deepcopy(base)
     for k, v in (over or {}).items():
-        if isinstance(v, dict) and isinstance(out.get(k), dict):
+        if (isinstance(v, dict) and isinstance(out.get(k), dict)
+                and v.get("name", out[k].get("name")) == out[k].get("name")):
             out[k] = deep_merge(out[k], v)
         else:
             out[k] = copy.deepcopy(v)
@@ -85,6 +88,10 @@ DEFAULTS = {
         "dataset": "finewebedu10B",  # hnet.data dataset name (finewebedu10B | fineweb10B | fineweb100B)
         "root": None,  # data root (default $HNET_DATA or <repo>/data)
         "paths": None,  # explicit shard list (overrides dataset/root)
+        "byte_paths": None,  # explicit byte shards (byte models; wins over paths)
+        "token_paths": None,  # explicit token shards (token models; wins over paths)
+        "val_token_path": None,  # explicit val token shard for the ValSet (default: the dataset's val shard)
+        "cross_window_label": True,  # last window position predicts the next stream element (same doc only)
         "n_train_shards": None,  # use only the first n train shards
         "shuffle_buffer": 0,  # WindowLoader block-shuffle size in windows (0 = stream order)
         "kind": None,  # bytes | tokens (default: bytes for hnet / vocab<=256, tokens otherwise)
@@ -93,7 +100,7 @@ DEFAULTS = {
         "batch_bytes": None,  # global bytes per optimizer step (byte models)
         "batch_tokens": None,  # global tokens per optimizer step (token models)
         "batch_windows": None,  # alternative: global windows per step
-        "bytes_per_token": None,  # tokens_eq for byte models = bytes / this (default model n_gpt or 4.6)
+        "bytes_per_token": None,  # tokens_eq for byte models = bytes / this (default: measured, bpt_stats.json)
         "num_workers": 1,  # prefetch threads (0 = synchronous)
         "prefetch": 4,
     },

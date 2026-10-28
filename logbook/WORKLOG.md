@@ -126,3 +126,18 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
   once.
 - Decided that both model types use the loader's cross-window label rule; passed to WS-D.
 - Relayed a bf16-autocast backward bug in `ssd.py`, found by WS-A2, to WS-A1.
+
+### 23:05 · WS-A1 (Mamba-2) finished; WS-B follow-up finished; GPU decision
+- **WS-A1:**
+  - The pure-torch SSD scan matches a sequential reference to 1e-9 in float64 over 40 random configs, plus gradcheck.
+  - Packed segments give the same results as separate segments, and the mixer is causal.
+  - Parameter names match mamba_ssm, so official checkpoints load.
+  - The custom backward avoids storing per-chunk [Q,Q] matrices: 1.5x faster and 30% less memory than the naive
+    einsum version.
+  - Fixed the bf16-autocast backward bug WS-A2 found.
+  - CPU: chunk_size 64 is 1.4x faster than 256. The 20 CUDA kernel-parity tests are written but await a GPU.
+- **WS-B follow-up:** `hnet2_small` now uses the XL width pattern (384/576/768, 11-layer main) at +1.4% FLOPs/byte
+  vs `bpe_small`. All ablations are rebuilt on it, and every config including `*_ratios42` is within ±2%.
+- Coordinator check: tests for SSD, Mamba-2, FLOPs, data and infra give **183 passed, 20 skipped (CUDA)**.
+- **GPU access:** the user chose to ask Prime to enable GPU sandboxes. Until then, all work is CPU-only (local plus
+  CPU sandboxes).

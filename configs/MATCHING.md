@@ -82,8 +82,8 @@ FLOPs/byte, so it is the default for hnet2_small / hnet2_speedrun. The L pattern
 and the 1-stage models use outer = main/2 for consistency. At 350M (hnet2_medium) the L-like pattern already
 leaves a T27 main. *Tiny models are head-dominated:* with the 50304-token GPT-2 vocabulary, the LM head
 (2 x 50304 x d per token) is 3x (2m) to 1.3x (10m) the FLOPs of the whole Transformer body. Byte-level H-Nets have
-no such head, so at equal FLOPs/byte the tiny H-Nets have 3-4x the parameters of their BPE partner's
-non-embedding body (and ~0.5x its total params).
+no such head, so at equal FLOPs/byte the tiny H-Nets have 3.5-3.7x (2m) and 2.3x (10m) the parameters of their BPE partner's
+non-embedding body (and 0.5-0.65x its total params).
 
 Ablations / variants of hnet2_small (and router/ratio variants of tiny_hnet2_2m, tiny_hnet2_10m) differ only in
 DC / mixer fields, plus the main network where re-matched:

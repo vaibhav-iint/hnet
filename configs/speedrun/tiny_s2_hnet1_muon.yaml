@@ -1,5 +1,5 @@
 # CPU smoke test of s2_hnet1_muon.yaml: WS-B's tiny 1-stage H-Net on synthetic bytes.
-include: _tiny_cpu.yaml
+include: [s2_hnet1_muon.yaml, _tiny_cpu.yaml]
 model: {include: ../models/tiny_hnet1_2m.yaml}
-data: {kind: bytes, seq_len: 512, batch_bytes: 2048}
+data: {seq_len: 512, batch_bytes: 2048}
 train: {out_dir: runs/speedrun/tiny_s2_hnet1_muon}

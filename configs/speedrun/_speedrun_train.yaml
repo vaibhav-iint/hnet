@@ -25,7 +25,7 @@ train:
   compile: model
   ckpt_every: 500
 eval:
-  val: speedrun_fineweb_val  # hnet.data.speedrun_valset: whole docs of the first 10,485,761 val tokens
+  val: speedrun  # hnet.data.speedrun_valset: whole docs of the first 10,485,761 FineWeb val tokens
   every: 125
   at_end: true
 log:

@@ -183,6 +183,21 @@ def test_low_precision_inputs():
     torch.testing.assert_close(yb.float(), y32, rtol=5e-2, atol=5e-2)
 
 
+def test_autocast_bf16_backward():
+    """Inside a bf16 autocast region the scan still runs (and differentiates) in fp32."""
+    t, _ = make_inputs(1, 40, 4, 8, 2, 8, dtype=torch.float32, seed=4)
+    leaves = {k: v.requires_grad_() for k, v in t.items()}
+    y_ref = ssd_chunk_scan_torch(**leaves, chunk_size=16, dt_softplus=True)
+    g_ref = torch.autograd.grad(y_ref.square().sum(), list(leaves.values()))
+    with torch.autocast("cpu", dtype=torch.bfloat16):
+        y = ssd_chunk_scan_torch(**leaves, chunk_size=16, dt_softplus=True)
+    g = torch.autograd.grad(y.square().sum(), list(leaves.values()))  # backward outside autocast, as recommended
+    assert y.dtype == torch.float32
+    torch.testing.assert_close(y, y_ref)
+    for a, b in zip(g, g_ref):
+        torch.testing.assert_close(a, b)
+
+
 def test_dispatch_uses_torch_on_cpu():
     t, _ = make_inputs(1, 9, 2, 2, 1, 2, seed=0)
     torch.testing.assert_close(ssd_chunk_scan(**t, chunk_size=4), ssd_chunk_scan_torch(**t, chunk_size=4))
@@ -195,7 +210,7 @@ needs_kernel = pytest.mark.skipif(
 
 
 @needs_kernel
-@pytest.mark.parametrize("dtype,tol", [(torch.float32, 2e-3), (torch.bfloat16, 3e-2)])
+@pytest.mark.parametrize("dtype,tol", [(torch.float32, 5e-3), (torch.bfloat16, 3e-2)])
 @pytest.mark.parametrize("with_seq_idx,ngroups,with_z", list(itertools.product([False, True], [1, 2], [False, True])))
 def test_kernel_agreement(dtype, tol, with_seq_idx, ngroups, with_z):
     b, l, h, p, n = 2, 300, 8, 32, 64

@@ -22,6 +22,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from hnet.data import download, speedrun_target  # noqa: E402
+from hnet.data.valsets import SPEEDRUN_VAL_TOKENS  # noqa: E402
 
 TRACKS = {3.28: "GPT-2 small track (track 1)", 2.92: "GPT-2 medium track (track 2)"}
 
@@ -36,8 +37,8 @@ def val_shard_path(path: str | None) -> str:
     return str(default)
 
 
-def compute(shard: str, losses=(3.28, 2.92)) -> dict:
-    res = speedrun_target(shard, losses=losses)
+def compute(shard: str, losses=(3.28, 2.92), n_targets: int = SPEEDRUN_VAL_TOKENS) -> dict:
+    res = speedrun_target(shard, n_targets=n_targets, losses=losses)
     n, n_eot, nb = res["n_targets"], res["n_eot_targets"], res["n_bytes"]
     res["target_bpb_eot_free"] = {str(l): l * (n - n_eot) / math.log(2) / nb for l in losses}
     return res

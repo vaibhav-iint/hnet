@@ -36,7 +36,7 @@ def test_repo_run_configs_compose():
     if not os.path.isdir(root):
         return
     for n in sorted(os.listdir(root)):
-        if n.endswith(".yaml"):
+        if n.endswith(".yaml") and not n.startswith("_"):
             cfg = load_run_config(os.path.join(root, n))
             assert cfg["model"].get("type") in ("hnet", "dense"), n
             assert cfg["train"]["out_dir"], n

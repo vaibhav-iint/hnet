@@ -108,7 +108,11 @@ class Trainer:
         # ---- model
         seed = int(tc["seed"])
         torch.manual_seed(seed)
-        self.model, self.mcfg = build_model_from_section(cfg["model"])
+        msec = cfg["model"]
+        if msec.get("type", "hnet") == "hnet" and msec.get("lr_multiplier_n_gpt", "data") in (None, "data"):
+            # N_GPT of App. C = measured GPT-2 bytes/token of the training data (hnet/data/bpt_stats.json)
+            msec = cfg["model"] = {**msec, "lr_multiplier_n_gpt": default_bytes_per_token(dc, None)}
+        self.model, self.mcfg = build_model_from_section(msec)
         if hasattr(self.model, "init_weights"):
             self.model.init_weights()
         self.model.to(self.device)
@@ -433,7 +437,8 @@ class Trainer:
             while self.step < end_step:
                 step = self.step
                 is_log = ((step + 1) % log_every == 0) or (step + 1 == end_step)
-                lr = set_lr(self.opt, self.schedule(step))
+                lr_factor = self.schedule(step)
+                lr = set_lr(self.opt, lr_factor)
                 host = [pf.next() for _ in range(self.accum)]
                 n_tgt = [int((hb["labels"] != IGNORE_INDEX).sum()) for hb in host]
                 n_tgt_step = max(sum(n_tgt), 1)
@@ -483,6 +488,7 @@ class Trainer:
 
                 if is_log:
                     rec = self._log_record(acc, stats_acc, host_acc, lr, t_log, steps_since_log)
+                    rec["lr_factor"] = lr_factor
                     step_time = rec["step_time"]
                     t_log = time.perf_counter()
                     steps_since_log = 0

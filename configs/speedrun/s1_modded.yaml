@@ -17,7 +17,8 @@ model:
   extra: {n_value_embeds: 3, skip_attn_layers: [7], unet_skips: true, logit_softcap: 15.0, rope_base: 1024.0,
           rope_frac: 0.5, window_tokens: [128, 1856]}
 data:
-  source: fineweb10B  # modded-nanogpt's kjj0/fineweb10B-gpt2 shards
+  source: hnet
+  dataset: fineweb10B  # modded-nanogpt's kjj0/fineweb10B-gpt2 shards
   kind: tokens
   seq_len: 65536
   micro_batch: 1

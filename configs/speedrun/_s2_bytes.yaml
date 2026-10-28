@@ -4,7 +4,8 @@
 # whose matmul FLOPs are within ~3% of S1's (see docs/SPEEDRUN.md). Same 1390-step schedule as S1.
 include: _speedrun_train.yaml
 data:
-  source: fineweb10B
+  source: hnet
+  dataset: fineweb10B
   kind: bytes
   seq_len: 4608
   micro_batch: 16

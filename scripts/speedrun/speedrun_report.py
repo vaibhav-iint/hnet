@@ -114,6 +114,8 @@ def plot(rows: list[dict], target: float, path: str):
         for r, color in zip(rows, plotstyle.SERIES):
             c = r["_curve"]
             ax.plot(c[q] * scale, c["bpb"], color=color, label=r["run"])
+            if q == panels[-1][0] and len(rows) <= 4 and len(c["bpb"]):
+                plotstyle.direct_label(ax, c[q][-1] * scale, c["bpb"][-1], r["run"])
         ax.axhline(target, color=plotstyle.INK_2, linewidth=1, linestyle="--")
         ax.set_xlabel(xlabel)
         if q == "flops":

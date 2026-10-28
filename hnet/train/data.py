@@ -32,9 +32,10 @@ GPT2_EOT = 50256
 
 
 # ----------------------------------------------------------------------------- packing helpers
-def pack_windows(windows: List[np.ndarray], seg_start_fn) -> dict:
+def pack_windows(windows: List[np.ndarray], seg_start_fn, next_labels: Optional[List[int]] = None) -> dict:
     """Concatenate windows into one packed micro-batch. ``seg_start_fn(w) -> bool[L]`` marks positions
-    that begin a new segment (position 0 of every window always does)."""
+    that begin a new segment (position 0 of every window always does). ``next_labels[i]`` (or IGNORE_INDEX)
+    is the label of window i's last position (``cross_window_label``, same rule as hnet.data.loader)."""
     L = len(windows[0])
     ids = np.concatenate(windows).astype(np.int64)
     starts = np.concatenate([seg_start_fn(w) for w in windows])
@@ -45,6 +46,8 @@ def pack_windows(windows: List[np.ndarray], seg_start_fn) -> dict:
     labels = np.full(T, IGNORE_INDEX, dtype=np.int64)
     labels[:-1] = ids[1:]
     labels[cu[1:] - 1] = IGNORE_INDEX  # last position of every segment has no target
+    if next_labels is not None:
+        labels[L - 1::L] = next_labels
     lens = np.diff(cu)
     return {
         "input_ids": torch.from_numpy(ids),
@@ -147,13 +150,14 @@ class BuiltinLoader:
 
     def __init__(self, stream: np.ndarray, kind: str, seq_len: int, micro_batch: int, grad_accum: int,
                  rank: int = 0, world_size: int = 1, token_nbytes: Optional[np.ndarray] = None,
-                 eot: int = GPT2_EOT, offset: int = 0):
+                 eot: int = GPT2_EOT, offset: int = 0, cross_window_label: bool = True):
         assert len(stream) >= seq_len, "corpus shorter than one window"
         self.stream, self.kind, self.L = stream, kind, seq_len
         self.mb, self.accum, self.rank, self.world = micro_batch, grad_accum, rank, world_size
         self.n_win = len(stream) // seq_len
         self.token_nbytes, self.eot, self.offset = token_nbytes, eot, offset
         self.seg_fn = byte_seg_starts if kind == "bytes" else token_seg_starts_fn(eot)
+        self.cross = cross_window_label
 
     def window(self, g: int) -> np.ndarray:
         i = (g + self.offset) % self.n_win
@@ -163,7 +167,16 @@ class BuiltinLoader:
         W = self.accum * self.world * self.mb
         base = step * W + (micro * self.world + self.rank) * self.mb
         wins = [self.window(base + j) for j in range(self.mb)]
-        b = pack_windows(wins, self.seg_fn)
+        nxt = None
+        if self.cross:  # label of the last position = next stream element if it is in the same document
+            nxt = []
+            for j, w in enumerate(wins):
+                i = (base + j + self.offset) % self.n_win
+                n = int(self.stream[((i + 1) * self.L) % len(self.stream)])
+                cur = int(w[-1])
+                same = (n != self.eot) if self.kind == "tokens" else (cur != EOS_ID and n != BOS_ID)
+                nxt.append(n if same else IGNORE_INDEX)
+        b = pack_windows(wins, self.seg_fn, nxt)
         if self.kind == "bytes":
             ids = b["input_ids"]
             b["n_bytes"] = int((ids < BOS_ID).sum())
@@ -257,7 +270,8 @@ def build_train_loader(data_cfg: dict, kind: str, grad_accum: int, rank: int, wo
         corpus = _builtin_corpus(data_cfg, "train", seed)
         stream = corpus.byte_stream() if kind == "bytes" else corpus.token_stream()
         return BuiltinLoader(stream, kind, int(data_cfg["seq_len"]), int(data_cfg["micro_batch"]), grad_accum,
-                             rank, world_size, corpus.token_nbytes, corpus.eot)
+                             rank, world_size, corpus.token_nbytes, corpus.eot,
+                             cross_window_label=bool(data_cfg.get("cross_window_label", True)))
     hd = _hnet_data()
     if hd is None:
         raise RuntimeError("data.source needs hnet.data (WS-C), which is not available; use synthetic|text")
@@ -265,8 +279,9 @@ def build_train_loader(data_cfg: dict, kind: str, grad_accum: int, rank: int, wo
 
 
 def _shard_paths(data_cfg: dict, kind: str, split: str = "train"):
-    if data_cfg.get("paths"):
-        return list(data_cfg["paths"])
+    explicit = data_cfg.get("byte_paths" if kind == "bytes" else "token_paths") or data_cfg.get("paths")
+    if explicit:
+        return [str(p) for p in ([explicit] if isinstance(explicit, str) else explicit)]
     from hnet.data import download as D
 
     ds, root, n = data_cfg.get("dataset", "finewebedu10B"), data_cfg.get("root"), data_cfg.get("n_train_shards")
@@ -293,6 +308,7 @@ class HNetDataLoader:
         self.inner = WindowLoader(_shard_paths(data_cfg, kind), kind, int(data_cfg["seq_len"]), n_windows=self.mb,
                                   rank=rank, world_size=world_size, seed=seed,
                                   shuffle_buffer=int(data_cfg.get("shuffle_buffer", 0) or 0),
+                                  cross_window_label=bool(data_cfg.get("cross_window_label", True)),
                                   pin_memory=False, prefetch=0)
         if kind == "tokens":
             from hnet.data.shards import token_byte_lengths
@@ -349,15 +365,18 @@ def build_val_batches(data_cfg: dict, eval_cfg: dict, kind: str, seed: int):
     kw = dict(byte_seq_len=int(eval_cfg.get("val_byte_seq_len", 8192)),
               token_seq_len=int(eval_cfg.get("val_token_seq_len", 1792)),
               windows_per_batch=int(eval_cfg.get("windows_per_batch", 8)))
-    which = eval_cfg.get("val", "auto")
+    which = eval_cfg.get("val", "standard")
     ds = data_cfg.get("dataset", "finewebedu10B")
-    if which == "speedrun":
+    vb = eval_cfg.get("val_bytes")
+    if data_cfg.get("val_token_path"):  # explicit val token shard (e.g. hnet.data.synth fixtures)
+        vs = hd.ValSet("custom_val", int(vb) if vb else None, data_cfg["val_token_path"], **kw)
+    elif which == "speedrun":
         from hnet.data import download as D
 
         shard = D.dataset_dir(ds, data_cfg.get("root")) / D.shard_name(ds, "val", 0)
         vs = hd.speedrun_valset(shard, **kw)
     else:
-        vs = hd.standard_valset(ds, n_bytes_target=int(eval_cfg.get("val_bytes", 10_000_000)),
+        vs = hd.standard_valset(ds, n_bytes_target=int(vb or 10_000_000),
                                 root=data_cfg.get("root"), **kw)
     return vs.batches(kind)
 
