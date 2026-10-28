@@ -150,3 +150,19 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
   - personal context → refused by our budget guard (personal wallet $0.00); the personal account has no sandboxes.
 - The team's three running sandboxes are CPU-only (4 CPU / 16 GB, `terminal-bench-science`). CPU sandboxes work via
   the API; GPU sandboxes need Prime to enable them for this team.
+
+### 23:20 · WS-G (speedrun + Muon) finished
+- Ported modded-nanogpt **record #18** (2025-01-04, 3.4 min on 8×H100, 3.28 at 729M tokens). It is the last plain
+  PyTorch + FlexAttention record; later records are mostly systems work or token-only tricks. The current record is
+  #92, 0.665 min, which requires exactly 8 Hopper GPUs.
+- `dense_modded` keeps every trick of record #18 (QK-norm, ReLU², value embeddings, U-net skips, softcap 15, window
+  warmup). The loss is computed in chunks so full logits are never built.
+- Muon (`build_muon_optimizer`): hidden 2-D matrices (including Mamba in/out projections) use Muon; everything else
+  uses Adam; router q/k use Adam by default.
+- Target bpb: 1.0667 (3.28) and 0.9496 (2.92), consistent with WS-C.
+- Configs: S1 (`s1_modded.yaml`) and S2 H-Nets with AdamW and Muon; one-GPU reference script for S0.
+- Coordinator check: speedrun tests pass (see commit). Open issues:
+  - the trainer must call `set_progress` (relayed to WS-D);
+  - FLOPs for the modded model are approximated by the Llama count (about 4% off);
+  - S2 learning rates are unswept;
+  - Muon on fused matrices could be split.
