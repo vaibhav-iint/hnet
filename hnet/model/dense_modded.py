@@ -13,9 +13,9 @@ Architecture (defaults reproduce the record at GPT-2 small size: 12 layers, d=76
   ``v <- l0 * v + l1 * ve`` of the first and the last ``n_value_embeds`` layers (pattern 012...012);
 * layers listed in ``skip_attn_layers`` have no attention (record: layer 7);
 * MLP 4x with ReLU^2; the attention output projection, MLP output projection and LM head are zero-initialized;
-* U-net skips: the output of encoder layer i (first half) is added, with a learned weight, to the input of
-  decoder layer n_dec-1-i;
-* untied LM head, logits soft-capped with ``cap * tanh(logits / cap)`` (cap 15), CE in fp32.
+* U-net skips: the output of layer i < L // 2 is added, with a learned weight, to the input of layer L - 1 - i;
+* untied LM head, logits soft-capped with ``cap * tanh(logits / cap)`` (cap 15), CE in fp32 (in checkpointed
+  chunks when the logits are not returned).
 
 Knobs live in ``DenseConfig.extra`` (see ``DEFAULT_EXTRA``); ``d_intermediate`` must be set (record: 4 * d_model).
 
