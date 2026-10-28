@@ -221,3 +221,16 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
   - Prime H200 ≈ $5.
 
   The $455 plan would cost roughly $260 on A100 spot.
+
+### 00:30 · Container restart, GCS access granted
+- The container restarted and stopped WS-H mid live test. Its spot VM `hnet-l4live` was left stopped (TERMINATED; disk
+  only). WS-H was resumed with the same limits, plus instructions to handle "local state RUNNING, VM stopped".
+- The user created `gs://neat-dispatch-501718-a5-hnet` and granted the service account Storage Object Admin on it,
+  plus Service Account User on itself.
+- Verified from here: write/list/read/delete of a test object, and `iam.serviceAccounts.actAs` via
+  testIamPermissions.
+- WS-H is extending infra/gcp:
+  - VMs run as the service account;
+  - run dirs and checkpoints rsync to the bucket;
+  - converted data shards are cached in the bucket;
+  - metrics are pulled from GCS, with the serial console as fallback.
