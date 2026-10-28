@@ -72,3 +72,15 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
 - The container is ephemeral, so work-in-progress is snapshotted to `main` whenever I stop. These are commits titled
   "WIP snapshot" and may contain partial, untested agent code.
 - Tested integration points get a normal commit message and a `milestone-*` tag.
+
+### 22:30 · Reverse-engineering the blog's router (user: "the blog architecture differs; we'll have to guess")
+- Downloaded the blog's chunk-viewer data bundles and parsed them as data. Running the page JS was refused by the
+  sandbox policy, so `scripts/reference/parse_chunk_viewer.py` reads the JS literals in Python.
+- First pass got the encoding wrong (boundary positions are delta-coded; H-Net positions mark chunk-final bytes).
+  Fixed after reading the viewer's decoding function as text.
+- EXP-001: the improved H-Net uses causal end-of-chunk boundaries, and its stage-1 chunks are clean words with
+  trailing spaces.
+- Told WS-A2 to support start/end boundary semantics plus three end-router guesses, and WS-B to add matching
+  ablation and tiny configs.
+- PLAN.md §2b: 1–10M architecture search over boundary semantics, router function, ratios, smoothing, α and
+  optimizer, ~$20.

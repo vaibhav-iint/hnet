@@ -51,16 +51,22 @@ class FlopsConvention:
     attn_windows: bool = True  # honour sliding windows (False: treat SWA layers as global)
     count_embedding: bool = False  # App. B counts 2*V*d for the embedding; blog / SPEC do not
     count_lm_head: bool = True
-    count_dc: bool = True  # router q/k projections + residual_proj of every H-Net stage
+    count_dc: bool = True  # router q/k projections of every H-Net stage
+    count_residual_proj: bool = True  # residual_proj (d x d) of every H-Net stage (blog Fig. 8 omits it)
     mamba_out_proj: str = "exact"  # "exact": 2*d_inner*d ; "paper": App. B literal 2*d*d
     count_elementwise: bool = True  # softmax 3*h*ctx, gating 5*d
     attn_quadratic_scale: float = 1.0  # extra factor on the quadratic attention terms (calibration knob)
     backward_factor: float = 2.0
 
 
-SPEC = FlopsConvention()  # SPEC / PLAN / blog: causal attention, no embedding, LM head counted
-PAPER_APPB = FlopsConvention(attn="full", count_embedding=True)  # App. B taken literally
-CONVENTIONS = {"spec": SPEC, "blog": SPEC, "paper_appB": PAPER_APPB}
+# SPEC / PLAN (used for all our matching): causal attention, embedding not counted, LM head counted.
+SPEC = FlopsConvention()
+# Paper Table 2 (eval GFLOPs/byte): App. B taken literally -- full (non-causal) attention, embedding counted.
+PAPER_APPB = FlopsConvention(attn="full", count_embedding=True)
+# Cartesia blog Fig. 8 (SmolLM3 vs 3.67B H-Net): causal attention counted at half the usual causal cost
+# (equivalently an average context of L/4, e.g. document masking), residual_proj not counted.
+BLOG_FIG8 = FlopsConvention(attn_quadratic_scale=0.5, count_residual_proj=False)
+CONVENTIONS = {"spec": SPEC, "paper_appB": PAPER_APPB, "blog_fig8": BLOG_FIG8}
 
 
 def _conv(convention) -> FlopsConvention:
@@ -167,19 +173,41 @@ def mlp_flops(d: int, f: int, cv: FlopsConvention) -> float:
     return 6 * d * round_up(f) + (5 * d if cv.count_elementwise else 0)
 
 
-# Router parameter counts by registry name. cosine_lookahead = paper (q/k projections, d x d each).
-# TODO(interface): causal_end_of_chunk is assumed to use two d x d projections as well; kept in sync with
-# hnet.model.routing by tests/test_flops.py::test_params_match_model.
-def _router_params(name: str, d: int, kwargs: dict) -> int:
-    if name in ("fixed_pool", "space_like", "external"):
-        return 0
-    return 2 * d * d
+# Router parameter / FLOP counts by registry name: name -> fn(d, kwargs) -> (params, forward FLOPs per position).
+# cosine_lookahead = paper (q/k projections, d x d each, no bias). MLP routers: fc1 d->h (+bias), fc2 h->1 (+bias).
+# Names not listed here are counted by instantiating the registered router on the meta device (no memory);
+# tests/test_flops.py::test_params_match_model checks every config against hnet.model.build_model.
+def _mlp_router(d, kw):
+    h = kw.get("d_hidden") or d
+    return d * h + h + h + 1, 2 * (d * h + h)
 
 
-def _router_flops(name: str, d: int, kwargs: dict) -> float:
-    if name in ("fixed_pool", "space_like", "external"):
-        return 0.0
-    return 2 * 2 * d * d
+ROUTER_COUNTS = {
+    "cosine_lookahead": lambda d, kw: (2 * d * d, 4 * d * d),
+    "end_cosine_shift": lambda d, kw: (2 * d * d, 4 * d * d),  # TODO(interface): assumed q/k like the paper
+    "causal_end_of_chunk": _mlp_router,
+    "end_mlp": _mlp_router,
+    "end_linear": lambda d, kw: (d + 1, 2 * d),
+    "fixed_pool": lambda d, kw: (0, 0),
+    "space_like": lambda d, kw: (0, 0),
+    "external": lambda d, kw: (0, 0),
+}
+
+
+def _router_counts(name: str, d: int, kwargs: dict, target_ratio=None):
+    if name in ROUTER_COUNTS:
+        return ROUTER_COUNTS[name](d, kwargs or {})
+    try:  # exact count from the registered implementation, built on the meta device
+        import torch
+
+        from hnet.registry import build
+
+        with torch.device("meta"):
+            r = build("router", name, d, target_ratio=target_ratio, **(kwargs or {}))
+        p = sum(x.numel() for x in r.parameters())
+    except Exception:  # pragma: no cover - unknown router and no implementation available
+        p = 2 * d * d
+    return p, 2 * p
 
 
 # ----------------------------------------------------------------------------- isotropic stacks
@@ -251,10 +279,11 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
                 comp_p[name], comp_f[name] = _iso(cfg, s, code, L, cv)
             dcs = cfg.dc.for_stage(s, n)
             rk = dcs.get("router_kwargs") or {}
-            comp_p["router"] = _router_params(dcs["router"], d, rk)
-            comp_f["router"] = _router_flops(dcs["router"], d, rk) if cv.count_dc else 0.0
+            rp, rf = _router_counts(dcs["router"], d, rk, dcs["target_ratio"])
+            comp_p["router"] = rp
+            comp_f["router"] = rf if cv.count_dc else 0.0
             comp_p["residual_proj"] = d * d + d
-            comp_f["residual_proj"] = 2 * d * d if cv.count_dc else 0.0
+            comp_f["residual_proj"] = 2 * d * d if cv.count_residual_proj else 0.0
         else:
             assert len(layout) == 1, layout
             comp_p["main"], comp_f["main"] = _iso(cfg, s, layout[0], L, cv)
@@ -431,6 +460,7 @@ __all__ = [
     "FlopsConvention",
     "SPEC",
     "PAPER_APPB",
+    "BLOG_FIG8",
     "CONVENTIONS",
     "model_flops",
     "count_params",

@@ -45,6 +45,30 @@ the GPT-2 tokenizer at ~1792 tokens/seq (≈8192 bytes), so both see the same by
 Optional if money is left: run C2 at 500M instead of 350M (+$50), or add cooldown branches to A1/A2 (~$5 each) to
 compare cooled-down models the way the blog's headline does.
 
+## 2b. Architecture search: guessing the blog's improved H-Net (1–10M params, ~$20)
+
+The blog's H-Net is an unreleased improvement on the paper. Its chunk-viewer data (EXP-001) shows the improved
+router marks the **last** byte of each chunk, decided causally. Its stage-1 chunks end after spaces ("word␣") and
+almost never split a word or a UTF-8 character. The router function itself is not published, so we test guesses on
+tiny models before scaling. Axes, ordered by how strongly the evidence supports them:
+
+| Axis | Variants | Evidence |
+|---|---|---|
+| Boundary semantics | start (paper `cosine_lookahead`) vs **end** | EXP-001: 99.8% of p ≥ 0.5 sit on chunk-final bytes |
+| End-router function | `end_linear`, `end_mlp`, `end_cosine_shift` | none, pure guess |
+| Target ratios | (3,3) paper vs (4,2) blog | blog text |
+| Smoothing | EMA vs none | paper Fig. 7 (critical for LH-Net); unknown for end routers |
+| Ratio-loss weight | α = 0.03 vs 0.1 ("strong auxiliary loss" in the blog ladder); local vs global scope | blog text, official code |
+| Optimizer | AdamW vs Muon; LR multipliers on/off | blog ladders use Muon |
+
+**Protocol:**
+* Screen 2-stage H-Nets of ~2M params on FineWeb-Edu bytes at equal FLOPs/byte and bytes, 3 seeds each.
+* Promote the top 2–3 to ~10M params (2 seeds). Compare against the matched tiny BPE model.
+* Score each variant on val bpb at a fixed byte budget and on chunk diagnostics measured against the blog's reference
+  (stage-1 ≈ 7 bytes/chunk in English, ≈ 0% word-internal cuts, ≈ 90% of chunks ending after a space).
+* The winner replaces the paper router in the 125M runs; the paper router stays as a control (A2 vs A2-paper).
+* Cost: the 2M screen runs on CPU or a few H200-hours total; budget ~$20 from the margin.
+
 ## 3. Matching rules (unchanged from the full plan)
 
 * Equal **bytes per step** and **training FLOPs/byte within ±2%**, computed from realized compression. Counting follows

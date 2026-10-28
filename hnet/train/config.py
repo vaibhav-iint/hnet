@@ -81,7 +81,12 @@ def load_run_config(path: Optional[str] = None, overrides=None, base: Optional[d
 DEFAULTS = {
     "model": {},
     "data": {
-        "source": "auto",  # auto | hnet.data source name | synthetic | text
+        "source": "hnet",  # hnet (WS-C shards) | synthetic | text
+        "dataset": "finewebedu10B",  # hnet.data dataset name (finewebedu10B | fineweb10B | fineweb100B)
+        "root": None,  # data root (default $HNET_DATA or <repo>/data)
+        "paths": None,  # explicit shard list (overrides dataset/root)
+        "n_train_shards": None,  # use only the first n train shards
+        "shuffle_buffer": 0,  # WindowLoader block-shuffle size in windows (0 = stream order)
         "kind": None,  # bytes | tokens (default: bytes for hnet / vocab<=256, tokens otherwise)
         "seq_len": 8192,
         "micro_batch": 1,  # windows per micro-step per rank
@@ -127,10 +132,13 @@ DEFAULTS = {
     "eval": {
         "every": 1000,
         "at_end": True,
-        "val": "auto",  # auto | valset name for hnet.data.valsets | builtin
-        "max_docs": 2000,
-        "max_bytes": None,
-        "batch_bytes": 65536,
+        "val": "standard",  # standard (hnet.data.standard_valset) | speedrun | none
+        "val_bytes": 10_000_000,  # standard valset size (whole docs, text bytes)
+        "val_byte_seq_len": 8192,  # ValSet chunking; keep identical across compared runs
+        "val_token_seq_len": 1792,
+        "windows_per_batch": 8,  # val windows per forward
+        "max_docs": 200,  # builtin (synthetic/text) val only
+        "batch_bytes": 65536,  # builtin val only: positions per batch
         "downstream": None,  # e.g. {every: 5000, tasks: [hellaswag], limit: 500}
     },
     "log": {
