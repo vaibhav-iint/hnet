@@ -95,7 +95,7 @@ def continuation_cf(context, continuations, gold, instruction=None):
     return f"{instruction}{context}", [space + c for c in conts], gold if isinstance(gold, list) else [gold]
 
 
-def _item(doc_id, query, answers, gold, group=None, prompt_parts=None):
+def _item(doc_id, query, answers, gold, group=None):
     return MCItem(doc_id=doc_id, contexts=[query] * len(answers), continuations=answers, gold=list(gold),
                   norm_texts=list(answers), group=group)
 

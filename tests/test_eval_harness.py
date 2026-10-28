@@ -111,6 +111,30 @@ def test_trainer_hook_flat_floats(monkeypatch):
     t = get_task("paper7/hellaswag")
     t.rows = _hs_rows(4)
     monkeypatch.setattr(harness, "suite_tasks", lambda suite, only=None: [t])
-    out = he.evaluate_model(SegmentSumModel(), kind="bytes", device="cpu", suites=["paper7"], limit=4)
+    m = SegmentSumModel().train()
+    out = he.evaluate_model(m, kind="bytes", device="cpu", suite="paper7", limit=4)
+    assert m.training
     assert out and all(isinstance(v, float) for v in out.values())
     assert "paper7/hellaswag/acc_norm_char" in out
+
+
+def test_report_plots_and_multiplier(tmp_path):
+    from hnet.eval.report import main as report_main
+
+    for name, scale in (("bpe", 1.0), ("hnet", 0.97)):
+        d = tmp_path / name
+        d.mkdir()
+        with open(d / "eval.jsonl", "w") as f:
+            for k in range(1, 9):
+                tok = 5e8 * k
+                f.write(json.dumps({"step": k, "tokens_eq": tok, "bytes_seen": 4.6 * tok,
+                                    "val/bpb": scale * (0.8 + 1.5 * (tok / 1e9) ** -0.4)}) + "\n")
+        with open(d / "metrics.jsonl", "w") as f:
+            f.write(json.dumps({"step": 1, "flops_per_byte": 1e9}) + "\n")
+    md = tmp_path / "r.md"
+    report_main(["--runs", str(tmp_path / "bpe"), str(tmp_path / "hnet"), "--plots", str(tmp_path / "plots"),
+                 "--baseline", str(tmp_path / "bpe"), "--md", str(md)])
+    assert (tmp_path / "plots" / "val_bpb_vs_tokens.png").exists()
+    assert (tmp_path / "plots" / "val_bpb_vs_flops.png").exists()
+    text = md.read_text()
+    assert "data multiplier vs bpe" in text and "| hnet |" in text

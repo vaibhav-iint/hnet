@@ -63,4 +63,4 @@ class SeqCtx:
 
     @classmethod
     def single(cls, T: int, device=None) -> "SeqCtx":
-        return cls.from_cu_seqlens(torch.tensor([0, T], dtype=torch.int32, device=device), T, T)
+        return cls.from_cu_seqlens(torch.arange(2, dtype=torch.int32, device=device) * T, T, T)

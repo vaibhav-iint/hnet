@@ -22,7 +22,7 @@ import numpy as np
 
 from hnet.eval import stats as st
 from hnet.eval.perturb import MODES, PERTURBATIONS, perturb_mc_item, robustness_score
-from hnet.eval.tasks import DERIVED, SUITE_AVERAGES, LMItem, MCItem, Task, get_task, suite_tasks
+from hnet.eval.tasks import DERIVED, SUITE_AVERAGES, LMItem, Task, get_task, suite_tasks
 
 LN2 = math.log(2)
 MC_METRICS = ("acc", "acc_norm_char", "acc_norm_token", "acc_norm_byte")
@@ -108,8 +108,8 @@ def summarize_task(task: Task, recs: List[dict], n_boot: int = 1000, seed: int =
 
 
 def evaluate_task(scorer, task: Task, limit: Optional[int] = None, n_boot: int = 1000, seed: int = 0,
-                  progress: bool = False):
-    items = task.items(limit)
+                  progress: bool = False, subset_seed: Optional[int] = None):
+    items = task.items(limit, subset_seed)
     recs = score_items(scorer, items, progress=progress)
     return summarize_task(task, recs, n_boot, seed), recs
 
@@ -155,17 +155,18 @@ def _averages(suite: str, tasks: Dict[str, Task], recs: Dict[str, List[dict]], n
 
 
 def evaluate_suite(scorer, suite: str, tasks: Optional[List[str]] = None, limit: Optional[int] = None,
-                   n_boot: int = 1000, seed: int = 0, progress: bool = False, task_objs: Optional[List[Task]] = None):
+                   n_boot: int = 1000, seed: int = 0, progress: bool = False, task_objs: Optional[List[Task]] = None,
+                   subset_seed: Optional[int] = None):
     """-> (summary dict, {task: records}). ``task_objs`` overrides the registry (tests inject rows)."""
     if suite == "robustness":
         return evaluate_robustness(scorer, limit=limit, n_boot=n_boot, seed=seed, progress=progress,
-                                   task=(task_objs or [None])[0])
+                                   task=(task_objs or [None])[0], subset_seed=subset_seed)
     tl = task_objs if task_objs is not None else suite_tasks(suite, tasks)
     tmap = {t.name: t for t in tl}
     summary = {"suite": suite, "tasks": {}}
     all_recs = {}
     for t in tl:
-        s, r = evaluate_task(scorer, t, limit, n_boot, seed, progress)
+        s, r = evaluate_task(scorer, t, limit, n_boot, seed, progress, subset_seed)
         summary["tasks"][t.name] = s
         all_recs[t.name] = r
     summary.update(_averages(suite, tmap, all_recs, n_boot, seed))
@@ -174,12 +175,12 @@ def evaluate_suite(scorer, suite: str, tasks: Optional[List[str]] = None, limit:
 
 def evaluate_robustness(scorer, limit: Optional[int] = None, perturbations=PERTURBATIONS, modes=MODES,
                         n_boot: int = 1000, seed: int = 0, progress: bool = False, task: Optional[Task] = None,
-                        metric: str = "acc_norm_char"):
+                        metric: str = "acc_norm_char", subset_seed: Optional[int] = None):
     """HellaSwag (paper7 / lm-eval prompt, acc_norm) under the BLT perturbations, each applied to the prompt, the
     completion and both (BLT protocol: average over the three). Robustness score per H-Net App. D.1, computed
     on the average over perturbations (as in Table 3). CIs resample documents jointly across variants."""
     task = task or get_task("paper7/hellaswag")
-    clean_items = task.items(limit)
+    clean_items = task.items(limit, subset_seed)
     variants = {"clean": clean_items}
     for p in perturbations:
         for m in modes:

@@ -46,7 +46,7 @@ def _init_head(head: nn.Linear, in_mean: float, in_std: float, init_scale: float
     """Logits ~ N(logit(1/N), init_scale^2) for i.i.d. inputs with mean ``in_mean`` and std ``in_std``."""
     with torch.no_grad():
         nn.init.normal_(head.weight, std=init_scale / (in_std * head.in_features**0.5))
-        head.bias.fill_(ratio_init_bias(target_ratio) - in_mean * head.weight.sum().item())
+        head.bias.copy_(ratio_init_bias(target_ratio) - in_mean * head.weight.sum(1))  # meta-device safe
     head.weight._no_reinit = True
 
 

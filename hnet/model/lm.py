@@ -58,7 +58,7 @@ def pack_inputs(
         return input_ids.reshape(-1), SeqCtx.from_cu_seqlens(cu, L, B * L), (B, L)
     T = input_ids.shape[0]
     if cu_seqlens is None:
-        cu_seqlens, max_seqlen = torch.tensor([0, T], dtype=torch.int32, device=input_ids.device), T
+        cu_seqlens, max_seqlen = torch.arange(2, dtype=torch.int32, device=input_ids.device) * T, T
     return input_ids, SeqCtx.from_cu_seqlens(cu_seqlens, max_seqlen, T), None
 
 
@@ -141,7 +141,7 @@ class HNetForCausalLM(nn.Module):
         out.bpred = bpred
         aux_terms = self.backbone.aux_losses(bpred)
         out.aux_loss = self.config.dc.ratio_loss_alpha * sum(loss for loss, _ in aux_terms)
-        stats = {"positions/s0": torch.tensor(float(ids.numel()), device=ids.device)}
+        stats = {"positions/s0": ids.new_full((), ids.numel(), dtype=torch.float32)}
         for s, (r, (loss, st)) in enumerate(zip(bpred, aux_terms)):
             n_sel = r.boundary_mask.sum().float()
             stats[f"aux/s{s}"] = loss.detach()

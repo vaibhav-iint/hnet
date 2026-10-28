@@ -76,9 +76,16 @@ class Task:
             self.rows = load_parquet_rows(self.source)
         return self.rows
 
-    def items(self, limit: Optional[int] = None) -> List[Item]:
+    def items(self, limit: Optional[int] = None, subset_seed: Optional[int] = None) -> List[Item]:
+        """First ``limit`` valid items (lm-eval ``--limit``), or a seeded random subset of ``limit`` rows when
+        ``subset_seed`` is given (unbiased; e.g. HellaSwag val starts with 3243 ActivityNet items)."""
+        rows = list(enumerate(self.load_rows()))
+        if subset_seed is not None and limit is not None:
+            import random
+
+            random.Random(subset_seed).shuffle(rows)
         out = []
-        for i, row in enumerate(self.load_rows()):
+        for i, row in rows:
             it = self.build(row, i)
             if it is not None:
                 out.append(it)

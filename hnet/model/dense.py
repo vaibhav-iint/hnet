@@ -55,7 +55,7 @@ class LlamaLM(nn.Module):
         h = self.backbone(self.embeddings(ids), ctx)
         out = lm_outputs(h, self.lm_head, labels, return_logits, batch_shape)
         out.aux_loss = torch.zeros((), device=ids.device)
-        out.stats = {"positions/s0": torch.tensor(float(ids.numel()), device=ids.device)}
+        out.stats = {"positions/s0": ids.new_full((), ids.numel(), dtype=torch.float32)}
         return out
 
     def init_weights(self):

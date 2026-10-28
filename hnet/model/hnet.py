@@ -5,8 +5,8 @@ Stage s with layout ``[enc, inner, dec]`` maps h [T, D^{s-1}] -> [T, D^{s-1}]:
     h        = cat(h, pad_dimension)                      (if D^s > D^{s-1}; learned, shared by all positions)
     h        = encoder(h)
     residual = residual_proj(h)                           (fp32 Linear, zero-init weight)
-    r        = router(h, ctx, **extras)                   -> RouterOutput
-    x, ctx'  = chunker(h, r.boundary_mask, ctx)
+    r        = router(h, ctx, **extras)                   -> RouterOutput ("start" or "end" boundary semantics)
+    x, ctx'  = chunker(h, r.boundary_mask, ctx)          (keeps the selected positions)
     z, preds = main_network(x, ctx', **extras')           (HNet stage s+1, or Isotropic if innermost)
     h        = dechunker(z, r, ctx, ctx') * STE(r.selected_probs) + residual      (fp32)
     h        = decoder(h)[:, :D^{s-1}]
@@ -23,7 +23,6 @@ from typing import List, Optional, Tuple
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from hnet import registry
 
@@ -105,12 +104,11 @@ class HNet(nn.Module):
         h = self.encoder(h, ctx)
         with _no_autocast(h.device):
             residual = self.residual_proj(h.float())
-        r = self.routing_module(
-            h, ctx, input_ids=input_ids, boundaries=boundaries[0] if boundaries else None
-        )
+        r = self.routing_module(h, ctx, input_ids=input_ids, boundaries=boundaries[0] if boundaries else None)
         x, ctx_inner = self.chunk_layer(h, r.boundary_mask, ctx)
         inner_ids = input_ids.index_select(0, ctx_inner.outer_index) if input_ids is not None else None
-        z, inner_preds = self.main_network(x, ctx_inner, input_ids=inner_ids, boundaries=boundaries[1:] if boundaries else None)
+        inner_boundaries = boundaries[1:] if boundaries else None
+        z, inner_preds = self.main_network(x, ctx_inner, input_ids=inner_ids, boundaries=inner_boundaries)
         out = self.dechunk_layer(z, r, ctx, ctx_inner)
         if self.use_ste:
             out = out * STE.apply(r.selected_probs)

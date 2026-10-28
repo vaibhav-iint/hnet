@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Dict, Optional, Sequence
 
 import numpy as np
 
@@ -170,14 +170,15 @@ def fit_curve(tokens, values, method: str = "powerlaw", increasing: Optional[boo
     if increasing is None:
         increasing = bool(np.polyfit(np.log(t), y, 1)[0] > 0)
     if method == "powerlaw":
-        best = None
-        for alpha in np.exp(np.linspace(math.log(1e-3), math.log(3.0), 600)):
-            X = np.stack([np.ones_like(t), t ** (-alpha)], 1)
-            coef, *_ = np.linalg.lstsq(X, y, rcond=None)
-            sse = float(((X @ coef - y) ** 2).sum())
-            if best is None or sse < best[0]:
-                best = (sse, alpha, coef)
-        _, alpha, (E, A) = best
+        alphas = np.exp(np.linspace(math.log(1e-3), math.log(3.0), 600))
+        X = t[None, :] ** (-alphas[:, None])  # [n_alpha, n]: closed-form simple regression y = E + A x per alpha
+        xm, ym = X.mean(1, keepdims=True), y.mean()
+        sxx = ((X - xm) ** 2).sum(1)
+        A_all = ((X - xm) * (y - ym)).sum(1) / np.maximum(sxx, 1e-300)
+        E_all = ym - A_all * xm[:, 0]
+        sse = ((E_all[:, None] + A_all[:, None] * X - y) ** 2).sum(1)
+        k = int(np.argmin(sse))
+        alpha, E, A = alphas[k], E_all[k], A_all[k]
         return Curve("powerlaw", increasing, t[0], t[-1], {"E": float(E), "A": float(A), "alpha": float(alpha)})
     if method == "quadratic_log":
         x = np.log(t)

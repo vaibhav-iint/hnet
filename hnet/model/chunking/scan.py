@@ -26,7 +26,7 @@ def linear_recurrence(u: torch.Tensor, log_a: torch.Tensor, reset: torch.Tensor,
     # L[b, i, k] = prod_{m=k+1..i} a_m for k <= i with no reset in (k, i]; else 0.
     tril = torch.ones(block, block, dtype=torch.bool, device=u.device).tril()
     keep = tril & (n_resets[:, :, None] == n_resets[:, None, :])
-    neg_inf = torch.tensor(float("-inf"), device=u.device, dtype=dtype)
+    neg_inf = torch.full((), float("-inf"), device=u.device, dtype=dtype)
     L = torch.where(keep, cum[:, :, None] - cum[:, None, :], neg_inf).exp()
     y = torch.bmm(L, u)  # zero state entering each block
     if nb > 1:

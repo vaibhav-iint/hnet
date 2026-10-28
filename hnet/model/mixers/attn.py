@@ -73,10 +73,10 @@ def select_backend(q: torch.Tensor) -> str:
 
 
 def _flex_fn():
-    """flex_attention compiled once on CUDA (eager flex is a slow reference implementation)."""
+    """flex_attention compiled once on CUDA, with dynamic shapes (eager flex is a slow reference implementation)."""
     global _compiled_flex
     if _compiled_flex is None:
-        _compiled_flex = torch.compile(flex_attention, dynamic=False)
+        _compiled_flex = torch.compile(flex_attention, dynamic=True)  # inner-stage lengths vary per step
     return _compiled_flex
 
 
@@ -93,7 +93,8 @@ def _block_mask(ctx: SeqCtx, window: int, device: torch.device):
             return keep
 
         T = ctx.total_len
-        bm = ctx.cache[key] = create_block_mask(mask_mod, None, None, T, T, device=device, _compile=device.type == "cuda")
+        bm = create_block_mask(mask_mod, None, None, T, T, device=device, _compile=device.type == "cuda")
+        ctx.cache[key] = bm
     return bm
 
 

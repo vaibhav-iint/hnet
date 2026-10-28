@@ -35,7 +35,7 @@ def _load(path):
 
 def paired(a_path, b_path, metric, n_boot):
     A, B = _load(a_path), _load(b_path)
-    print(f"| suite/task | n | A | B | A-B | 95% CI | p |\n|---|---|---|---|---|---|---|")
+    print("| suite/task | n | A | B | A-B | 95% CI | p |\n|---|---|---|---|---|---|---|")
     for key in sorted(set(A) & set(B)):
         ids = sorted(set(A[key]) & set(B[key]))
         m = metric if metric in A[key][ids[0]] else "acc"

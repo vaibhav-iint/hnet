@@ -166,3 +166,46 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
   - FLOPs for the modded model are approximated by the Llama count (about 4% off);
   - S2 learning rates are unswept;
   - Muon on fused matrices could be split.
+
+### 23:35 · WS-A2 (modular H-Net model) and WS-D (trainer) finished
+- **WS-A2:** 51 model tests pass.
+  - They cover causality for every router under both semantics, packed vs separate documents, dense/H-Net parity,
+    attention backends vs a naive loop, the scan vs a loop, and STE gradient flow.
+  - **Official-checkpoint check:** Cartesia's `hnet_2stage_L` loads into our code (328/328 keys) and scores 0.37–0.66
+    bpb on English paragraphs.
+  - Greedy "The capital of France is" → " Paris. It is the capital of the French region of".
+  - Realized compression 3.09 / 2.39. The checkpoint was deleted afterwards.
+  - End-of-chunk routers share the select/plug-back code with start semantics; each router declares its semantics.
+- **WS-D:** 25 trainer tests pass, covering real H-Net and dense e2e training, exact resume and 2-process DDP.
+  - All workstreams are integrated: data, FLOPs/MFU, eval, Muon with `set_progress`.
+  - Run files are in `configs/runs/`.
+- **Decision:** peak LR follows the paper's rule (GPT-3 LR × 2.5): 1.5e-3 for the 125M runs and 7.5e-4 for 350M, the
+  same for BPE and H-Net. To be sanity-checked in the tiny sweep.
+- CPU smoke run through the real trainer: loss 4.8 → 1.7 in 20 steps; per-stage LR multipliers 3.03 / 1.43 / 0.88;
+  compression logged.
+- Downloaded and converted FineWeb-Edu train shard 1 (100M tokens → 462 MB of bytes, exact decoding).
+
+### 23:40 · GCP (user: "try using gcp instead")
+- The user uploaded a service-account key for project `neat-dispatch-501718-a5`. It is kept in an isolated gcloud
+  config in the scratchpad; the environment's preset `CLOUDSDK_AUTH_ACCESS_TOKEN` must be unset to use it.
+- Enabled: Compute Engine, Vertex AI, Storage, Logging.
+- Regional quotas (on-demand / spot): A100-40GB 16/64, L4 16/16, T4 8/8, V100 8/16; no H100.
+- The service account **cannot** create or list GCS buckets (403). Resource Manager API is disabled, so no IAM
+  self-check.
+- Probe: created one spot L4 VM (`hnet-gpu-probe`, us-central1-a, Deep Learning VM PyTorch 2.9/CUDA 12.9) with a
+  15-minute max run duration and auto-delete, no service account attached. Creation succeeded.
+
+### 23:55 · All 7 workstreams done; milestone-1
+- **WS-E (eval):** 60 tests pass.
+  - Per-choice logprobs match an independent HF lm-eval re-implementation within 6e-5.
+  - GPT-2 HellaSwag acc_norm 31.2 [26.9, 35.8] on 400 items vs lm-eval's 31.1 on full val.
+  - Two prompt suites: `paper7` (lm-eval yamls) and `smollm3_cf` (lighteval at a pinned commit, quirks included).
+  - Robustness perturbations follow BLT/ByT5 definitions.
+  - The multiplier estimator recovers 1.75x / 2.95x on Cartesia's SmolLM3 curve.
+- **Full suite: 342 passed, 26 skipped (CUDA-only), 2 slow deselected.** Tagged `milestone-1`.
+- CPU is too slow for the architecture search: a tiny H-Net takes ~35 s per 131 KB step on the shared 4 cores. GPU
+  runs are needed.
+- **GCP probe result:** the spot L4 VM booted with driver 580, torch 2.9.1+cu129, CUDA OK and HF reachable. Output was
+  read via the serial console, and the VM was deleted after ~4 minutes; no VMs of ours remain.
+- The service account can create GPU VMs but cannot write Cloud Storage. Results would come back via serial console
+  and guest attributes unless the user grants bucket access.

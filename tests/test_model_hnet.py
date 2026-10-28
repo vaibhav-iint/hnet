@@ -5,7 +5,7 @@ import torch
 
 from hnet import registry
 from hnet.config import IGNORE_INDEX, DenseConfig, HNetConfig
-from hnet.model import HNetForCausalLM, build_model
+from hnet.model import build_model
 from hnet.model import lm as lm_mod
 
 torch.set_num_threads(1)
@@ -190,7 +190,8 @@ def test_init_stage_map_blocks():
     fc1 = big.backbone.main_network.main_network.main_network.layers[0].mlp.fc1.weight
     assert abs(fc2.std().item() / (0.02 / n_res**0.5) - 1) < 0.05 and abs(fc1.std().item() / 0.02 - 1) < 0.05
     assert torch.equal(big.backbone.routing_module.q_proj_layer.weight, torch.eye(64))
-    assert big.backbone.residual_proj.weight.abs().sum() == 0 and big.backbone.residual_proj.weight.dtype == torch.float32
+    rp = big.backbone.residual_proj.weight
+    assert rp.abs().sum() == 0 and rp.dtype == torch.float32
     assert abs(big.embeddings.weight.std().item() - 1.0) < 0.05
 
 
@@ -211,3 +212,11 @@ def test_dense_api():
     out = m(ids, labels=ids)
     assert out.logits.shape == (2, 16, 300) and m.lm_head.weight is m.embeddings.weight
     assert m.stage_of_param("embeddings.weight") == 0 and len(m.blocks()) == 2
+
+
+@pytest.mark.parametrize("router", sorted(set(ROUTERS) | {"external"}))
+def test_builds_on_meta_device(router):
+    """FLOPs/param counting and checkpoint loading build models on the meta device."""
+    with torch.device("meta"):
+        m = build_model(tiny_cfg(router))
+    assert all(p.is_meta for p in m.parameters())

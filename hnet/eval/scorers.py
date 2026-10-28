@@ -27,10 +27,9 @@ right-padded (HF models, causal so padding never leaks into scored positions).
 
 from __future__ import annotations
 
-import math
 from contextlib import nullcontext
 from dataclasses import dataclass
-from typing import Callable, List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 import torch
 import torch.nn.functional as F
@@ -89,8 +88,9 @@ class BaseScorer:
         """-> (prefix ids, text ids) for rolling / bpb scoring."""
         raise NotImplementedError
 
-    def _logits(self, inputs: List[List[int]]) -> List[torch.Tensor]:
-        """Run the model on a batch of input sequences; return logits [len(seq), V] for each."""
+    def _logits(self, inputs: List[List[int]], ncont: List[int]) -> List[torch.Tensor]:
+        """Run the model on a batch of input sequences; for each, return the logits of its last ``n`` positions
+        ([n, V], the rows that predict the continuation)."""
         raise NotImplementedError
 
     # ------------------------------------------------------------------ public API
@@ -163,11 +163,10 @@ class BaseScorer:
                if self.amp_dtype is not None else nullcontext())
         for b in it:
             with amp:
-                logits = self._logits([items[i][0] for i in b])
+                logits = self._logits([items[i][0] for i in b], [len(items[i][1]) for i in b])
             for i, lg in zip(b, logits):
                 inp, tgt = items[i]
-                n = len(tgt)
-                rows = lg[len(inp) - n:len(inp)].float()
+                rows = lg.float()
                 lp = F.log_softmax(rows, dim=-1)
                 t = torch.tensor(tgt, device=lp.device, dtype=torch.long)
                 tok_lp = lp.gather(-1, t[:, None]).squeeze(-1)
@@ -184,7 +183,7 @@ class _OwnModelScorer(BaseScorer):
         super().__init__(**kw)
         self.model = model.to(self.device).eval() if hasattr(model, "to") else model
 
-    def _logits(self, inputs):
+    def _logits(self, inputs, ncont):
         dev = self.device
         if self.packed:
             lens = [len(x) for x in inputs]
@@ -193,14 +192,14 @@ class _OwnModelScorer(BaseScorer):
             cu[1:] = torch.cumsum(torch.tensor(lens), 0)
             out = self.model(ids, cu_seqlens=cu.to(dev), max_seqlen=max(lens), return_logits=True)
             lg = out.logits.reshape(-1, out.logits.shape[-1])
-            return [lg[int(cu[k]):int(cu[k + 1])] for k in range(len(lens))]
+            return [lg[int(cu[k + 1]) - n:int(cu[k + 1])] for k, n in enumerate(ncont)]
         # padded [B, L]: right padding, each row one segment (causal => padding never affects scored rows)
         L = max(len(x) for x in inputs)
         ids = torch.zeros(len(inputs), L, dtype=torch.long)
         for r, x in enumerate(inputs):
             ids[r, :len(x)] = torch.tensor(x)
         out = self.model(ids.to(dev), return_logits=True)
-        return [out.logits[r, :len(x)] for r, x in enumerate(inputs)]
+        return [out.logits[r, len(x) - n:len(x)] for r, (x, n) in enumerate(zip(inputs, ncont))]
 
 
 class ByteModelScorer(_OwnModelScorer):
@@ -284,7 +283,7 @@ class HFScorer(_TokenizerMixin, BaseScorer):
 
     def __init__(self, name: str, revision: Optional[str] = None, dtype: Optional[torch.dtype] = None,
                  add_bos: Optional[bool] = None, max_len: Optional[int] = None, batch_tokens: int = 16384,
-                 device=None, model=None, tokenizer=None, **kw):
+                 device=None, model=None, tokenizer=None, fast_head: Optional[bool] = None, **kw):
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         device = torch.device(device) if device is not None else _default_device()
@@ -294,6 +293,11 @@ class HFScorer(_TokenizerMixin, BaseScorer):
         if model is None:
             model = AutoModelForCausalLM.from_pretrained(name, revision=revision, dtype=dtype)
         self.model = model.to(device).eval()
+        if fast_head is None:  # base_model + output embeddings == full forward for plain decoder LMs
+            cfg = self.model.config
+            fast_head = cfg.model_type in ("gpt2", "llama", "smollm3", "mistral", "qwen2", "gpt_neox") and not \
+                getattr(cfg, "final_logit_softcapping", None)
+        self.fast_head = bool(fast_head)
         if max_len is None:
             cfg = self.model.config
             max_len = getattr(cfg, "n_positions", None) or getattr(cfg, "max_position_embeddings", None) or 2048
@@ -313,7 +317,7 @@ class HFScorer(_TokenizerMixin, BaseScorer):
     def _enc(self, text):
         return self.tok.encode(text, add_special_tokens=False)
 
-    def _logits(self, inputs):
+    def _logits(self, inputs, ncont):
         L = max(len(x) for x in inputs)
         pad = self.tok.pad_token_id if self.tok.pad_token_id is not None else 0
         ids = torch.full((len(inputs), L), pad, dtype=torch.long)
@@ -321,8 +325,14 @@ class HFScorer(_TokenizerMixin, BaseScorer):
         for r, x in enumerate(inputs):
             ids[r, :len(x)] = torch.tensor(x)
             mask[r, :len(x)] = 1
-        out = self.model(input_ids=ids.to(self.device), attention_mask=mask.to(self.device))
-        return [out.logits[r, :len(x)] for r, x in enumerate(inputs)]
+        ids, mask = ids.to(self.device), mask.to(self.device)
+        head = self.model.get_output_embeddings() if self.fast_head else None
+        if head is not None:
+            # LM head only on the scored rows (full [B, L, V] logits would dominate memory for 50k+ vocabularies)
+            h = self.model.base_model(input_ids=ids, attention_mask=mask).last_hidden_state
+            return [head(h[r, len(x) - n:len(x)]) for r, (x, n) in enumerate(zip(inputs, ncont))]
+        out = self.model(input_ids=ids, attention_mask=mask)
+        return [out.logits[r, len(x) - n:len(x)] for r, (x, n) in enumerate(zip(inputs, ncont))]
 
 
 def make_scorer(model, kind: str, **kw) -> BaseScorer:

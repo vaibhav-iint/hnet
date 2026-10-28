@@ -1,4 +1,4 @@
-"""Real smoke test: GPT-2 small (HF) on 50 HellaSwag val items. Downloads ~550 MB once; marked slow.
+"""Real smoke test: GPT-2 small (HF) on 50 random HellaSwag val items (the first 3243 are all ActivityNet, easier). Downloads ~550 MB once; marked slow.
 
     OMP_NUM_THREADS=4 python -m pytest -q -s tests/test_eval_smoke_gpt2.py -m slow
 
@@ -22,12 +22,12 @@ def test_gpt2_hellaswag_50():
     assert sc.add_bos is False and sc.prefix_id == 50256  # lm-eval GPT-2 behaviour
     out = {}
     for suite in ("paper7", "smollm3_cf"):
-        s, recs = evaluate_suite(sc, suite, tasks=["hellaswag"], limit=50, n_boot=200)
+        s, recs = evaluate_suite(sc, suite, tasks=["hellaswag"], limit=50, n_boot=200, subset_seed=0)
         m = s["tasks"]["hellaswag"]["metrics"]
         out[suite] = {k: round(100 * m[k]["value"], 1) for k in ("acc", "acc_norm_char", "acc_norm_token")}
         out[suite]["soft_bpb"] = round(m["soft_bpb"]["value"], 3)
         assert len(recs["hellaswag"]) == 50
-    print("\nGPT-2 small, HellaSwag first 50 val items:", out)
+    print("\nGPT-2 small, HellaSwag 50 random val items (subset_seed=0):", out)
     assert 0.15 <= out["paper7"]["acc_norm_char"] / 100 <= 0.55
     # same tokenization through tiktoken (our TokenModelScorer path) with the HF weights
     tk = TokenModelScorer(sc.model, tokenizer="gpt2", add_bos=False, device="cpu", max_len=1024)

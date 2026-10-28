@@ -139,16 +139,25 @@ def run_bpb(scorer, info, valset_name: str, n_bytes: int, max_batches=None):
 
 
 def evaluate_model(model, model_cfg=None, kind: str = "bytes", device=None, suites=("paper7",), limit: int = 500,
-                   n_boot: int = 0, tasks=None, **kw) -> dict:
-    """Hook for the trainer (``eval.downstream`` section): flat {name: float} for a live model."""
+                   n_boot: int = 0, tasks=None, subset_seed: Optional[int] = 0, suite=None, **kw) -> dict:
+    """Hook for the trainer (``eval.downstream: {suite|suites, tasks, limit, n_boot}``): flat {name: float} for a live
+    model. ``limit`` items per task are a fixed seeded random subset (``subset_seed``), identical across checkpoints."""
+    if suite is not None:
+        suites = suite
     from hnet.eval.harness import evaluate_suite
 
+    was_training = getattr(model, "training", False)
     k = "byte" if kind in ("bytes", "byte") else "token"
-    sc = ByteModelScorer(model, device=device, **kw) if k == "byte" else TokenModelScorer(model, device=device, **kw)
     out = {}
-    for s in ([suites] if isinstance(suites, str) else suites):
-        summary, _ = evaluate_suite(sc, s, tasks=tasks, limit=limit, n_boot=n_boot)
-        out.update(_flatten(summary))
+    if isinstance(tasks, str):
+        tasks = tasks.split(",")
+    try:
+        sc = ByteModelScorer(model, device=device, **kw) if k == "byte" else TokenModelScorer(model, device=device, **kw)
+        for s in (suites.split(",") if isinstance(suites, str) else suites):
+            summary, _ = evaluate_suite(sc, s, tasks=tasks, limit=limit, n_boot=n_boot, subset_seed=subset_seed)
+            out.update(_flatten(summary))
+    finally:
+        model.train(was_training)  # the scorer puts the model in eval mode
     return out
 
 
@@ -157,7 +166,9 @@ def main(argv=None):
     ap.add_argument("--model", required=True)
     ap.add_argument("--suite", default="paper7", help="paper7|smollm3_cf|robustness|bpb|all (comma list ok)")
     ap.add_argument("--tasks", default=None, help="comma-separated task names within the suite")
-    ap.add_argument("--limit", type=int, default=None, help="max items per task")
+    ap.add_argument("--limit", type=int, default=None, help="max items per task (first N, as lm-eval)")
+    ap.add_argument("--subset-seed", type=int, default=None,
+                    help="with --limit: a seeded random subset instead of the first N items")
     ap.add_argument("--out", default=None, help="results json")
     ap.add_argument("--items", default=None, help="per-item records jsonl (for paired bootstrap)")
     ap.add_argument("--n-boot", type=int, default=1000)
@@ -190,7 +201,7 @@ def main(argv=None):
         else:
             tasks = a.tasks.split(",") if a.tasks else None
             summary, recs = evaluate_suite(scorer, s, tasks=tasks, limit=a.limit, n_boot=a.n_boot, seed=a.seed,
-                                           progress=a.progress)
+                                           progress=a.progress, subset_seed=a.subset_seed)
             summary["seconds"] = time.time() - ts
             results["suites"][s] = summary
             results["flat"].update(_flatten(summary))
