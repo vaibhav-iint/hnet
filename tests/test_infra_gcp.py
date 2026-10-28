@@ -531,3 +531,31 @@ def test_cli_resume_rerun_pushes_new_job(monkeypatch):
     rec = State(C.state_dir() / "state.json").get("hnet-r")
     assert rec["meta"]["job"]["cmd"] == "echo 2" and rec["meta"]["job"]["nonce"] != "n1"
     assert len(rec["segments"]) == 2 and rec["segments"][1]["end"] is None
+
+
+def test_overlay_roundtrip_and_missing_config_check(tmp_path, monkeypatch):
+    root = tmp_path / "src"
+    (root / "configs" / "runs").mkdir(parents=True)
+    (root / "configs" / "runs" / "a.yaml").write_text("train: {}\n")
+    (root / "configs" / "runs" / "__pycache__").mkdir()
+    (root / "configs" / "runs" / "__pycache__" / "x.pyc").write_bytes(b"\0")
+    b64 = startup.make_overlay(["configs/runs"], root)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.setattr(VA, "REPO", str(repo))
+    ser = tmp_path / "tty"
+    ser.write_text("")
+    ag = VA.Agent({"overlay_b64": b64}, VA.Emitter(dev=str(ser)))
+    ag.apply_overlay()
+    assert (repo / "configs" / "runs" / "a.yaml").read_text() == "train: {}\n"
+    assert not (repo / "configs" / "runs" / "__pycache__" / "x.pyc").exists()
+    with pytest.raises(FileNotFoundError):
+        startup.make_overlay(["nope"], root)
+    # configs/runs is .gitignored by `runs/` in this repo: the launch check must notice untracked configs
+    sha = subprocess.run(["git", "-C", str(C.REPO_ROOT), "rev-parse", "HEAD"], capture_output=True,
+                         text=True).stdout.strip()
+    if sha:
+        cmd = "python -m hnet.train.train --config configs/does_not_exist.yaml"
+        assert cli.missing_configs(cmd, sha, []) == ["configs/does_not_exist.yaml"]
+        assert cli.missing_configs(cmd, sha, ["configs"]) == []
+        assert cli.missing_configs("python -m hnet.train.train --config configs/README.md", sha, []) == []
