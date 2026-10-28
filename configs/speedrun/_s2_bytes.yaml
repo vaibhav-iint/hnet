@@ -1,0 +1,21 @@
+# Shared S2 setup: byte-level H-Net on the same FineWeb train documents (decoded to UTF-8), equal bytes per step
+# to S1: 512 windows x 4608 bytes = 2,359,296 bytes/step (S1: 524,288 tokens x 4.436 bytes/token = 2,325,700;
+# +1.4%). Model configs (configs/models/hnet*_speedrun.yaml, WS-B) are FLOPs/byte-matched to bpe_speedrun_124m,
+# whose matmul FLOPs are within ~3% of S1's (see docs/SPEEDRUN.md). Same 1390-step schedule as S1.
+include: _speedrun_train.yaml
+data:
+  source: fineweb10B
+  kind: bytes
+  seq_len: 4608
+  micro_batch: 16
+  batch_bytes: 2359296
+train:
+  compile: blocks
+  # Muon variant (default here): the record's split, with LRs re-scaled for H-Net (proposal; sweep muon.lr and
+  # lr_other first). The per-stage multipliers (lr_multiplier: auto) multiply every group of a stage.
+  muon:
+    lr: 0.02
+    lr_embed: 0.02
+    lr_head: 0.008
+    lr_other: 0.004
+    router: adam

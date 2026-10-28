@@ -107,3 +107,20 @@ def test_verify_sample(ds):
     v = _verify_sample(ds["token_paths"][1], ds["byte_paths"][1], ds["idx_paths"][1], 20, 0)
     assert v["decode_exact"] == v["n_checked"] > 0
     assert v["reencode_match"] == v["n_reencode"] > 0
+
+
+def test_real_val_shard_smoke():
+    """Runs only when scripts/data/prepare.py has converted the FineWeb-Edu val shard locally."""
+    from hnet.data.download import bytes_dir, dataset_dir
+
+    tp = dataset_dir("finewebedu10B") / "finewebedu_val_000000.bin"
+    bp, ip = S.byte_paths(bytes_dir("finewebedu10B"), "finewebedu_val_000000")
+    if not (tp.exists() and bp.exists() and ip.exists()):
+        pytest.skip("real val shard not prepared")
+    enc = tiktoken.get_encoding("gpt2")
+    toks, data, idx = S.read_token_shard(tp), S.read_byte_shard(bp), S.read_doc_index(ip)
+    for i in [0, 1, len(idx) // 2, len(idx) - 1]:
+        tt = S.doc_text_tokens(toks, idx[i]).astype(np.int64).tolist()
+        assert bytes(S.doc_text_bytes(data, idx[i])) == enc.decode_bytes(tt)
+    bpt = idx[:, S.N_BYTES].sum() / idx[:, S.N_TOKENS].sum()
+    assert 4.4 < bpt < 4.8

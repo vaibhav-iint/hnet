@@ -1,0 +1,7 @@
+# Shared CPU smoke-test overrides: the trainer's built-in synthetic corpus, a few fp32 steps, no compile.
+include: _speedrun_train.yaml
+data: {source: synthetic, micro_batch: 2}
+train: {steps: 12, precision: fp32, compile: false, device: cpu, ckpt_every: 0, save_final: false, resume: null,
+        muon: {momentum_warmup_steps: 4}}
+eval: {val: auto, every: 6, max_docs: 8}
+log: {every: 2}

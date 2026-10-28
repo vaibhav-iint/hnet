@@ -1,0 +1,32 @@
+# Shared optimization recipe of the speedrun runs: modded-nanogpt record #18 (2025-01-04), see docs/SPEEDRUN.md.
+# 1390 steps x 524,288 tokens (~2.33 GB of text); constant LR, then linear decay to 0 over the last 40%;
+# Muon (lr 0.05, momentum 0.85 -> 0.95 over 300 steps) on hidden matrices, Adam (0.8, 0.95) on the rest;
+# no warmup, no grad clipping, no weight decay. Validation every 125 steps (as the record).
+train:
+  optimizer: muon
+  muon:
+    lr: 0.05
+    momentum: 0.95
+    momentum_warmup_start: 0.85
+    momentum_warmup_steps: 300
+    nesterov: true
+    ns_steps: 5
+    weight_decay: 0.0
+    lr_embed: 0.6
+    lr_head: 0.008
+    lr_other: 0.04
+    adam_betas: [0.8, 0.95]
+    adam_eps: 1.0e-8
+    adam_weight_decay: 0.0
+  schedule: {name: wsd, warmup: 0, decay: 0.4, decay_shape: linear, min_lr_ratio: 0.0}
+  steps: 1390
+  grad_clip: 0.0
+  precision: bf16
+  compile: model
+  ckpt_every: 500
+eval:
+  val: speedrun_fineweb_val  # hnet.data.speedrun_valset: whole docs of the first 10,485,761 val tokens
+  every: 125
+  at_end: true
+log:
+  every: 10

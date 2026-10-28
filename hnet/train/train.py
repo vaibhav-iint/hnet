@@ -94,7 +94,10 @@ class Trainer:
         else:
             self.device = torch.device(dev)
         if self.world > 1 and not dist.is_initialized():
-            dist.init_process_group("nccl" if self.device.type == "cuda" else "gloo")
+            import datetime
+
+            dist.init_process_group("nccl" if self.device.type == "cuda" else "gloo",
+                                    timeout=datetime.timedelta(minutes=float(tc.get("dist_timeout_min", 60))))
         self.is_main = self.rank == 0
         self.cuda = self.device.type == "cuda"
         if self.cuda:
@@ -321,31 +324,49 @@ class Trainer:
         return {"val/bpb": ce_v / LN2 / max(nb_v, 1.0), "val/bytes": int(nb_v), "val/docs": int(nd_v)}
 
     def downstream_eval(self) -> dict:
+        """Optional zero-shot eval via hnet.eval (WS-E), rank 0 only. Config ``eval.downstream``:
+        ``{every, suite (paper7), tasks (null = suite default), limit, n_boot}``. Returns flat numeric leaves."""
         ds = self.ec.get("downstream")
         if not ds:
             return {}
-        try:
-            import hnet.eval as he  # WS-E, optional
-        except ImportError:
+        try:  # lazy, optional
+            from hnet.eval.harness import evaluate_suite
+            from hnet.eval.scorers import make_scorer
+        except ImportError as e:
+            print(f"[train] downstream eval unavailable: {e!r}", file=sys.stderr)
             return {}
-        fn = getattr(he, "evaluate_model", None) or getattr(he, "run_downstream", None)  # TODO(interface)
-        if fn is None:
-            return {}
+        was_training = self.raw.training
         try:
-            res = fn(self.raw, model_cfg=self.mcfg, kind=self.kind, device=self.device, **{
-                k: v for k, v in ds.items() if k != "every"})
-            return {f"downstream/{k}": v for k, v in (res or {}).items() if isinstance(v, (int, float))}
-        except Exception as e:
+            scorer = make_scorer(self.raw, "byte" if self.kind == "bytes" else "token", device=self.device)
+            summary, _ = evaluate_suite(scorer, ds.get("suite", "paper7"), tasks=ds.get("tasks"),
+                                        limit=ds.get("limit"), n_boot=int(ds.get("n_boot", 200)))
+        except Exception as e:  # never kill a training run over eval
             print(f"[train] downstream eval failed: {e!r}", file=sys.stderr)
             return {}
+        finally:
+            self.raw.train(was_training)
+        flat = {}
 
-    def run_eval(self, final: bool = False):
-        rec = self.evaluate()
+        def walk(prefix, v):
+            if isinstance(v, dict):
+                for k, x in v.items():
+                    walk(f"{prefix}/{k}", x)
+            elif isinstance(v, (int, float)) and not isinstance(v, bool):
+                flat[prefix] = v
+
+        walk("downstream", {k: v for k, v in summary.items() if k != "suite"})
+        return flat
+
+    def run_eval(self, final: bool = False, val: bool = True, downstream: bool = False):
+        """Collective: every rank must call it at the same step."""
+        rec = self.evaluate() if val else {}
         ds = self.ec.get("downstream") or {}
-        if ds and self.is_main and (final or (ds.get("every") and self.step % int(ds["every"]) == 0)):
+        if ds and self.is_main and (final or downstream):
             rec.update(self.downstream_eval())
+        if self.world > 1 and ds and (final or downstream):
+            dist.barrier()
+        bytes_seen, tokens_eq = self._global_counters()
         if rec:
-            bytes_seen, tokens_eq = self._global_counters()
             rec = {"step": self.step, "tokens_eq": tokens_eq, "bytes_seen": bytes_seen, **rec}
             self.logger.log(rec, kind="eval")
         return rec
@@ -374,6 +395,7 @@ class Trainer:
         tc, lc = self.tc, self.lc
         log_every = int(lc.get("every", 10))
         eval_every = int(self.ec.get("every") or 0)
+        ds_every = int((self.ec.get("downstream") or {}).get("every") or 0)
         ckpt_every = int(tc.get("ckpt_every") or 0)
         ckpt_steps = set(int(s) for s in (tc.get("ckpt_steps") or []))
         ckpt_every_tok = float(tc.get("ckpt_every_tokens") or 0)
@@ -473,8 +495,10 @@ class Trainer:
                 if self.dry_run:
                     continue
 
-                if eval_every and self.step % eval_every == 0 and self.step < self.total_steps:
-                    self.run_eval()
+                do_val = bool(eval_every) and self.step % eval_every == 0
+                do_ds = bool(ds_every) and self.step % ds_every == 0
+                if (do_val or do_ds) and self.step < self.total_steps:
+                    self.run_eval(val=do_val, downstream=do_ds)
                 stop = False
                 if self.step % check_every == 0 or self.step == end_step:
                     stop = self._should_stop(t_start, step_time)

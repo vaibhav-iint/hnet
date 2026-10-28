@@ -160,10 +160,7 @@ def test_models_matched(path):
         return
     rr = _ref_flops(os.path.join(os.path.dirname(path), ref + ".yaml"))
     err = r["flops_per_byte"] / rr["flops_per_byte"] - 1
-    if path.endswith("_ratios42.yaml"):  # deliberately not re-matched (MATCHING.md)
-        assert abs(err) < 0.06
-    else:
-        assert abs(err) <= 0.02, f"{os.path.basename(path)}: {100 * err:+.2f}% vs {ref}"
+    assert abs(err) <= 0.02, f"{os.path.basename(path)}: {100 * err:+.2f}% vs {ref}"
 
 
 def test_ablations_differ_only_in_dc_or_mixers():

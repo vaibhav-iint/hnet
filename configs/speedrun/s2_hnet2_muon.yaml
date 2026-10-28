@@ -1,0 +1,5 @@
+# S2, 2-stage H-Net, Muon on hidden matrices (incl. Mamba-2 in/out_proj), Adam on the rest (see _s2_bytes.yaml).
+include: _s2_bytes.yaml
+model: {include: ../models/hnet2_speedrun.yaml}
+train:
+  out_dir: runs/speedrun/s2_hnet2_muon

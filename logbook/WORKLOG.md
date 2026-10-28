@@ -99,3 +99,18 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
 - Note for the tiny runs: tiny BPE models are dominated by the 50K-vocab LM head, so FLOPs-matched tiny H-Nets have
   3–4x the parameters.
 - Fixed `configs/hnet_3p7b_smollm3.yaml` (it had an invalid `dc.smoothing` key).
+
+### 22:50 · WS-F (Prime infrastructure) finished; GPU access blocker found
+- `python -m infra.prime` provides offers / launch (budget guard: $500 total, $50 per launch) / sync / setup / run
+  (detached) / tail / pull / cost / teardown. 14 unit tests pass.
+- Live end-to-end test on one CPU sandbox: 2.6 minutes, billed $0.0013, torn down and verified gone.
+- **Blocker:** H200 pods ($5.55/h effective) are controlled only via SSH, and this container can only make HTTPS
+  connections. GPU *sandboxes* (HTTPS, which our tooling supports) need an explicit grant from Prime. No cheaper GPU
+  types are listed right now.
+- The team wallet is shared with three other running team sandboxes, so spend is tracked in our own ledger plus our
+  resource ids.
+- Options taken to the user:
+  - (a) ask Prime to enable GPU sandboxes;
+  - (b) attach this session to a folder on the user's computer (Remote Control) so pod SSH runs there;
+  - (c) last resort: pods with a self-running custom template.
+- CPU sandboxes (≤16 vCPU, ~$1.1/h) work now and can host the 1–10M architecture search.

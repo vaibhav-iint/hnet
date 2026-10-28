@@ -97,5 +97,5 @@ def valset_texts(valset) -> list:
     """Document texts of a ValSet (for scorers with other tokenizers, via ``bpb_of_texts``)."""
     from hnet.data.shards import decode_tokens_to_stream
 
-    return [bytes(decode_tokens_to_stream(t)[0].astype("uint8").tobytes()).decode("utf-8", errors="replace")
+    return [decode_tokens_to_stream(t)[0].tobytes().decode("utf-8", errors="replace")
             for t in valset._doc_tokens]

@@ -1,0 +1,26 @@
+# S1: the record-#18 GPT (hnet/model/dense_modded.py) in our trainer on 1 GPU, same batch/schedule/steps as the
+# record. One 65,536-token window per micro-step (the record's per-GPU micro-batch, document-masked), 8 micro-steps
+# per step = the record's 8 GPUs as gradient accumulation. Needs ~35-40 GB (fp32 logits of 64K x 50304);
+# on a 24 GB card use --set data.seq_len=32768 (16 micro-steps; windows cut documents at 32K instead of 64K).
+# Pass: tokens to the 3.28-equivalent bpb (scripts/speedrun/target.py) within 10% of S0 (run_reference.sh record18).
+include: _speedrun_train.yaml
+model:
+  type: dense
+  variant: modded
+  vocab_size: 50304
+  d_model: 768
+  n_layers: 12
+  d_intermediate: 3072
+  num_heads: 6
+  tie_embeddings: false
+  norm_eps: 1.0e-6
+  extra: {n_value_embeds: 3, skip_attn_layers: [7], unet_skips: true, logit_softcap: 15.0, rope_base: 1024.0,
+          rope_frac: 0.5, window_tokens: [128, 1856]}
+data:
+  source: fineweb10B  # modded-nanogpt's kjj0/fineweb10B-gpt2 shards
+  kind: tokens
+  seq_len: 65536
+  micro_batch: 1
+  batch_tokens: 524288
+train:
+  out_dir: runs/speedrun/s1_modded

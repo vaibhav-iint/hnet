@@ -24,7 +24,7 @@ from hnet.model.ctx import SeqCtx  # noqa: E402
 from hnet.model.mixers.mamba2 import Mamba2  # noqa: E402
 
 FULL = dict(d_model=[256, 768], seqlen=[2048, 8192], d_state=[64, 128])
-SMALL = dict(d_model=[256], seqlen=[512, 2048], d_state=[64])
+SMALL = dict(d_model=[256], seqlen=[2048, 8192], d_state=[64])
 
 
 def _rss_kb(field: str) -> int:
