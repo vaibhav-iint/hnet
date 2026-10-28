@@ -64,7 +64,7 @@ a { color: var(--accent); }
 <div class="wrap">
   <header class="top">
     <h1>H-Net Logbook</h1>
-    <span class="meta">updated 2026-10-28 22:18 UTC</span>
+    <span class="meta">updated 2026-10-28 22:54 UTC</span>
   </header>
   <p class="lede">Byte-level H-Net vs tokenized Transformers at 100M–500M parameters, built from scratch on a $500 budget.
   The experiment log records each run with configs, costs and loss curves. The work log records everything else.</p>
@@ -361,7 +361,7 @@ Times are UTC. Experiments (anything with a result) are written up in <a href="E
 <ul>
 <li>The container is ephemeral, so work-in-progress is snapshotted to <code>main</code> whenever I stop. These are commits titled
   "WIP snapshot" and may contain partial, untested agent code.</li>
-<li>Tested integration points get a normal commit message and a <code>milestone-*</code> tag.</li>
+<li>Tested integration points get a normal commit message and a <code>milestone-*</code> branch on the remote (tag pushes are blocked by this session's git proxy; tags exist locally only).</li>
 </ul>
 <h3>22:30 · Reverse-engineering the blog's router (user: "the blog architecture differs; we'll have to guess")</h3>
 <ul>
@@ -375,7 +375,153 @@ Times are UTC. Experiments (anything with a result) are written up in <a href="E
   ablation and tiny configs.</li>
 <li>PLAN.md §2b: 1–10M architecture search over boundary semantics, router function, ratios, smoothing, α and
   optimizer, ~$20.</li>
-</ul></section>
+</ul>
+<h3>22:45 · WS-B (FLOPs + matched configs) finished</h3>
+<ul>
+<li><code>hnet/flops.py</code> with three counting conventions. Paper Table 2 is reproduced only by App. B taken literally
+  (forward only, non-causal attention, embedding counted). The blog's Fig. 8 needs causal-halved attention and no
+  embedding.</li>
+<li>Our matching rule (causal attention, LM head counted, embedding not) is applied to all 28 configs. 80 tests pass,
+  including exact param counts against the real model.</li>
+<li>The 3.7B stage-1 guess (FFN 5504, MHA) reproduces the blog's 0.32B params and 0.52 GFLOPs/byte; GQA + FFN ≈ 6400
+  is indistinguishable.</li>
+<li><strong>Decision:</strong> at 125M, the paper's L width pattern leaves a 5-layer main net (58% of FLOPs at byte level). Switched
+  the small and speedrun H-Nets to the XL width pattern (outer = ½ and ¾ of main → 11-layer main); the L pattern stays
+  as an ablation. (4,2) variants get re-matched. WS-B was resumed to regenerate the configs.</li>
+<li>Note for the tiny runs: tiny BPE models are dominated by the 50K-vocab LM head, so FLOPs-matched tiny H-Nets have
+  3–4x the parameters.</li>
+<li>Fixed <code>configs/hnet_3p7b_smollm3.yaml</code> (it had an invalid <code>dc.smoothing</code> key).</li>
+</ul>
+<h3>22:50 · WS-F (Prime infrastructure) finished; GPU access blocker found</h3>
+<ul>
+<li><code>python -m infra.prime</code> provides offers / launch (budget guard: $500 total, $50 per launch) / sync / setup / run
+  (detached) / tail / pull / cost / teardown. 14 unit tests pass.</li>
+<li>Live end-to-end test on one CPU sandbox: 2.6 minutes, billed $0.0013, torn down and verified gone.</li>
+<li><strong>Blocker:</strong> H200 pods ($5.55/h effective) are controlled only via SSH, and this container can only make HTTPS
+  connections. GPU <em>sandboxes</em> (HTTPS, which our tooling supports) need an explicit grant from Prime. No cheaper GPU
+  types are listed right now.</li>
+<li>The team wallet is shared with three other running team sandboxes, so spend is tracked in our own ledger plus our
+  resource ids.</li>
+<li>Options taken to the user:</li>
+<li>(a) ask Prime to enable GPU sandboxes;</li>
+<li>(b) attach this session to a folder on the user's computer (Remote Control) so pod SSH runs there;</li>
+<li>(c) last resort: pods with a self-running custom template.</li>
+<li>CPU sandboxes (≤16 vCPU, ~$1.1/h) work now and can host the 1–10M architecture search.</li>
+</ul>
+<h3>22:55 · WS-C (data pipeline) finished</h3>
+<ul>
+<li>Byte and token shards are aligned per document (verified byte-identical decoding on all sampled documents); 31
+  tests pass.</li>
+<li>modded-nanogpt shards split documents at shard edges; the converter carries the fragments across.</li>
+<li>Measured GPT-2 bytes/token: <strong>FineWeb-Edu 4.621</strong>, FineWeb 4.454. The paper's 1792 tokens ↔ 8192 bytes holds.</li>
+<li>Speedrun targets in bpb: <strong>1.0667</strong> (3.28 nats/token) and <strong>0.9496</strong> (2.92). These are near-equivalents only:
+  modded-nanogpt also counts <code>&lt;|endoftext|&gt;</code> predictions.</li>
+<li>Val-set protocol: whole documents, split at identical text positions for byte and token models; every byte scored
+  once.</li>
+<li>Decided that both model types use the loader's cross-window label rule; passed to WS-D.</li>
+<li>Relayed a bf16-autocast backward bug in <code>ssd.py</code>, found by WS-A2, to WS-A1.</li>
+</ul>
+<h3>23:05 · WS-A1 (Mamba-2) finished; WS-B follow-up finished; GPU decision</h3>
+<ul>
+<li><strong>WS-A1:</strong></li>
+<li>The pure-torch SSD scan matches a sequential reference to 1e-9 in float64 over 40 random configs, plus gradcheck.</li>
+<li>Packed segments give the same results as separate segments, and the mixer is causal.</li>
+<li>Parameter names match mamba_ssm, so official checkpoints load.</li>
+<li>The custom backward avoids storing per-chunk [Q,Q] matrices: 1.5x faster and 30% less memory than the naive
+    einsum version.</li>
+<li>Fixed the bf16-autocast backward bug WS-A2 found.</li>
+<li>CPU: chunk_size 64 is 1.4x faster than 256. The 20 CUDA kernel-parity tests are written but await a GPU.</li>
+<li><strong>WS-B follow-up:</strong> <code>hnet2_small</code> now uses the XL width pattern (384/576/768, 11-layer main) at +1.4% FLOPs/byte
+  vs <code>bpe_small</code>. All ablations are rebuilt on it, and every config including <code>*_ratios42</code> is within ±2%.</li>
+<li>Coordinator check: tests for SSD, Mamba-2, FLOPs, data and infra give <strong>183 passed, 20 skipped (CUDA)</strong>.</li>
+<li><strong>GPU access:</strong> the user chose to ask Prime to enable GPU sandboxes. Until then, all work is CPU-only (local plus
+  CPU sandboxes).</li>
+</ul>
+<h3>23:12 · GPU sandbox probe (user: "I've spawned sandboxes via the API before")</h3>
+<ul>
+<li>Tried to create one 10-minute GPU sandbox. Nothing was created and nothing was charged:</li>
+<li>team context, RTX_PRO_6000 → HTTP 403 "GPU VM sandboxes require an explicit account grant and are not included in
+    the CPU VM public beta";</li>
+<li>team context, H200_141GB → the same 403;</li>
+<li>personal context → refused by our budget guard (personal wallet $0.00); the personal account has no sandboxes.</li>
+<li>The team's three running sandboxes are CPU-only (4 CPU / 16 GB, <code>terminal-bench-science</code>). CPU sandboxes work via
+  the API; GPU sandboxes need Prime to enable them for this team.</li>
+</ul>
+<h3>23:20 · WS-G (speedrun + Muon) finished</h3>
+<ul>
+<li>Ported modded-nanogpt <strong>record #18</strong> (2025-01-04, 3.4 min on 8×H100, 3.28 at 729M tokens). It is the last plain
+  PyTorch + FlexAttention record; later records are mostly systems work or token-only tricks. The current record is
+  #92, 0.665 min, which requires exactly 8 Hopper GPUs.</li>
+<li><code>dense_modded</code> keeps every trick of record #18 (QK-norm, ReLU², value embeddings, U-net skips, softcap 15, window
+  warmup). The loss is computed in chunks so full logits are never built.</li>
+<li>Muon (<code>build_muon_optimizer</code>): hidden 2-D matrices (including Mamba in/out projections) use Muon; everything else
+  uses Adam; router q/k use Adam by default.</li>
+<li>Target bpb: 1.0667 (3.28) and 0.9496 (2.92), consistent with WS-C.</li>
+<li>Configs: S1 (<code>s1_modded.yaml</code>) and S2 H-Nets with AdamW and Muon; one-GPU reference script for S0.</li>
+<li>Coordinator check: speedrun tests pass (see commit). Open issues:</li>
+<li>the trainer must call <code>set_progress</code> (relayed to WS-D);</li>
+<li>FLOPs for the modded model are approximated by the Llama count (about 4% off);</li>
+<li>S2 learning rates are unswept;</li>
+<li>Muon on fused matrices could be split.</li>
+</ul>
+<h3>23:35 · WS-A2 (modular H-Net model) and WS-D (trainer) finished</h3>
+<ul>
+<li><strong>WS-A2:</strong> 51 model tests pass.</li>
+<li>They cover causality for every router under both semantics, packed vs separate documents, dense/H-Net parity,
+    attention backends vs a naive loop, the scan vs a loop, and STE gradient flow.</li>
+<li><strong>Official-checkpoint check:</strong> Cartesia's <code>hnet_2stage_L</code> loads into our code (328/328 keys) and scores 0.37–0.66
+    bpb on English paragraphs.</li>
+<li>Greedy "The capital of France is" → " Paris. It is the capital of the French region of".</li>
+<li>Realized compression 3.09 / 2.39. The checkpoint was deleted afterwards.</li>
+<li>End-of-chunk routers share the select/plug-back code with start semantics; each router declares its semantics.</li>
+<li><strong>WS-D:</strong> 25 trainer tests pass, covering real H-Net and dense e2e training, exact resume and 2-process DDP.</li>
+<li>All workstreams are integrated: data, FLOPs/MFU, eval, Muon with <code>set_progress</code>.</li>
+<li>Run files are in <code>configs/runs/</code>.</li>
+<li><strong>Decision:</strong> peak LR follows the paper's rule (GPT-3 LR × 2.5): 1.5e-3 for the 125M runs and 7.5e-4 for 350M, the
+  same for BPE and H-Net. To be sanity-checked in the tiny sweep.</li>
+<li>CPU smoke run through the real trainer: loss 4.8 → 1.7 in 20 steps; per-stage LR multipliers 3.03 / 1.43 / 0.88;
+  compression logged.</li>
+<li>Downloaded and converted FineWeb-Edu train shard 1 (100M tokens → 462 MB of bytes, exact decoding).</li>
+</ul>
+<h3>23:40 · GCP (user: "try using gcp instead")</h3>
+<ul>
+<li>The user uploaded a service-account key for project <code>neat-dispatch-501718-a5</code>. It is kept in an isolated gcloud
+  config in the scratchpad; the environment's preset <code>CLOUDSDK_AUTH_ACCESS_TOKEN</code> must be unset to use it.</li>
+<li>Enabled: Compute Engine, Vertex AI, Storage, Logging.</li>
+<li>Regional quotas (on-demand / spot): A100-40GB 16/64, L4 16/16, T4 8/8, V100 8/16; no H100.</li>
+<li>The service account <strong>cannot</strong> create or list GCS buckets (403). Resource Manager API is disabled, so no IAM
+  self-check.</li>
+<li>Probe: created one spot L4 VM (<code>hnet-gpu-probe</code>, us-central1-a, Deep Learning VM PyTorch 2.9/CUDA 12.9) with a
+  15-minute max run duration and auto-delete, no service account attached. Creation succeeded.</li>
+</ul>
+<h3>23:55 · All 7 workstreams done; milestone-1</h3>
+<ul>
+<li><strong>WS-E (eval):</strong> 60 tests pass.</li>
+<li>Per-choice logprobs match an independent HF lm-eval re-implementation within 6e-5.</li>
+<li>GPT-2 HellaSwag acc_norm 31.2 [26.9, 35.8] on 400 items vs lm-eval's 31.1 on full val.</li>
+<li>Two prompt suites: <code>paper7</code> (lm-eval yamls) and <code>smollm3_cf</code> (lighteval at a pinned commit, quirks included).</li>
+<li>Robustness perturbations follow BLT/ByT5 definitions.</li>
+<li>The multiplier estimator recovers 1.75x / 2.95x on Cartesia's SmolLM3 curve.</li>
+<li><strong>Full suite: 342 passed, 26 skipped (CUDA-only), 2 slow deselected.</strong> Tagged <code>milestone-1</code>.</li>
+<li>CPU is too slow for the architecture search: a tiny H-Net takes ~35 s per 131 KB step on the shared 4 cores. GPU
+  runs are needed.</li>
+<li><strong>GCP probe result:</strong> the spot L4 VM booted with driver 580, torch 2.9.1+cu129, CUDA OK and HF reachable. Output was
+  read via the serial console, and the VM was deleted after ~4 minutes; no VMs of ours remain.</li>
+<li>The service account can create GPU VMs but cannot write Cloud Storage. Results would come back via serial console
+  and guest attributes unless the user grants bucket access.</li>
+</ul>
+<h3>00:05 · GCP runner workstream (WS-H) launched</h3>
+<ul>
+<li>The repo is public, so VMs <code>git clone</code> it at a pinned commit. Results come back by streaming metrics lines to the
+  serial console, which we read via the API and rebuild locally as <code>metrics.jsonl</code>.</li>
+<li>Spot VMs stop (not delete) on preemption so they can resume; every VM has a hard <code>--max-run-duration</code>.</li>
+<li>Separate GCP ledger: $300 total, $25 per launch. The live test is capped at 2 spot VMs, ≤ 30 min each, &lt; $3.</li>
+<li>Rough cost per 1e18 training FLOPs at ~35% MFU:</li>
+<li>A100 spot ≈ $3.7 (~$1.45/h, estimate);</li>
+<li>L4 spot ≈ $2–2.5 (~$0.3–0.35/h, estimate);</li>
+<li>Prime H200 ≈ $5.</li>
+</ul>
+<p>The $455 plan would cost roughly $260 on A100 spot.</p></section>
 </div>
 
 <script>
