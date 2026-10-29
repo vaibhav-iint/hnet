@@ -82,6 +82,9 @@ afterwards. Mechanisms must be instrumented and tested first; outcomes come last
     logits unchanged), packed sequences ≡ single sequences, cached decoding ≡ teacher forcing, a backward-only flag
     leaves the forward pass bit-identical, realized FLOPs within a few percent of the budgeted FLOPs (the paper
     router ran 10–16% over budget for weeks).
+10b. **The full test suite runs before every launch**, not the quick core subset: the sweep VMs run it as a gate and
+    stop if it fails, which cost EXP-028 its first launch (a new model buffer changed the state dict and broke the
+    dense-parity test). A failed gate on a VM is paid for in GPU minutes and a relaunch; locally it is ten minutes.
 11. **Fail loudly.** A stage that selects no positions raises; a launcher asserts the data and tokenizer exist
     before training starts; a metric outside its sane range (F far from 1/ratio, tau at 1.000, score_std → 0, grad norm
     × 100) stops the run instead of filling a log we read a day later.

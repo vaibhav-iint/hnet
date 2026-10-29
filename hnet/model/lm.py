@@ -193,8 +193,10 @@ class HNetForCausalLM(nn.Module):
             self.chunk_pred_head = nn.Linear(d_in, cfg.dc.chunk_pred_k * cfg.vocab_size, bias=False)
         if cfg.tie_embeddings:
             self.lm_head.weight = self.embeddings.weight
-        self.register_buffer("gain_mu", torch.zeros(()))  # running mean / std of the per-chunk hierarchy gain
-        self.register_buffer("gain_var", torch.ones(()))
+        # running mean / var of the per-chunk hierarchy gain (dc.router_gain_weight); not persistent so the state
+        # dict stays identical to the official / dense layouts (re-warms within a few steps after a resume)
+        self.register_buffer("gain_mu", torch.zeros(()), persistent=False)
+        self.register_buffer("gain_var", torch.ones(()), persistent=False)
         self._param_stage = {}
         for st in self.backbone.stages():
             prefix = "backbone" + ".main_network" * st.stage_idx + "."

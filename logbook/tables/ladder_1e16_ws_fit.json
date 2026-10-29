@@ -1,0 +1,233 @@
+{
+ "ref": "bpe",
+ "new": "hnet_ws",
+ "budgets": [
+  1e+16
+ ],
+ "notes": [
+  "single compute budget (1e+16 FLOPs): compute multipliers and power laws are undefined; only matched-budget loss gaps are reported. Run >= 2 (preferably >= 3) budgets with >= 3 model sizes each."
+ ],
+ "runs": [
+  {
+   "name": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L03/bpe_s0",
+   "arch": "bpe",
+   "flops": 1.0003442990015414e+16,
+   "params": 20023040.0,
+   "D": 490960823.0,
+   "seed": 0,
+   "budget": 1e+16,
+   "metrics": {
+    "val": 1.6952347237194452
+   },
+   "path": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L03/bpe_s0",
+   "done": true
+  },
+  {
+   "name": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L04/bpe_s0",
+   "arch": "bpe",
+   "flops": 9997315041098568.0,
+   "params": 21629184.0,
+   "D": 394060002.0,
+   "seed": 0,
+   "budget": 1e+16,
+   "metrics": {
+    "val": 1.622363940650147
+   },
+   "path": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L04/bpe_s0",
+   "done": true
+  },
+  {
+   "name": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L05/bpe_s0",
+   "arch": "bpe",
+   "flops": 1.0005222305602886e+16,
+   "params": 38195328.0,
+   "D": 213813817.0,
+   "seed": 0,
+   "budget": 1e+16,
+   "metrics": {
+    "val": 1.7557235116122236
+   },
+   "path": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L05/bpe_s0",
+   "done": true
+  },
+  {
+   "name": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L06/bpe_s0",
+   "arch": "bpe",
+   "flops": 9982193332760250.0,
+   "params": 59513344.0,
+   "D": 131480157.0,
+   "seed": 0,
+   "budget": 1e+16,
+   "metrics": {
+    "val": 1.8410755776564318
+   },
+   "path": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L06/bpe_s0",
+   "done": true
+  },
+  {
+   "name": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L03/hnet_ws_s0",
+   "arch": "hnet_ws",
+   "flops": 1.0078918629779908e+16,
+   "params": 20010025.0,
+   "D": 494456781.0,
+   "seed": 0,
+   "budget": 1e+16,
+   "metrics": {
+    "val": 1.8227318649272632
+   },
+   "path": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L03/hnet_ws_s0",
+   "done": true
+  },
+  {
+   "name": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L04/hnet_ws_s0",
+   "arch": "hnet_ws",
+   "flops": 1.0068280992405536e+16,
+   "params": 21616169.0,
+   "D": 396436189.0,
+   "seed": 0,
+   "budget": 1e+16,
+   "metrics": {
+    "val": 1.8639379852301043
+   },
+   "path": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L04/hnet_ws_s0",
+   "done": true
+  },
+  {
+   "name": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L05/hnet_ws_s0",
+   "arch": "hnet_ws",
+   "flops": 1.0067230945178174e+16,
+   "params": 38185263.0,
+   "D": 215099999.0,
+   "seed": 0,
+   "budget": 1e+16,
+   "metrics": {
+    "val": 1.9389012307767914
+   },
+   "path": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L05/hnet_ws_s0",
+   "done": true
+  },
+  {
+   "name": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L06/hnet_ws_s0",
+   "arch": "hnet_ws",
+   "flops": 1.0002412905246294e+16,
+   "params": 59507289.0,
+   "D": 132327445.0,
+   "seed": 0,
+   "budget": 1e+16,
+   "metrics": {
+    "val": 2.0351578721149353
+   },
+   "path": "runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L06/hnet_ws_s0",
+   "done": true
+  }
+ ],
+ "metrics": {
+  "val": {
+   "metric": "val",
+   "notes": [
+    "bpe @ 1e+16 FLOPs: iso-FLOP minimum outside the sampled sizes (clamped to the edge; extend the size grid)",
+    "hnet_ws @ 1e+16 FLOPs: iso-FLOP minimum outside the sampled sizes (clamped to the edge; extend the size grid)",
+    "budgets per architecture {'bpe': 1, 'hnet_ws': 1}: a compute power law (hence a compute multiplier) needs >= 2 budgets per architecture; reporting compute-optimal losses only"
+   ],
+   "form": null,
+   "budgets_per_arch": {
+    "bpe": 1,
+    "hnet_ws": 1
+   },
+   "frontier": {
+    "bpe": [
+     {
+      "budget": 1e+16,
+      "C": 9997039308502390.0,
+      "L": 1.6596883874680877,
+      "N_opt": 20023039.999999978,
+      "D_opt": 459627759.9679193,
+      "status": "edge",
+      "n_sizes": 4,
+      "coef": [
+       1.7109165031212081,
+       0.15370765335620581,
+       0.08969879740797519,
+       17.265470779255683
+      ],
+      "flops_spread_dex": 0.0010007657253962002
+     }
+    ],
+    "hnet_ws": [
+     {
+      "budget": 1e+16,
+      "C": 1.0054165254095984e+16,
+      "L": 1.8361930025283313,
+      "N_opt": 20010025.000000034,
+      "D_opt": 462639509.7751593,
+      "status": "edge",
+      "n_sizes": 4,
+      "coef": [
+       1.9083739616769109,
+       0.17486628952277272,
+       0.03450031761149252,
+       17.265066423596362
+      ],
+      "flops_spread_dex": 0.003309160520125309
+     }
+    ]
+   },
+   "laws": {},
+   "multiplier": null,
+   "multiplier_interp": null,
+   "matched_budget_gap": [
+    {
+     "budget": 1e+16,
+     "L_ref": 1.6596883874680877,
+     "L_new": 1.8361930025283313,
+     "delta": 0.17650461506024362,
+     "rel": 0.10634804484563976
+    }
+   ]
+  }
+ },
+ "allocation": {
+  "bpe": {
+   "points": [
+    {
+     "C": 9997039308502390.0,
+     "N_opt": 20023039.999999978,
+     "D_opt": 459627759.9679193,
+     "status": "edge"
+    }
+   ]
+  },
+  "hnet_ws": {
+   "points": [
+    {
+     "C": 1.0054165254095984e+16,
+     "N_opt": 20010025.000000034,
+     "D_opt": 462639509.7751593,
+     "status": "edge"
+    }
+   ]
+  }
+ },
+ "loss_to_loss": {
+  "x": "val",
+  "y": "down:avg",
+  "points": {
+   "bpe": [],
+   "hnet_ws": []
+  },
+  "laws": {
+   "bpe": null,
+   "hnet_ws": null
+  },
+  "notes": [
+   "bpe: 0 run(s) with both 'val' and 'down:avg': no loss-to-loss law (needs >= 2 runs with distinct validation losses)",
+   "hnet_ws: 0 run(s) with both 'val' and 'down:avg': no loss-to-loss law (needs >= 2 runs with distinct validation losses)"
+  ]
+ },
+ "source_meta": {},
+ "figures": {
+  "loss_vs_compute": "logbook/figures/ladder_ws_loss_vs_compute.png",
+  "isoflop": "logbook/figures/ladder_ws_isoflop.png"
+ },
+ "compression": {}
+}
