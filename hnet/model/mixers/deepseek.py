@@ -207,8 +207,7 @@ def _flex_attend(q, k, v, mask_mod, scale: float, per_head: bool) -> torch.Tenso
     if _attn.flex_attention is None:
         raise RuntimeError("flex backend requested but torch.nn.attention.flex_attention is unavailable")
     T, H = q.shape[0], q.shape[1]
-    bm = _attn.create_block_mask(mask_mod, None, H if per_head else None, T, T, device=q.device,
-                                 _compile=q.is_cuda)
+    bm = _attn.packed_block_mask(mask_mod, H if per_head else None, T, q.device)
     fn = _attn._flex_fn() if q.is_cuda else _attn.flex_attention
     qt, kt, vt = (x.transpose(0, 1).unsqueeze(0) for x in (q, k, v))
     out = fn(qt, kt, vt, block_mask=bm, scale=scale, enable_gqa=k.shape[1] != H)

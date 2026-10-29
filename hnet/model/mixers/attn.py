@@ -82,6 +82,23 @@ def _flex_fn():
     return _compiled_flex
 
 
+def packed_block_mask(mask_mod, H, T: int, device: torch.device):
+    """BlockMask for a packed length-T sequence whose ``mask_mod`` indexes per-position tensors (segment ids etc.).
+
+    Built eagerly (a [H or 1, T, T] bool grid): the inductor-compiled ``create_block_mask(_compile=True)`` with
+    closures over per-step tensors caused CUDA illegal memory accesses in EXP-002. Indices are clamped to T - 1 (and
+    out-of-range pairs masked) so a ``mask_mod`` never reads past its index tensors, including when flex evaluates the
+    padded tail of a partial block. The bound is a tensor, not a Python int, so a new T does not recompile flex.
+    """
+    last = torch.tensor(T - 1, device=device)
+
+    def bounded(b, h, q_idx, kv_idx):
+        inside = (q_idx <= last) & (kv_idx <= last)
+        return mask_mod(b, h, torch.minimum(q_idx, last), torch.minimum(kv_idx, last)) & inside
+
+    return create_block_mask(bounded, None, H, T, T, device=device)
+
+
 def _block_mask(ctx: SeqCtx, window: int, device: torch.device):
     key = ("flex_mask", window)
     bm = ctx.cache.get(key)
@@ -95,7 +112,7 @@ def _block_mask(ctx: SeqCtx, window: int, device: torch.device):
             return keep
 
         T = ctx.total_len
-        bm = create_block_mask(mask_mod, None, None, T, T, device=device, _compile=device.type == "cuda")
+        bm = packed_block_mask(mask_mod, None, T, device)
         ctx.cache[key] = bm
     return bm
 

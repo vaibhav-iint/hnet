@@ -42,7 +42,7 @@ from hnet.registry import register
 from ..ctx import SeqCtx
 from ..rotary import apply_rotary, rotary_cos_sin
 from ..ssd import use_kernel
-from .attn import CausalAttention, attention, create_block_mask, flex_attention, _flex_fn
+from .attn import CausalAttention, attention, flex_attention, packed_block_mask, _flex_fn
 from .conv import causal_conv1d
 
 try:  # optional fast path; only a missing `fla` package falls back, a broken install raises
@@ -498,7 +498,7 @@ class MoBA(CausalAttention):
                     keep = keep & (qi - ki <= w)
                 return keep
 
-            bm = create_block_mask(mask_mod, None, H, T, T, device=q.device, _compile=q.is_cuda)
+            bm = packed_block_mask(mask_mod, H, T, q.device)
             fn = _flex_fn() if q.is_cuda else flex_attention
             out = fn(qt, kt, vt, block_mask=bm, scale=self.softmax_scale, enable_gqa=gqa)
         else:
