@@ -104,7 +104,7 @@ def alerts(run):
     if len(gn) >= 4 and gn[-1] > 50 * statistics.median(gn[:-1]) and gn[-1] > 10:
         out.append(f"grad_norm×{gn[-1] / statistics.median(gn[:-1]):.0f}")
     bpb = [r.get("bpb") for r in m if isinstance(r.get("bpb"), (int, float))]
-    if bpb and (math.isnan(bpb[-1]) or bpb[-1] > 6):
+    if bpb and (math.isnan(bpb[-1]) or (bpb[-1] > 6 and m[-1]["step"] >= 100)):
         out.append("train bpb diverged")
     return out
 
