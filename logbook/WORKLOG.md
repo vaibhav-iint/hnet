@@ -795,3 +795,14 @@ predictor of the logit); relaunched as EXP-020 (second launch, same arms).
   same objective: adoption is decided early (step 200–600), by whether the hierarchy's signal reaches the decoder
   before the residual path consolidates. That is the next dynamics problem (EXP-021 removes one trigger, the
   heavy-tailed-score damping).
+
+### EXP-021 (median/MAD decider) stopped: the MAD collapses under a word tokenizer
+`h1r_vocab_pred_s0`: from step ~650 the robust scale `score_std/s0` falls 4.4 → 0.0 while `p_margin` pins at 0.50;
+grad norm 0.3 → 4.6e3 (step 900) → 1.9e6 (step 1050), val bpb 3.25 at step 1000. With a word tokenizer 5/6 of the
+positions are "not a boundary" and get near-identical logits, so the median and the MAD both sit inside that mode and
+the MAD → 0; the ±4 clip protects the forward pass, not the gradient through 1/σ. Seeds 1–2 did not diverge but did
+not adopt the hierarchy either (1.98 / 2.00 at step 1000 ≈ baseline). `h1r_quant` ≡ `h1_quant` (the decider change
+is invisible without a vocabulary), `h1r_vocab_pred_ng` reached 1.82 at step 1000 (= `paper_ng`) before the stop.
+Fix: mean/std over the central 98% of the scores (outlier-proof, cannot collapse unless 98% of scores coincide; unit
+test with 5/6 identical scores). Rule, stated generally: a scale estimator for boundary scores must straddle both
+modes of a bimodal distribution; medians do not. → EXP-023 (same arms + residual warmup; EXP-022 draft superseded).

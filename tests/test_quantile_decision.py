@@ -130,3 +130,19 @@ def test_robust_normalization_keeps_typical_confidences_away_from_half_under_out
         else:
             assert margin < 0.05, margin  # the failure mode
         assert int(r.boundary_mask[free].sum()) == round(int(free.sum()) / 3)
+
+
+def test_bimodal_scores_do_not_blow_up_the_scale_or_the_gradient():
+    """EXP-021: 5/6 of the scores identical (a word tokenizer's "not a boundary" logit) made the MAD zero; the
+    trimmed std stays of order the gap between the modes and the gradient stays bounded."""
+    ctx = _ctx([1200])
+    free = ctx.position_ids != 0
+    logit = torch.full((1200,), -5.0)
+    logit[::6] = 3.0  # exactly 1/6 boundaries, everything else identical
+    logit = (logit + 1e-3 * torch.randn(1200)).requires_grad_(True)
+    dec = QuantileDecider(target_ratio=6.0).train()
+    r = dec(router_output(torch.sigmoid(logit), ctx, "end", logit=logit), ctx)
+    assert float(dec.sigma) > 1.0, float(dec.sigma)
+    (g,) = torch.autograd.grad(r.selected_probs.sum(), logit)
+    assert torch.isfinite(g).all() and float(g.abs().max()) < 10.0
+    assert int(r.boundary_mask[free].sum()) == round(int(free.sum()) / 6)

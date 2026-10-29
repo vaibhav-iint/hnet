@@ -1,0 +1,27 @@
+# EXP-023: the word-scale chunk vocabulary with the trimmed-statistics rank decider (supersedes EXP-021/022).
+# EXP-018: vocabulary + next-chunk objective on 1-stage ratio-6 chunks gives -0.13 / -0.11 bpb when the decoder adopts
+# the hierarchy early, nothing when the residual path wins the race (seed 1: heavy-tailed scores -> confidences 0.5).
+# EXP-021 standardized by median/MAD and diverged: with a word tokenizer 5/6 of the scores are near-identical, the
+# MAD is ~0 and 1/sigma blows up the gradient. The decider now uses the mean/std of the central 98% of the scores.
+# Arms: vocabulary + prediction (`vp`), the same + byte n-gram tables (`vp_ng`), the same + residual warmup over the
+# first 30% of training (`vp_rwarm`: keeps the bypass weak while the hierarchy's signal forms). Baseline: EXP-018
+# `h1_quant` 1.853 (the decider change does not touch a model without a vocabulary: EXP-021 `h1r_quant` == `h1_quant`).
+name: exp023_word_vocab_trimmed
+out_root: runs/search/exp023_word_vocab_trimmed
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp023_word_vocab_trimmed
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - model.dc.decision=quantile
+  - "model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}]"
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {vp: "vocabulary + next-chunk prediction (trimmed decider)",
+           vp_ng: "+ byte n-gram tables",
+           vp_rwarm: "+ residual warmup 0.3"}
+runs:
+  - {name: vp,       config: configs/runs/tiny_hnet1_2m.yaml}
+  - {name: vp_ng,    config: configs/runs/tiny_hnet1_2m.yaml, set: ["model.ngram_embed={ns: [3, 4, 5, 6, 7, 8], buckets: 12289}"]}
+  - {name: vp_rwarm, config: configs/runs/tiny_hnet1_2m.yaml, set: [model.dc.residual_warmup=0.3]}

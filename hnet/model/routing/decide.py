@@ -7,8 +7,9 @@ and "select nothing" (logbook, EXP-003).
 
 ``quantile`` (rank decisions on normalized scores): exactly the top 1/N positions of the batch, by router score,
 are selected, whatever the scale or offset of the scores. The score s (the router's logit, or logit(p) when the
-router has none) is standardized over the batch, z = (s - median) / (1.4826 MAD) (robust; mean/std with
-``robust=False``), with the statistics in the graph (as in BatchNorm), and the confidence seen by the STE and the EMA dechunker is p' = sigmoid(temp (z - z_tau)) with z_tau
+router has none) is standardized over the batch, z = (s - mean) / std with the mean and std taken over the central
+98% of the scores (robust to a few huge scores; plain mean/std with ``robust=False``), with the statistics in the
+graph (as in BatchNorm), and the confidence seen by the STE and the EMA dechunker is p' = sigmoid(temp (z - z_tau)) with z_tau
 midway between the k-th and (k+1)-th largest z: 0.5 exactly at the decision boundary. Running estimates of mean, std
 and z_tau serve eval, like BatchNorm statistics. Under this rule the ratio loss is an exact constant (F = 1/N),
 i.e. inert, and the router only has to learn the relative order of positions.
@@ -39,14 +40,15 @@ class QuantileDecider(nn.Module):
     scale (the EXP-014 behaviour, apart from the rank selection), for ablation."""
 
     def __init__(self, target_ratio: float, momentum: float = 0.99, temp: float = 2.0, normalize: bool = True,
-                 robust: bool = True, z_clip: float = 4.0):
+                 robust: bool = True, z_clip: float = 4.0, trim: float = 0.01):
         super().__init__()
         assert target_ratio > 1, target_ratio
         self.ratio = float(target_ratio)
         self.momentum = momentum
         self.temp = float(temp)
         self.normalize = bool(normalize)
-        self.robust = bool(robust)  # median / 1.4826 MAD instead of mean / std (EXP-018: heavy-tailed scores)
+        self.robust = bool(robust)  # trimmed mean / std (EXP-018: heavy-tailed scores; EXP-021: MAD collapses)
+        self.trim = float(trim)  # fraction trimmed at each end before the mean / std
         self.z_clip = float(z_clip)
         self.register_buffer("mu", torch.tensor(0.0))
         self.register_buffer("sigma", torch.tensor(1.0))
@@ -72,9 +74,16 @@ class QuantileDecider(nn.Module):
             sf = s[free]
             if self.normalize and self.robust:
                 # in the graph: the gradient loses its shift/scale components. Robust: a few huge scores must not
-                # shrink everyone else's confidence toward 0.5 (EXP-018 seed 1: std 15, margins 0.10, hierarchy unused)
-                mu = sf.median()
-                sigma = 1.4826 * (sf - mu).abs().median() + EPS  # mu in the graph: keeps the shift/scale gradients exactly zero
+                # shrink everyone else's confidence toward 0.5 (EXP-018 seed 1: std 15, margins 0.10, hierarchy
+                # unused), so the statistics are taken over the central 1 - 2 trim of the scores. Not median / MAD:
+                # with a word tokenizer 5/6 of the scores are near-identical "not a boundary" logits, the MAD is ~0
+                # and 1 / sigma blows up the gradient (EXP-021 seed 0 diverged at step ~900).
+                with torch.no_grad():
+                    lo, hi = torch.quantile(sf, torch.tensor([self.trim, 1 - self.trim], device=sf.device))
+                    keep = (sf >= lo) & (sf <= hi)
+                st = sf[keep] if int(keep.sum()) >= 2 else sf
+                mu = st.mean()
+                sigma = st.std() + 1e-3
             elif self.normalize:
                 mu, sigma = sf.mean(), sf.std() + EPS
             else:
