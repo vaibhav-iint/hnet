@@ -71,3 +71,11 @@ compression on target.
    *why* each loser lost (mechanism metrics, interpretability notes) so the next proposers do not repeat it.
 
 Cost: ~8 candidates × 2 seeds ≈ 16 A100-runs ≈ 1.5 h of a 4×A100 spot VM ≈ $9 per generation.
+
+## Budget and ledger
+User-approved cap for the loop: **+$50** (2026-10-29), about five generations. The orchestrator stops launching when the
+ledger below reaches the cap and reports. Generation 1 runs seeds 1 and 2 for candidates *and* for the `bpe` and
+`hnet_ws` controls (which already have seed 0), so the references get three seeds.
+
+| generation | VM-hours | cost | candidates | best fitness |
+|---|---|---|---|---|

@@ -59,6 +59,7 @@ EXP002 = _p("runs/gcp/exp002_tiny2m")
 
 
 @pytest.mark.skipif(not os.path.isdir(EXP002), reason="EXP-002 run metrics not present")
+@pytest.mark.xfail(strict=True, reason="AUDIT B1: threshold routers over-spend FLOPs at realized compression")
 @pytest.mark.parametrize("arm", ["paper_s0", "paper_s1", "end_cosine_shift_s0", "end_mlp_s1", "paper_nolrmult_s0"])
 def test_threshold_router_runs_stay_within_budget_at_realized_compression(arm):
     """FAILS: realized training FLOPs/byte of the paper-router (threshold-decision) tiny runs are 7-12% above the BPE
