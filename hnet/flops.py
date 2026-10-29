@@ -355,6 +355,18 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
             comp_f["router"] = rf if cv.count_dc else 0.0
             comp_p["residual_proj"] = d * d + d
             comp_f["residual_proj"] = 2 * d * d if cv.count_residual_proj else 0.0
+            if dcs.get("chunk_vocab"):  # hashed chunk tables (lookups, like the embedding) + training-only head
+                cvk = {"buckets": 65536, "n_hash": 2, "pred_weight": 0.0, "n_neg": 4096, **dcs["chunk_vocab"]}
+                d_in = d  # the inner stage returns its output at this stage's width
+                rows = int(cvk["buckets"]) * int(cvk["n_hash"])
+                L_in = seq_len / bpp[s + 1]
+                comp_p["chunk_vocab"] = rows * d
+                comp_f["chunk_vocab"] = ((2 * rows * d * L_in / seq_len if cv.count_embedding else 0.0)
+                                         + (int(cvk["n_hash"]) * d * L_in / seq_len if cv.count_elementwise else 0.0))
+                if float(cvk["pred_weight"]) > 0:
+                    comp_p["chunk_vocab_head"] = d_in * d
+                    comp_f["chunk_vocab_head"] = ((2 * d_in * d + 2 * d * (int(cvk["n_neg"]) + 1)) * L_in / seq_len
+                                                  if cv.count_lm_head else 0.0)
             cp, cf = _chunker_counts(dcs["chunker"], d, dcs.get("chunker_kwargs") or {}, dcs["target_ratio"])
             if cp:
                 comp_p["chunker"] = cp

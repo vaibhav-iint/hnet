@@ -1,0 +1,32 @@
+# EXP-017: a vocabulary for the learned chunks (hnet/model/chunk_vocab.py). The mechanism study (logbook) says the
+# gap to BPE is word identity, which BPE gets from a FLOP-free 12.9M-parameter table while the H-Net has to compute it
+# from bytes; the main network gets no word-level signal (its output is less predictive than its input) and the
+# chunk vector is the boundary byte's state, not the chunk's identity. Here each stage-0 chunk's byte content is
+# hashed (2 hashes x 65536 buckets x d=96 = 12.6M parameters, zero FLOPs: matched to the BPE table) and added to the
+# chunk vector (`vocab`); `vocab_pred*` additionally train the main network to predict the next chunk's bucket with a
+# sampled softmax (1024 candidates, +1.6% FLOPs, training only): BPE's objective over the learned segmentation.
+# Baseline `quant_fix`: the same model with the fixed rank decisions (rank on batch-normalized fp32 logits; EXP-014's
+# p-space quantile saturated and collapsed). 2-stage (3,3), end-of-chunk MLP router, lr 1.5e-3, EXP-002 budget.
+name: exp017_chunk_vocab
+out_root: runs/search/exp017_chunk_vocab
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp017_chunk_vocab
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - model.dc.decision=quantile
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {quant_fix: "rank decisions (fixed), no vocabulary",
+           vocab: "+ hashed chunk vocabulary (input side)",
+           vocab_pred: "+ vocabulary + next-chunk prediction (w 0.5)",
+           vocab_pred_w1: "+ vocabulary + next-chunk prediction (w 1.0)"}
+runs:
+  - {name: quant_fix,     config: configs/runs/tiny_hnet2_2m.yaml}
+  - {name: vocab,         config: configs/runs/tiny_hnet2_2m.yaml,
+     set: ["model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16}, null]"]}
+  - {name: vocab_pred,    config: configs/runs/tiny_hnet2_2m.yaml,
+     set: ["model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}, null]"]}
+  - {name: vocab_pred_w1, config: configs/runs/tiny_hnet2_2m.yaml,
+     set: ["model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 1.0, n_neg: 1024}, null]"]}

@@ -152,7 +152,15 @@ class HNetForCausalLM(nn.Module):
         x = self.embeddings(ids)
         if self.ngram_embeddings is not None:
             x = x + self.ngram_embeddings(ids, ctx)
-        h, bpred = self.backbone(x, ctx, input_ids=ids, boundaries=boundaries)
+        binfo = None
+        vocab_stages = [st for st in self.backbone.stages() if getattr(st, "chunk_vocab", None) is not None]
+        if vocab_stages:
+            from .chunk_vocab import ByteInfo, hash_bank
+
+            bank = hash_bank(ids, ctx, max(st.chunk_vocab.n_hash for st in vocab_stages),
+                             max(st.chunk_vocab.max_len for st in vocab_stages))
+            binfo = ByteInfo(bank, torch.arange(ids.numel(), device=ids.device))
+        h, bpred = self.backbone(x, ctx, input_ids=ids, boundaries=boundaries, binfo=binfo)
         out = lm_outputs(h, self.lm_head, labels, return_logits, batch_shape)
         out.bpred = bpred
         aux_terms = self.backbone.aux_losses(bpred)
@@ -169,7 +177,15 @@ class HNetForCausalLM(nn.Module):
         if self.chunk_pred_head is not None and labels is not None:
             chunk_ce = self._chunk_pred_loss(bpred, ids, labels.reshape(-1), ctx)
             out.aux_loss = out.aux_loss + dc.chunk_pred_weight * chunk_ce
+        vocab_ce = {}
+        if labels is not None:
+            for st, r in zip(self.backbone.stages(), bpred):
+                cv = getattr(st, "chunk_vocab", None)
+                if cv is not None and cv.pred_weight > 0:
+                    vocab_ce[st.stage_idx] = cv.pred_loss(r.inner_out, r.vocab_tgt)
+                    out.aux_loss = out.aux_loss + cv.pred_weight * vocab_ce[st.stage_idx]
         stats = {"positions/s0": ids.new_full((), ids.numel(), dtype=torch.float32)}
+        stats.update({f"chunk_vocab_ce/s{s}": v.detach() for s, v in vocab_ce.items()})
         if self.main_aux_head is not None and labels is not None:
             stats["main_aux_ce"] = main_ce.detach()
         if self.chunk_pred_head is not None and labels is not None:
@@ -202,6 +218,9 @@ class HNetForCausalLM(nn.Module):
         if self.ngram_embeddings is not None:
             self.ngram_embeddings.reset_parameters()
         self.backbone.init_weights(std)
+        for st in self.backbone.stages():
+            if getattr(st, "chunk_vocab", None) is not None:
+                st.chunk_vocab.reset_parameters()
 
     def _chunk_pred_loss(self, bpred, ids: torch.Tensor, labels: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
         """Mean CE of predicting, from the innermost main network's output at each innermost position, the k bytes

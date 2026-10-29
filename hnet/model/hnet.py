@@ -95,6 +95,12 @@ class HNet(nn.Module):
             assert need is None or need == have, (
                 f"chunker {dc['chunker']!r} requires {need!r} boundary semantics, router {dc['router']!r} has {have!r}")
             self.dechunk_layer = registry.build("dechunker", dc["dechunker"])
+            self.chunk_vocab = None
+            if dc["chunk_vocab"]:
+                from .chunk_vocab import ChunkVocab
+
+                assert have == "end", f"dc.chunk_vocab needs 'end' boundary semantics, router {dc['router']!r} has {have!r}"
+                self.chunk_vocab = ChunkVocab(d, **dc["chunk_vocab"])  # the inner stage returns width d
             self.residual_proj = nn.Linear(d, d, dtype=torch.float32)
             assert cfg.dc.residual_init in ("zero", "identity"), cfg.dc.residual_init
             if cfg.dc.residual_init == "identity":
@@ -113,6 +119,7 @@ class HNet(nn.Module):
         ctx: SeqCtx,
         input_ids: Optional[torch.Tensor] = None,
         boundaries: Optional[List[torch.Tensor]] = None,
+        binfo=None,
     ) -> Tuple[torch.Tensor, List[RouterOutput]]:
         """h [T, D_in] -> ([T, D_in], router outputs of this and all inner stages, outer first)."""
         D_in = h.shape[-1]
@@ -130,7 +137,14 @@ class HNet(nn.Module):
         x, ctx_inner = self.chunk_layer(h, r.boundary_mask, ctx)
         inner_ids = input_ids.index_select(0, ctx_inner.outer_index) if input_ids is not None else None
         inner_boundaries = boundaries[1:] if boundaries else None
-        z, inner_preds = self.main_network(x, ctx_inner, input_ids=inner_ids, boundaries=inner_boundaries)
+        inner_binfo = binfo.select(ctx_inner.outer_index) if binfo is not None else None
+        if self.chunk_vocab is not None:  # the chunk's identity (hashed content) joins its boundary state
+            assert binfo is not None, "dc.chunk_vocab needs the byte hash bank (HNetForCausalLM builds it)"
+            bucket = self.chunk_vocab.chunk_ids(binfo, ctx, ctx_inner)
+            x = x + self.chunk_vocab.embed(bucket, x.dtype)
+            r.vocab_tgt = self.chunk_vocab.next_targets(bucket[0], ctx_inner)
+        z, inner_preds = self.main_network(x, ctx_inner, input_ids=inner_ids, boundaries=inner_boundaries,
+                                           binfo=inner_binfo)
         out = self.dechunk_layer(z, r, ctx, ctx_inner)
         if self.use_ste:
             out = out * STE.apply(r.selected_probs)

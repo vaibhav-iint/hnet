@@ -45,6 +45,7 @@ class RouterOutput:
     main_out: Optional[torch.Tensor] = None  # the stage's dechunked main-network output (with grad), [T, D]
     inner_out: Optional[torch.Tensor] = None  # the stage's main-network output before dechunking (with grad), [M, D]
     logit: Optional[torch.Tensor] = None  # fp32 [T] raw router score (log-odds of p) when the router has one
+    vocab_tgt: Optional[torch.Tensor] = None  # [M] next-chunk bucket ids (dc.chunk_vocab), IGNORE at segment ends
 
     @property
     def p(self) -> torch.Tensor:

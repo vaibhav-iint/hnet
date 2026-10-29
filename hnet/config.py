@@ -67,6 +67,9 @@ class DCConfig:
     router_kwargs: Any = field(default_factory=dict)
     decision: Any = "threshold"  # "threshold" (p > 0.5, paper) or "quantile" (top 1/N by rank; see routing/decide.py)
     decision_kwargs: Any = None  # QuantileDecider options: {temp: 2.0, normalize: true, momentum: 0.99}
+    # chunk_vocab: a hashed vocabulary for the learned chunks (model/chunk_vocab.py), dict or per-stage list:
+    #   {buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 4096}; null = off. Needs "end" routers.
+    chunk_vocab: Any = None
     chunker: Any = "select"  # keep vectors at boundaries (paper default); "pool" = learned summary over the chunk
     chunker_kwargs: Any = field(default_factory=dict)
     dechunker: Any = "ema"  # EMA smoothing (paper default); "repeat" = no smoothing
@@ -105,7 +108,7 @@ class DCConfig:
 
     def for_stage(self, s: int, n_stages: int) -> dict:
         out = {}
-        for name in ("router", "router_kwargs", "decision", "decision_kwargs", "chunker", "chunker_kwargs", "dechunker", "ste",
+        for name in ("router", "router_kwargs", "decision", "decision_kwargs", "chunk_vocab", "chunker", "chunker_kwargs", "dechunker", "ste",
                      "aux_loss", "residual_dropout"):
             v = getattr(self, name)
             if isinstance(v, list):

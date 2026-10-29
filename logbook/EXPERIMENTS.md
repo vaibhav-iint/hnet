@@ -265,9 +265,24 @@ multipliers, main-heavy multipliers [1, 1, 4] · 3 seeds · status: running*
 *spec `exp014_quantile_decision.yaml` · `hnet/model/routing/decide.py`: select the top 1/N positions by p (batch
 quantile, running threshold for eval, p recentred so the threshold is 0.5). Compression is pinned exactly and the
 ratio loss becomes inert. Arms: quantile, quantile + attention pooling, each at lr 1.5e-3 and 6e-3 · 3 seeds ·
-status: running*
+status: **stopped at step ~500, invalid** (see work log: the p-space quantile saturated and collapsed the selection in
+most runs; the decider was rewritten to rank batch-normalized fp32 logits and is validated as the `quant_fix` arm of
+EXP-017). EXP-015/016 were built on the same rule and were stopped with it; they will be re-run on the fixed rule only
+if EXP-017 says the hierarchy is worth more training signals.*
 
 ## EXP-015 · Which training signals make the hierarchy carry the model, at honest compute
 
 *spec `exp015_hierarchy_factorial.yaml` · end-of-chunk router + quantile decisions, with path-drop, aux head, both,
 both + mean pooling · 3 seeds · status: launching (spot capacity)*
+
+## EXP-017 · A vocabulary for the learned chunks (learned tokenization with a token table)
+
+*spec `exp017_chunk_vocab.yaml` · `hnet/model/chunk_vocab.py` · 2-stage (3,3), end-of-chunk MLP router, rank
+decisions, lr 1.5e-3, EXP-002 budget · arms: `quant_fix` (fixed rank decisions, no vocabulary), `vocab` (each
+stage-0 chunk's byte content hashed by 2 hashes into 65536-row tables, 12.6M parameters ≈ BPE's 12.9M embedding +
+head, zero FLOPs, added to the chunk vector), `vocab_pred` / `vocab_pred_w1` (plus a sampled-softmax next-chunk
+objective for the main network, 1024 candidates, +1.6% FLOPs, weight 0.5 / 1.0) · 3 seeds · status: launching*
+
+Hypothesis: the gap to BPE is word identity, which BPE stores in a FLOP-free table and the H-Net must compute; and the
+main network gets no word-level training signal. A hashed vocabulary over the router's chunks gives both, and makes
+the segmentation matter (a chunk's identity is its token), which is what a learned tokenizer needs to be trained on.

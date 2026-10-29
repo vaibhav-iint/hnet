@@ -629,3 +629,34 @@ compression (last 10 logged steps):
   compression. Dropped from further use.
 - New intervention (EXP-016): chunk-level multi-byte prediction, a head on the innermost main network's output
   predicting the next chunk's first k bytes, bypassing dechunker, residual and decoder.
+
+### EXP-014 post-mortem: the p-space quantile rule saturates and collapses
+`metrics.jsonl` of the stopped runs: `tau/s1` climbs to 1.000 within 70–90 steps, then `compression/s1` jumps to
+440–600 (only forced boundaries) and stays there (`quant__lr0.0015_s1`, `quant__lr0.006_s0`, ...); in
+`quant__lr0.0015_s2` the same happens at stage 0 at step ~290 (`compression/s0` 1300–1800, then stage 1 selects
+everything because it sees no free positions). The one healthy-looking run had `tau/s0 = 1.000` too.
+
+Mechanism: the quantile threshold was detached, so nothing anchored the *scale* of the router's logits; the STE
+confidence gradient pushes selected logits up and unselected ones down forever (the same force that makes the paper
+router over-select, now with no ratio loss to oppose it). Once logits exceed ~17, `sigmoid` is exactly 1.0 in fp32
+for more than 1/N of the positions, the quantile sits on the tie, recentring gives p' = 0.5 for all of them, the
+strict `>` selects none, and the stage is dead (no selected positions → no gradient → no recovery).
+
+Fix (`routing/decide.py`, tests `test_quantile_decision.py`): rank the router's raw fp32 logit (`RouterOutput.logit`)
+with `topk` (ties broken by rank, never "none"); standardize the scores over the batch *in the graph* (BatchNorm
+style) before the threshold and the confidence, which makes the gradient's common-shift and common-scale components
+exactly zero (unit test), so the logits cannot inflate; midpoint threshold between the k-th and (k+1)-th score;
+running mean/std/threshold for eval; `temp` controls the confidence margins; `score_std/s*` is logged as the drift
+diagnostic. A general lesson for H-Net routers: any decision rule needs a scale anchor; the paper's is the ratio loss
+(weak), ours is normalization.
+
+### Zooming out: the hierarchy needs a vocabulary (EXP-017)
+The user asked for coarser-grained ideas and reminded that the point of H-Net is *learned tokenization*. Reading the
+findings as one story: (1) 84% of the gap to BPE is word identity; (2) BPE gets it from a FLOP-free 12.9M-parameter
+table, the H-Net has to compute it; (3) the main network receives the boundary byte's state, not the chunk's
+identity, and gets no word-level training signal; (4) oracle word boundaries barely move bpb, so routing quality is
+not the bottleneck at this scale: what the main network is fed and trained on is. EXP-017 treats the router's chunks
+as tokens: hashed chunk-content embeddings (parameter-matched to BPE, zero FLOPs) enter the main network, and a
+sampled-softmax next-chunk objective trains it. This also makes the segmentation matter to the loss (a chunk's
+identity is its token), so the learned tokenizer finally has something to be good at. Router-dynamics work stops
+here; the remaining budget (~$120 of the $200 cap) goes to this line.
