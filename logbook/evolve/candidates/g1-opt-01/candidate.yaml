@@ -1,0 +1,37 @@
+id: g1-opt-01
+parents: [hnet_ws]
+track: optimization
+hypothesis: >-
+  Muon-native LR transfer: drop the paper's Adam-derived per-stage multiplier (x2.35 at L03) from the Muon matrices
+  and keep it on the Adam part only. The `auto` rule (paper App. C) is lambda^s = sqrt(N_GPT * D^S/D^s / prod N),
+  i.e. Adam's sqrt(batch) rule times a 1/sqrt(width) muP correction for per-element updates. Muon's update is already
+  orthogonalized and scaled by sqrt(rows/cols), which is the spectral (width-transferable) step per matrix, so stacking
+  lambda on it double-counts: today the outer Mamba in_proj takes a spectral step of 0.02 x 2.35 x 2.39 = 0.112 per
+  step, 2.1x the largest main-network step (fc1, 0.053) and 5.6x BPE's base step, and the zero-init residual bypass
+  (also a stage-0 Muon matrix) grows on a 2.35x faster clock. This explains the measured LR facts: the H-Net's best
+  Muon LR is half of BPE's (0.01 vs 0.02 at L04, -0.044 bpb), and above 0.01 the bypass ends 5-25x the hierarchy's
+  rms. With the multiplier off the Muon side, the main Transformer (identical to BPE's, same positions per step)
+  trains at BPE's optimum 0.02 while the outer network gets the step the Muon scaling already gives it, so the H-Net
+  should do better at 0.02 than at its old optimum 0.01 (where the main network was under-stepped by 2x; BPE loses
+  0.084 bpb from 0.02 to 0.01). Single-factor change vs the parent: only the 10 stage-0 Muon matrices
+  (Mamba in/out_proj x4, chunk_vocab.pred_proj, residual_proj) move from 0.0470 to 0.0200; every Adam group,
+  the main network and BPE are untouched. CPU probe (150 steps, full 908-step schedule): the bypass spectral norm
+  tracks 0.8 x sum(lr) of its group (it is a clock, not a learned quantity; 2.93 vs 1.25 at step 120 = exactly the
+  2.35 ratio), so this also delays bypass/hierarchy rms parity from step ~85 to ~120 (see checks.md); the
+  candidate is slower in the warmup and has caught up on train loss by step ~100.
+prediction:
+  fitness: 0.085            # parent hnet_ws +0.127 (1 seed): recovers >= 0.04, the measured transfer cost
+  falsified_if: "fitness within +-0.02 of the parent's (mean of 2 seeds): the multiplier on Muon is not why the H-Net prefers half of BPE's LR"
+  mechanism: "bypass_ratio (residual_rms/dechunk_rms) at step 300 <= 2.8 (parent 3.83) and at step 908 <= 4.0 (parent 5.09); the advantage is visible by step 300 and does not shrink in the decay"
+branch: evolve/g1-opt-01
+model: configs/ladder/models/hnet_ws_L03.yaml
+set: ["model.lr_multiplier_kinds=[embed,head,other]"]
+applied_peak_lrs:   # benchmark spec values (Muon 0.02, Adam part 0.003); printed by the trainer ("peak_lr_by_group")
+  parent: {muon/s0: 0.04702, muon/s1: 0.02, embed/s0: 0.007053, head/s0: 0.007053, other/s0: 0.007053, other/s1: 0.003}
+  candidate: {muon/s0: 0.02, muon/s1: 0.02, embed/s0: 0.007053, head/s0: 0.007053, other/s0: 0.007053, other/s1: 0.003}
+checks:
+  tests: pass             # tests/test_muon_lr_mult_kinds.py + test_optim_groups, test_speedrun_muon, test_model_hnet, test_invariances, test_flops
+  fairness: pass          # scripts/search/fairness.py on make_gen output (bpe, hnet_ws, g1_opt_01): no problems, params 20.01M, 0.02037 GFLOPs/byte
+  grad_audit: "n/a: optimizer-only change, no new loss term or gradient path"
+  smoke: pass             # logbook/evolve/candidates/g1-opt-01/checks.md
+  params_unchanged: 20010025

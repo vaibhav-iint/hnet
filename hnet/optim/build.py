@@ -68,6 +68,9 @@ def make_param_groups_fn(model_cfg, train_cfg: dict):
         )
 
     fn.lr_multipliers = mults
+    # H-Net-only: optimizer kinds the multipliers apply to (read by the Muon builder; None = all kinds)
+    fn.lr_mult_kinds = getattr(model_cfg, "lr_multiplier_kinds", None)
+    assert fn.lr_mult_kinds is None or train_cfg.get("optimizer") == "muon", "lr_multiplier_kinds needs Muon"
     return fn
 
 

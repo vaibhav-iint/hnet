@@ -67,6 +67,12 @@ MUON_DEFAULTS = dict(
     ns_steps=5,
     weight_decay=0.0,  # decoupled, Muon params
     router="adam",  # adam | muon: optimizer for 2-D router projections (H-Net)
+    # Kinds (subset of KINDS) whose groups take the per-stage LR multiplier (``lr_mult``) from ``param_groups_fn``;
+    # groups of the other kinds get lr_mult 1. None = every kind (the default; unchanged behaviour), unless the
+    # param_groups_fn carries ``lr_mult_kinds`` (from the H-Net config's ``lr_multiplier_kinds``). E.g. [embed, head,
+    # other] keeps the paper's Adam-derived per-stage multipliers on the Adam part only: Muon's orthogonalized,
+    # sqrt(rows/cols)-scaled update already sets a width-transferable step per matrix.
+    lr_mult_kinds=None,
     lr_embed=0.6,
     lr_head=0.008,
     lr_other=0.04,
@@ -261,6 +267,13 @@ def build_muon_optimizer(model: nn.Module, train_cfg, param_groups_fn: Optional[
         else:
             ids = {id(p) for _, p in named}
             sub = param_groups_fn(model, filter_fn=lambda name, p: id(p) in ids, weight_decay=hp["weight_decay"])
+            mult_kinds = c["lr_mult_kinds"]
+            if mult_kinds is None:
+                mult_kinds = getattr(param_groups_fn, "lr_mult_kinds", None)
+            if mult_kinds is not None:
+                assert set(mult_kinds) <= set(KINDS), f"lr_mult_kinds must be a subset of {KINDS}, got {mult_kinds}"
+                if kind not in mult_kinds:
+                    sub = [{**g, "lr_mult": 1.0} for g in sub]
         for g in sub:
             group = {**hp, **g, "kind": kind}
             group.setdefault("lr_mult", 1.0)
