@@ -12,7 +12,7 @@ Sections of the JSON (all bits are bits per predicted byte; "class" = class of t
               by position in word; logit lens of each path through the decoder's final norm + LM head;
               input x gradient attribution of each path
   probes      held-out linear probes from the chunk vector before the vocabulary (x_enc), after it (x) and from
-              the main-network output (z): chunk identity (top-255 strings), length, first byte, last byte,
+              the main-network output (z): chunk identity (top-63 strings + other), length, first byte, last byte,
               next chunk's first byte, previous chunk's last byte; unigram baselines; effective ranks
   attention   attention mass of every main-network attention layer over chunk offsets (8 documents)
 """
@@ -50,10 +50,23 @@ def eff_rank(X: np.ndarray) -> dict:
             "top1_var": float(s[0]), "top10_var": float(s[:10].sum())}
 
 
-def probe(X: np.ndarray, y: np.ndarray, groups: np.ndarray, n_cls: int, steps: int = 250) -> dict:
+def remap_top(y: np.ndarray, k: int) -> tuple:
+    """Keep the k-1 most frequent labels, map the rest to one 'other' class (k-1)."""
+    vals, cnt = np.unique(y, return_counts=True)
+    top = vals[np.argsort(-cnt)[: k - 1]]
+    lut = {v: i for i, v in enumerate(top)}
+    return np.array([lut.get(v, k - 1) for v in y]), k
+
+
+def probe(X: np.ndarray, y: np.ndarray, groups: np.ndarray, n_cls: int, steps: int = 150, max_rows: int = 8000) -> dict:
     """Multinomial logistic probe, split by document (60/20/20 train/val/test), standardized inputs, weight decay
     chosen on the validation docs. Held-out bits and accuracy, against the train-set unigram distribution."""
     rng = np.random.default_rng(0)
+    if n_cls > 64:
+        y, n_cls = remap_top(y, 64)
+    if len(y) > max_rows:
+        keep = np.sort(rng.choice(len(y), max_rows, replace=False))
+        X, y, groups = X[keep], y[keep], groups[keep]
     ug = rng.permutation(np.unique(groups))
     n = len(ug)
     te_g, va_g = set(ug[: max(1, n // 5)].tolist()), set(ug[max(1, n // 5): max(2, 2 * n // 5)].tolist())
@@ -82,7 +95,7 @@ def probe(X: np.ndarray, y: np.ndarray, groups: np.ndarray, n_cls: int, steps: i
         return W.detach(), b.detach()
 
     best = None
-    for wd in (1e-4, 1e-3, 1e-2):
+    for wd in (1e-3, 1e-2):
         W, b = fit(wd)
         v = float(F.cross_entropy(Xt[va] @ W + b, yt[va]))
         if best is None or v < best[0]:
@@ -342,7 +355,7 @@ def analyse(path: str, docs: list, attn_docs: int = 8, grad_attr: bool = True) -
     for k in rows:
         X = np.stack(rows[k])
         pr[k] = {"eff_rank": eff_rank(X)}
-        for tname, y, n in (("identity_top255", y_id, 256), ("length", y_len, 16), ("first_byte", y_first, 256),
+        for tname, y, n in (("identity_top63", y_id, 256), ("length", y_len, 16), ("first_byte", y_first, 256),
                             ("last_byte", y_last, 256), ("next_first_byte", y_next, 256),
                             ("prev_last_byte", y_prev, 256)):
             pr[k][tname] = probe(X, np.array(y), grp, n)
@@ -387,7 +400,7 @@ def grad_attribution(model, c) -> tuple:
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("ckpt")
-    ap.add_argument("--docs", type=int, default=48)
+    ap.add_argument("--docs", type=int, default=32)
     ap.add_argument("--max-bytes", type=int, default=2048)
     ap.add_argument("--attn-docs", type=int, default=8)
     ap.add_argument("--out", default=None)
