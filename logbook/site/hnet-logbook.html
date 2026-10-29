@@ -64,7 +64,7 @@ a { color: var(--accent); }
 <div class="wrap">
   <header class="top">
     <h1>H-Net Logbook</h1>
-    <span class="meta">updated 2026-10-29 10:47 UTC</span>
+    <span class="meta">updated 2026-10-29 12:00 UTC</span>
   </header>
   <p class="lede">Byte-level H-Net vs tokenized Transformers at 100M–500M parameters, built from scratch on a $500 budget.
   The experiment log records each run with configs, costs and loss curves. The work log records everything else.</p>
@@ -525,7 +525,7 @@ the vocabulary then helps more than in EXP-017, consistency is the missing ingre
 variance / total variance of the stage-0 logit · arms <code>cons1</code>, <code>cons10</code>, <code>cons10_vocab_pred</code> · 3 seeds · status:
 <code>cons1</code> <strong>1.768 / 1.812 / 1.813 → 1.798</strong>, <code>cons10</code> <strong>1.775 / 1.783 / 1.840 → 1.799</strong>, vs EXP-017 <code>quant_fix</code> 1.799
 ± 0.005: neutral on average with a larger seed spread (two seeds −0.02, one +0.04); main-network contribution 0.02–0.06
-(baseline 0.03). <code>cons10_vocab_pred</code> pending. Consistency can be imposed on a character-pair tokenizer without cost,
+(baseline 0.03). <code>cons10_vocab_pred</code> 1.875 / 1.868 / 1.833 → 1.859 (<code>vocab_pred</code> without the penalty: 1.836). Consistency can be imposed on a character-pair tokenizer without cost,
 but it does not by itself make the second level useful at (3,3); the word-scale line (EXP-018/023) is where the gain is.</em></p>
 <h2>EXP-021 · (stopped) word-scale vocabulary with the median/MAD decider</h2>
 <p><em>Stopped at step ~1000: the MAD of a word tokenizer's boundary scores is ~0 (5/6 identical "not a boundary" logits),
@@ -533,7 +533,7 @@ but it does not by itself make the second level useful at (3,3); the word-scale 
 <h2>EXP-023 · Word-scale chunk vocabulary, trimmed-statistics rank decider (+ n-gram tables, + residual warmup)</h2>
 <p><em>spec <code>exp023_word_vocab_trimmed.yaml</code> · 1-stage ratio 6, end_mlp, rank decisions on trimmed-standardized scores,
 chunk vocabulary (2 × 65536 × 96) + next-chunk objective (w 0.5, 1024 candidates) · 3 seeds · baseline EXP-018
-<code>h1_quant</code> 1.853 · status: <code>vp</code> and <code>vp_ng</code> done, <code>vp_rwarm</code> finishing</em></p>
+<code>h1_quant</code> 1.853 · status: <strong>done</strong></em></p>
 <div class="tablewrap"><table>
 <thead>
 <tr>
@@ -557,6 +557,12 @@ chunk vocabulary (2 × 65536 × 96) + next-chunk objective (w 0.5, 1024 candidat
 <td>BPE is 1.634 ± 0.002</td>
 </tr>
 <tr>
+<td><code>vp_rwarm</code> + residual warmup 0.3</td>
+<td>1.810 / 1.875 / 1.746</td>
+<td>0.32 / 0.16 / 0.69</td>
+<td>worse than <code>vp</code> in every seed; seed 1 still not adopted</td>
+</tr>
+<tr>
 <td>EXP-018 <code>h1_vocab_pred</code> (same arm, mean/std decider)</td>
 <td>1.720 / 1.863 / 1.737</td>
 <td>0.75 / 0.13 / 0.55</td>
@@ -570,6 +576,56 @@ chunk vocabulary (2 × 65536 × 96) + next-chunk objective (w 0.5, 1024 candidat
 <li><code>vp_ng</code>: the adopted seeds are 0.02–0.035 bpb from BPE at identical training FLOPs, with a learned word tokenizer
   and a main network that carries 0.42 bpb. The two parameter-side memories are complementary: n-gram tables give
   the byte stage local identity, the chunk table gives the hierarchy word identity.</li>
+</ul>
+<h2>EXP-024 · Reliable adoption: a whitespace tokenizer curriculum (H-Net matches BPE at equal FLOPs)</h2>
+<p><em>spec <code>exp024_adoption_curriculum.yaml</code> · best configuration (<code>vp_ng</code>: 1-stage ratio 6, end_mlp router, trimmed rank
+decisions, chunk vocabulary 2 × 65536 × 96 + next-chunk objective, byte n-gram tables) · arms: <code>prior</code> = for the first
+10% of steps the router's logit is also trained (BCE, weight 1 → 0) toward "a chunk ends at every whitespace byte",
+then released; <code>temp4</code> = confidence temperature 4 · 3 seeds · status: <strong>done</strong></em></p>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>arm</th>
+<th>val bpb (s0 / s1 / s2)</th>
+<th>mean</th>
+<th>main-network contribution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong><code>prior</code></strong></td>
+<td><strong>1.6337 / 1.6346 / 1.6364</strong></td>
+<td><strong>1.635 ± 0.001</strong></td>
+<td>0.56 / 0.57 / 0.60</td>
+</tr>
+<tr>
+<td><code>temp4</code></td>
+<td>1.753 / 1.713 / 1.704</td>
+<td>1.723</td>
+<td>0.02 / 0.14 / 0.21</td>
+</tr>
+<tr>
+<td>EXP-023 <code>vp_ng</code> (no curriculum)</td>
+<td>1.720 / 1.669 / 1.656</td>
+<td>1.682</td>
+<td>0.09 / 0.41 / 0.42</td>
+</tr>
+<tr>
+<td>BPE (EXP-006, same FLOPs, same data, 3 seeds)</td>
+<td></td>
+<td>1.634 ± 0.002</td>
+<td></td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>With the curriculum every seed adopts the hierarchy early (main-network contribution 0.14–0.16 by step 250, 0.3+
+  by 750) and the three runs end within 0.003 bpb of each other, <strong>at BPE's bits per byte</strong> at identical training
+  FLOPs (fairness gate: configured and realized compute within 1%; realized compression pinned at 6.0 by the rank
+  decider). Without the curriculum two of three seeds reach 1.66–1.67 and one stays at 1.72.</li>
+<li>The curriculum is BPE's own pre-tokenization used as a 10%-of-training warm start, not a constraint: the router
+  is free afterwards (chunk statistics of the final checkpoint in the work log).</li>
+<li>A sharper confidence temperature does the opposite: it lowers the hierarchy's share and ends 0.04 behind <code>vp_ng</code>.</li>
 </ul></section>
   <section class="log" id="work" hidden><h1>Work log</h1>
 <p>Chronological record of what was done, why, and what came out of it. Newest entries at the bottom.
@@ -1883,7 +1939,65 @@ hierarchy is not adopted; the seeds that find the <em>word</em> tokenizer are ad
 seed across two deciders, so the bifurcation is in the router's initialization or the first few hundred steps of
 data, not in the decision rule. Open question whether the tokenizer causes the non-adoption (morpheme chunks are
 less predictable, a weaker chunk-level signal) or both follow from the same early state; either way the fix is to
-steer the first ~300 steps (residual warmup <code>vp_rwarm</code>, pending; or a brief whitespace-prior on the router).</p></section>
+steer the first ~300 steps (residual warmup <code>vp_rwarm</code>, pending; or a brief whitespace-prior on the router).</p>
+<h3>EXP-024: the tokenizer curriculum makes adoption reliable; H-Net matches BPE at equal FLOPs</h3>
+<p><code>prior</code> (vocabulary + next-chunk objective + n-gram tables + a 10%-of-training whitespace warm start on the router):
+<strong>1.6337 / 1.6346 / 1.6364 → 1.635 ± 0.001 bpb</strong>, BPE <strong>1.634 ± 0.002</strong>, same data, same training FLOPs (realized
+compute +0.3% of budget for every arm, <code>logbook/sweep_summary.py</code>). All three seeds adopt the hierarchy by step 250
+and the main network ends worth 0.56–0.60 bpb. <code>temp4</code> (sharper confidences) goes the other way: 1.723, hierarchy share
+0.02–0.21.</p>
+<p>Final checkpoint's tokenizer (<code>cs_exp024_prior_s0.json</code>), after 90% of training with no prior: 97% of boundaries on
+word boundaries, 99.3% of word boundaries hit, 99.8% of recurring words cut the same way, 25% singleton chunks (the
+whitespace tokenizer: 25%); the 3% of non-whitespace cuts are around punctuation and brackets. The router kept the
+word tokenizer it was pointed at and refined it; it did not drift back to character pairs or suffixes.</p>
+<h3>Where this leaves the project (honest-compute view, tiny scale, 50M token-eq)</h3>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>model</th>
+<th>val bpb</th>
+<th>hierarchy's share</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BPE (tiny_bpe_2m)</td>
+<td>1.634 ± 0.002</td>
+<td>—</td>
+</tr>
+<tr>
+<td>paper H-Net, 2-stage, as published (α 0.03)</td>
+<td>1.796 at <strong>+11% compute</strong>; ~1.87 ± 0.11 at budget (EXP-006)</td>
+<td>0.04</td>
+</tr>
+<tr>
+<td>+ fixed rank decider (EXP-017 <code>quant_fix</code>)</td>
+<td>1.799 ± 0.005</td>
+<td>0.03</td>
+</tr>
+<tr>
+<td>1-stage ratio 6 + word-scale chunk vocabulary + next-chunk objective (EXP-023 <code>vp</code>)</td>
+<td>1.773 ± 0.071 (1.73 when adopted)</td>
+<td>0.5–0.7</td>
+</tr>
+<tr>
+<td>+ byte n-gram tables (EXP-023 <code>vp_ng</code>)</td>
+<td>1.682 ± 0.034 (1.66 when adopted)</td>
+<td>0.4</td>
+</tr>
+<tr>
+<td>+ whitespace curriculum (EXP-024 <code>prior</code>)</td>
+<td><strong>1.635 ± 0.001</strong></td>
+<td>0.57</td>
+</tr>
+</tbody>
+</table></div>
+<p>The path from 1.80 to 1.635 was: (1) pin compression with rank decisions so comparisons are honest and routers cannot
+collapse; (2) notice that the paper's learned chunks are not types (half of them singletons) and that the gap is
+word identity; (3) give the chunks a vocabulary and a token-level objective; (4) move the chunk scale to words;
+(5) remove the adoption lottery with a 10% warm start. What is still open: the two-level hierarchy (the vocabulary at
+a (6,3) second level), scale (10M → 125M, more data), downstream tasks, and whether the warm start can be replaced by
+something that does not name whitespace (a surprise-based or consistency-based start).</p></section>
 </div>
 
 <script>
