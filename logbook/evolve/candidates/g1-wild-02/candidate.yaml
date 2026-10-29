@@ -1,0 +1,51 @@
+id: g1-wild-02
+parents: [hnet_ws]
+track: wildcard
+hypothesis: >-
+  Prefix output dictionary: give the byte model the output half of BPE's vocabulary, which it lacks entirely, at 1%
+  of BPE's cost. BPE's LM head is a string-keyed output memory (one vector per vocabulary string, 8.4M parameters at
+  L03) and costs 60% of BPE's FLOPs because every string is scored; the H-Net's LM head is 256 vectors, and all 15M
+  of its table parameters sit on the input side, so the decoder (one 192-wide Mamba layer, no MLP) must spell every
+  word from a single state: the logbook attributes 84% of the gap to BPE to the letters of words. Here the LM head's
+  top-16 bytes at each position are rescored by q_t . K[hash(current learned chunk so far + b)], with q_t built
+  from the final hidden state, the dechunked main-network output and a constant (a context-free spelling prior per
+  trie node). That is a hashed hierarchical softmax whose tree is the trie of the learned units: a word's
+  probability factorizes over its bytes, each scored against its own prefix's output vector exactly as BPE scores a
+  token against its output embedding, so for a word the model has learned, the letters after the first cost almost
+  nothing once the context has chosen it. Only k lookups of r = 64 numbers per byte: +0.74% FLOPs/byte, 4.1M
+  parameters moved from the chunk-vocabulary input table (25733 -> 15000 buckets) to a 64000 x 64 output table. It
+  also opens a direct, high-capacity path from the main network to the logits that does not go through the
+  residual sum (where the bypass carries 5-40x the hierarchy's signal) or the decoder. It needs consistent,
+  word-like units to key the trie, so the parent is hnet_ws (word-like units, 2.4x the hierarchy gain of suffix
+  units). Unlike BPE's, the dictionary covers strings longer than any BPE token and is shared by all words with a
+  common prefix, which is where a byte model should generalize better in the data-starved regime.
+prediction:
+  fitness: "<= +0.09 (hnet_ws +0.127; gain >= 0.03 bpb, central estimate 0.05)"
+  mechanism: >-
+    the gain is concentrated on non-initial bytes of chunks (>= 2/3 of the bpb gain on bytes with a non-empty chunk
+    prefix); prefix_topk_cov > 0.97 after step 100; bypass ratio (residual_rms / dechunk_rms) at the end below
+    hnet_ws's 5.09 because the main network now has a direct path to the logits. Falsified if the gain is < 0.01
+    bpb, or if it sits on chunk-initial bytes (then the table is acting as a context-free n-gram prior that the
+    input n-gram tables already provide, and the contextual part is unused).
+branch: evolve/g1-wild-02
+model: configs/evolve/models/g1-wild-02.yaml
+set: []
+checks:
+  tests: "pass: tests/test_prefix_head.py (8: chunk-prefix bookkeeping, prefix hash depends only on the chunk
+    prefix, zero-init = default model bit-for-bit with identical state dict and RNG stream, causality with and
+    without the chunk vocabulary, packed = separate, gradient paths: byte CE reaches the table at init and the
+    queries once it is non-zero, and the correction alone reaches the main network and the router, params/FLOPs)
+    + tests/test_model_hnet.py tests/test_invariances.py tests/test_flops.py (156 passed, 4 skipped)"
+  fairness: "pass (scripts/search/fairness.py, logbook/evolve/candidates/g1-wild-02/fairness.md): 20.52 MFLOPs/byte
+    vs 20.37 for hnet_ws (+0.74%), params 20.009M <= hnet_ws 20.010M <= BPE 20.023M"
+  grad_audit: logbook/evolve/candidates/g1-wild-02/grad_audit.txt
+  smoke: "pass: L03 candidate model through hnet.train.train on CPU, mix_v1_small, 4 x 2048-byte windows/step, 40
+    steps, Muon 0.02 / Adam 0.003, fp32: train bpb 6.56 -> 3.24 (hnet_ws, same settings: 6.52 -> 3.39), no NaN,
+    compression 4.14 on target; val (code, 70 KB) 4.119 vs 4.115; new per-step metrics prefix_topk_cov (0.86 at
+    step 5) and prefix_corr_rms logged"
+author: wildcard proposer
+next_if_fails: >-
+  Ablate before discarding: (a) use_main=false (is the main->logit path or the decoder query doing the work), (b)
+  keep the chunk-vocabulary table at full size and pay with the n-gram tables instead (is the loss from the smaller
+  input table hiding the gain), (c) k = 32 if prefix_topk_cov < 0.97. If the gain is real but small on the
+  prior-free parent, the trie keys are the bottleneck: pair it with any router candidate that raises consistency.

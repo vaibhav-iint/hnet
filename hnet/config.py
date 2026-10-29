@@ -229,6 +229,12 @@ class HNetConfig:
     # embeddings at the encoder input (enc) and decoder input (dec) and as a gated logit bonus (gate). {"orders":
     # [4, 8, 16, 32], "enc": true, "dec": true, "gate": true}. Empty = off (the default model is unchanged).
     match_model: dict = field(default_factory=dict)
+    # Prefix output dictionary (hnet.model.prefix_head): the k bytes ranked highest by the LM head are rescored by
+    # q_t . K[hash(current chunk prefix + b)], q_t from the final hidden state and the dechunked main-network output: a
+    # BPE-style output embedding over the trie of the learned chunks. {"buckets": 65536, "rank": 64, "k": 16,
+    # "max_len": 16, "use_main": true, "prior_scale": 4.0}. Needs a 1-stage H-Net with "end" boundary semantics.
+    # Empty = off (the default model is unchanged).
+    prefix_head: dict = field(default_factory=dict)
 
     def attn_res_for_stage(self, s: int) -> int:
         return int(_per_stage(self.attn_res, self.n_stages + 1, "attn_res")[s])

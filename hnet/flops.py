@@ -342,6 +342,14 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
                 comp_p["match_model"] = n_tab * k * 257 * d0 + ((d0 + 1) * k if mm["gate"] else 0)
                 comp_f["match_model"] = ((n_tab * k * d0 if cv.count_elementwise else 0.0)
                                          + ((2 * d0 * k + (3 * k if cv.count_elementwise else 0)) if mm["gate"] else 0.0))
+            if cfg.prefix_head:  # prefix output dictionary (hnet.model.prefix_head): table lookups are free
+                from hnet.model.prefix_head import PrefixHead
+
+                ph = {"buckets": 65536, "rank": 64, "k": 16, "use_main": True, **cfg.prefix_head}
+                r, k, um = int(ph["rank"]), int(ph["k"]), bool(ph["use_main"])
+                comp_p["prefix_head"] = int(ph["buckets"]) * r + d0 * (r - 1) * (2 if um else 1)
+                comp_f["prefix_head"] = (PrefixHead.flops_per_byte(d0, r, k, um, cv.count_elementwise)
+                                         if cv.count_lm_head else 0.0)
             if cfg.dc.main_aux_weight > 0:  # training-only auxiliary head on the dechunked main output
                 comp_p["main_aux_head"] = V * d0
                 comp_f["main_aux_head"] = 2 * V * d0 if cv.count_lm_head else 0.0

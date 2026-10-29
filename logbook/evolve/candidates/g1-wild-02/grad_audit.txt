@@ -1,0 +1,26 @@
+
+== gradient norms by (objective, parameter group) after 0 steps
+                             embeddings   ngram_embeddings         s0.encoder   s1.pad_dimension    s1.main_network         s0.decoder  s0.routing_module     s0.chunk_vocab   s0.residual_proj            lm_head        prefix_head
+byte_ce                        7.54e-02           1.72e-01           2.28e+00           3.32e-03           4.12e-01           1.91e+00           1.30e-01           9.35e-02           1.03e+00           3.56e+00           4.83e-02
+ratio/s0                       9.23e-05           1.27e-04           2.63e-03           0 (none)           0 (none)           0 (none)           1.33e-03           0 (none)           0 (none)           0 (none)           0 (none)
+next_chunk_ce/s0               0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           7.18e-02           0 (none)           0 (none)           0 (none)
+router_prior/s0                1.21e-01           7.54e-02           3.38e+00           0 (none)           0 (none)           0 (none)           1.87e+00           0 (none)           0 (none)           0 (none)           0 (none)
+
+== mechanism metrics
+  F/s0=0.242  G/s0=0.309  boundary_frac/s0=0.242  compression/s0=4.14  dechunk_rms/s0=1.03  p_margin/s0=0.33  p_mid/s0=0.115  residual_rms/s0=0.0433  score_std/s0=1.1  tau/s0=0.335
+
+== warnings
+  - next_chunk_ce/s0: sends the router no gradient (dc.chunk_ste=false; the STE sits after dechunking)
+
+== gradient norms by (objective, parameter group) after 3 steps
+                             embeddings   ngram_embeddings         s0.encoder   s1.pad_dimension    s1.main_network         s0.decoder  s0.routing_module     s0.chunk_vocab   s0.residual_proj            lm_head        prefix_head
+byte_ce                        6.44e-02           1.44e-01           1.92e+00           3.08e-03           3.55e-01           1.66e+00           1.45e-01           7.78e-02           9.26e-01           3.42e+00           9.65e-01
+ratio/s0                       9.56e-05           1.31e-04           2.73e-03           0 (none)           0 (none)           0 (none)           1.38e-03           0 (none)           0 (none)           0 (none)           0 (none)
+next_chunk_ce/s0               2.32e-06           1.68e-06           6.96e-05           1.67e-07           1.47e-05           0 (none)           0 (none)           7.07e-02           0 (none)           0 (none)           0 (none)
+router_prior/s0                1.21e-01           7.58e-02           3.38e+00           0 (none)           0 (none)           0 (none)           1.87e+00           0 (none)           0 (none)           0 (none)           0 (none)
+
+== mechanism metrics
+  F/s0=0.242  G/s0=0.32  boundary_frac/s0=0.242  compression/s0=4.14  dechunk_rms/s0=1.03  p_margin/s0=0.322  p_mid/s0=0.138  residual_rms/s0=0.0452  score_std/s0=1.1  tau/s0=0.335
+
+== warnings
+  - next_chunk_ce/s0: sends the router no gradient (dc.chunk_ste=false; the STE sits after dechunking)
