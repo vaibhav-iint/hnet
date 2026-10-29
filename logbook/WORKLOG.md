@@ -1090,3 +1090,19 @@ finals will say which.
   one seed; worth a second seed before drawing conclusions. The H-Net's realized compression on code is 2.8-3.8
   bytes/position (BPE 2.3-4.3 bytes/token): it does not compress code more than BPE at this scale, unlike the blog.
 - Largest deficits: Chinese (+0.52), Russian (+0.36 to +0.45), assembly and SQL; smallest: Arabic (+0.14), English.
+
+### Why the bypass wins under Muon: its size follows the LR schedule (evolve g1, optimization proposer)
+CPU probe through the real trainer (L03 hnet_ws, benchmark schedule and LRs, one 2048-byte window per step, 150 steps):
+the zero-initialized bypass matrix `residual_proj` sits in the stage-0 Muon group at 0.02 × 2.35 (`auto` multiplier) =
+0.047 with no weight decay. Muon's orthogonalized step has a fixed size per step, so a zero-init matrix with a
+consistent gradient grows its singular values by ≈ LR per step: its top singular value tracked 0.8 × the cumulative LR
+at every step to 150 (3.90 at step 150, still linear), effective rank ~150/192. The bypass rms crossed the hierarchy's at
+step ~85 and was 2.8× by step 150 (the GPU run: 3.8× at step 300, 5.1× at the end), while the encoder-output and
+main-output gains barely moved (1.15, 1.04). So the "bypass opens at steps 60-130" race is, under Muon, mostly a clock:
+the bypass's scale is set by the LR schedule, not by what it is learned to need, and nothing anchors it (the decoder
+normalizes its input). Under AdamW the same zero-init matrix grows too (EXP-023), but this is the first measurement of
+the rate. Candidates g1-opt-01 (drop the Adam-derived ×2.35 on stage-0 Muon matrices) and g1-opt-02 (decoupled weight
+decay 0.5 on `residual_proj` only, which bounds its size at ~1/wd; probe: plateau at 1.50, bypass ratio held at 1.2)
+test whether anchoring the bypass is a fix or only a symptom.
+Also: my hand-written note in the generated docs/LADDER.md broke `test_committed_files_match_the_generator`, which the
+VM test gate would have caught at launch. Moved to docs/ANALYSIS_LADDER.md; CLAUDE.md now says not to edit generated files.
