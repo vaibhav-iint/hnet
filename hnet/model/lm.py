@@ -174,6 +174,25 @@ def lm_outputs(
     return out
 
 
+def logits_outputs(
+    logits: torch.Tensor,
+    labels: Optional[torch.Tensor],
+    return_logits: bool,
+    batch_shape: Optional[Tuple[int, int]],
+) -> CausalLMOutput:
+    """``lm_outputs`` for fully materialized logits [T, V] (heads with additive per-position terms, e.g. the match
+    model's logit bonus; byte vocabularies only, so the logits are small)."""
+    out = CausalLMOutput()
+    if labels is not None:
+        labels = labels.reshape(-1)
+        out.ce_sum = F.cross_entropy(logits.float(), labels, ignore_index=IGNORE_INDEX, reduction="sum")
+        out.n_targets = (labels != IGNORE_INDEX).sum()
+        out.loss = out.ce_sum / out.n_targets.clamp(min=1)
+    if return_logits:
+        out.logits = logits.view(*batch_shape, -1) if batch_shape is not None else logits
+    return out
+
+
 class HNetForCausalLM(nn.Module):
     """Byte embeddings -> recursive ``HNet`` backbone -> lm_head (official parameter names)."""
 
@@ -203,6 +222,15 @@ class HNetForCausalLM(nn.Module):
             for n, _ in st.named_parameters():
                 if st.is_innermost or not n.startswith("main_network."):
                     self._param_stage[prefix + n] = st.stage_idx
+        # built under a forked RNG (its parameters are zero-initialized anyway), so every other module's
+        # initialization, here and in init_weights(), is identical with and without the match model
+        self.match_model = None
+        if cfg.match_model:
+            from .match import MatchModel
+
+            assert cfg.vocab_size == 256 and cfg.n_stages > 0, "match_model: byte vocabulary and a hierarchy"
+            with torch.random.fork_rng(devices=[]):
+                self.match_model = MatchModel(d0, **cfg.match_model)
 
     @property
     def n_stages(self) -> int:
@@ -222,6 +250,13 @@ class HNetForCausalLM(nn.Module):
         x = self.embeddings(ids)
         if self.ngram_embeddings is not None:
             x = x + self.ngram_embeddings(ids, ctx)
+        cand, dec_add = None, None
+        if self.match_model is not None:  # copy candidates from earlier in the same document (no gradient)
+            cand = self.match_model.candidates(ids, ctx)
+            if self.match_model.enc is not None:
+                x = x + self.match_model.enc_embed(cand).to(x.dtype)
+            if self.match_model.dec is not None:
+                dec_add = self.match_model.dec_embed(cand)
         binfo = None
         vocab_stages = [st for st in self.backbone.stages() if getattr(st, "chunk_vocab", None) is not None]
         if vocab_stages:
@@ -230,8 +265,12 @@ class HNetForCausalLM(nn.Module):
             bank = hash_bank(ids, ctx, max(st.chunk_vocab.n_hash for st in vocab_stages),
                              max(st.chunk_vocab.max_len for st in vocab_stages))
             binfo = ByteInfo(bank, torch.arange(ids.numel(), device=ids.device))
-        h, bpred = self.backbone(x, ctx, input_ids=ids, boundaries=boundaries, binfo=binfo)
-        out = lm_outputs(h, self.lm_head, labels, return_logits, batch_shape)
+        h, bpred = self.backbone(x, ctx, input_ids=ids, boundaries=boundaries, binfo=binfo, dec_add=dec_add)
+        if self.match_model is not None and self.match_model.gate is not None:
+            logits = self.lm_head(h).float() + self.match_model.logit_bonus(h, cand, self.config.vocab_size)
+            out = logits_outputs(logits, labels, return_logits, batch_shape)
+        else:
+            out = lm_outputs(h, self.lm_head, labels, return_logits, batch_shape)
         out.bpred = bpred
         aux_terms = self.backbone.aux_losses(bpred)
         out.aux_loss = self.config.dc.ratio_loss_alpha * sum(loss for loss, _ in aux_terms)
@@ -307,6 +346,8 @@ class HNetForCausalLM(nn.Module):
         for st in self.backbone.stages():
             if getattr(st, "chunk_vocab", None) is not None:
                 st.chunk_vocab.reset_parameters()
+        if self.match_model is not None:
+            self.match_model.reset_parameters()
 
     def _router_consistency(self, logit: torch.Tensor, ids: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
         """Within-group variance of the byte-level router logit over positions in the batch that end in the same
@@ -384,7 +425,8 @@ class HNetForCausalLM(nn.Module):
         """Stage index owning parameter ``name`` (DDP ``module.`` / compile ``_orig_mod.`` prefixes allowed);
         embeddings and lm_head belong to stage 0."""
         name = name.replace("_orig_mod.", "").removeprefix("module.")
-        if name.startswith(("embeddings.", "ngram_embeddings.", "lm_head.", "main_aux_head.", "chunk_pred_head.")):
+        if name.startswith(("embeddings.", "ngram_embeddings.", "lm_head.", "main_aux_head.", "chunk_pred_head.",
+                            "match_model.")):
             return 0
         return self._param_stage[name]
 

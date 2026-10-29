@@ -1,0 +1,49 @@
+id: g1-wild-01
+parents: [hnet_ws]
+track: wildcard
+hypothesis: >-
+  In-context match model (the PPM / LZ77 / PAQ "match model", built into the byte LM). For orders n in {4, 8, 16, 32}
+  an exact index finds the most recent earlier occurrence, in the same document, of the n bytes ending at t and
+  proposes the byte that followed it as a candidate for x[t+1]; the candidates enter as per-order embeddings at the
+  encoder input (so the router and the chunk vectors see "the next bytes are a copy") and at the decoder input, and
+  as a context-gated logit bonus a_n(t) = w_n . h_t + b_n on the candidate byte. It costs one int64 sort per order
+  (no FLOPs), +0.05% FLOPs/byte and 0.4M parameters (paid by shrinking the n-gram tables). Why it should beat BPE
+  and not just the H-Net: copying is the one capability a language model can have without learning it, and our
+  benchmark is the data-starved regime where the blog's H-Net loses and where we lose most (5x more data halves our
+  gap): BPE L03 sees 119M tokens in 908 steps, below where 2-3-layer models form induction heads, so it cannot yet
+  exploit in-document repeats; an exact byte index can from step ~10, and it is tokenization-invariant (" foo",
+  "(foo" and ".foo" all match on "foo", which BPE splits into unrelated ids). Measured offline on mix_v1 val with
+  the training windowing: an order>=8 match exists for 21% of mix bytes (81% correct), 46% of code (88%), 50% of
+  held-out code (89%), 30% of math; mixed into a global Witten-Bell n-gram model (fitted on 20MB) it removes 0.45
+  bpb (mix) and 1.31 bpb (code) at order 6, 0.51 / 1.25 at order 3: the gain shrinks only slowly as the base model
+  gets stronger. The repeats are largest exactly where the blog reports its largest H-Net wins (code, held-out
+  languages), so the per-source gaps should move most there.
+prediction:
+  fitness: "<= +0.07 (hnet_ws +0.127; gain >= 0.05 bpb, central estimate 0.08); 2-seed spread no larger than hnet_ws's"
+  mechanism: >-
+    per-source gain on code and held-out code >= 2x the gain on English; the gate bias b_n is positive and ordered
+    b_32 > b_16 > b_8 > b_4 by step 300; per-byte CE on bytes with a correct order>=16 match at least 0.5 bits below
+    hnet_ws on the same bytes. Falsified if the overall gain is < 0.02 bpb (the main network already copies) or the
+    code gain is not larger than the English gain.
+branch: evolve/g1-wild-01
+model: configs/evolve/models/g1-wild-01.yaml
+set: []
+checks:
+  tests: "pass: tests/test_match_model.py (9: exact candidates vs brute-force string search incl. segment
+    boundaries, zero-init = default model bit-for-bit with identical state dict and RNG stream, causality, packed =
+    separate when segments repeat each other, every match parameter gets byte-CE gradient at init, gate bonus,
+    params/FLOPs) + tests/test_model_hnet.py tests/test_invariances.py tests/test_flops.py"
+  fairness: "pass (scripts/search/fairness.py, logbook/evolve/candidates/g1-wild-01/fairness.md): 20.38 MFLOPs/byte
+    vs 20.37 for hnet_ws (+0.05%), params 20.009M <= hnet_ws 20.010M <= BPE 20.023M"
+  grad_audit: logbook/evolve/candidates/g1-wild-01/grad_audit.txt
+  smoke: "pass: L03 candidate model through hnet.train.train on CPU, mix_v1_small, 4 x 2048-byte windows/step, 40
+    steps, Muon 0.02 / Adam 0.003, fp32: train bpb 6.42 -> 2.85, no NaN, compression 4.14 on target; same settings
+    for hnet_ws: 6.52 -> 3.39; val (code, 70 KB) 2.82 vs 4.12 for hnet_ws (an early-training effect: copying needs
+    no learning; it says the path works, not the size of the final gain)"
+author: wildcard proposer
+next_if_fails: >-
+  If the overall gain is < 0.02 but code gains: the main network already copies English; keep the index and move it
+  to the chunk level (copy the whole next chunk after an earlier occurrence of the last chunk, as a candidate row for
+  the main network's input and a next-chunk proposal for speculative decoding). If nothing gains: measure the
+  hnet_ws checkpoint's CE on matched bytes first; a model that already predicts them at < 0.3 bits has nothing left
+  to copy and the in-context direction is dead at this scale.

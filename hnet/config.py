@@ -173,6 +173,11 @@ class HNetConfig:
     # Hashed byte n-gram embeddings added to the byte embedding (hnet.model.ngram; BLT-style): {"ns": [3, ..., 8],
     # "buckets": int or one per n}. Empty = off. Parameter-rich and FLOP-free (lookups, like the BPE embedding).
     ngram_embed: dict = field(default_factory=dict)
+    # In-context match model (hnet.model.match): for each order n the byte that followed the most recent earlier
+    # occurrence (same document) of the n bytes ending at t is a copy candidate for x[t+1]; candidates enter as
+    # embeddings at the encoder input (enc) and decoder input (dec) and as a gated logit bonus (gate). {"orders":
+    # [4, 8, 16, 32], "enc": true, "dec": true, "gate": true}. Empty = off (the default model is unchanged).
+    match_model: dict = field(default_factory=dict)
 
     def attn_res_for_stage(self, s: int) -> int:
         return int(_per_stage(self.attn_res, self.n_stages + 1, "attn_res")[s])

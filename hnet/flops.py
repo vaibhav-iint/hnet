@@ -335,6 +335,13 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
                                              + (len(ns) * d0 if cv.count_elementwise else 0.0))
             comp_p["lm_head"] = 0 if cfg.tie_embeddings else V * d0
             comp_f["lm_head"] = 2 * V * d0 if cv.count_lm_head else 0.0
+            if cfg.match_model:  # in-context match model (hnet.model.match): lookups + adds + a k-way logit gate
+                mm = {"orders": [4, 8, 16, 32], "enc": True, "dec": True, "gate": True, **cfg.match_model}
+                k = len(mm["orders"])
+                n_tab = int(bool(mm["enc"])) + int(bool(mm["dec"]))
+                comp_p["match_model"] = n_tab * k * 257 * d0 + ((d0 + 1) * k if mm["gate"] else 0)
+                comp_f["match_model"] = ((n_tab * k * d0 if cv.count_elementwise else 0.0)
+                                         + ((2 * d0 * k + (3 * k if cv.count_elementwise else 0)) if mm["gate"] else 0.0))
             if cfg.dc.main_aux_weight > 0:  # training-only auxiliary head on the dechunked main output
                 comp_p["main_aux_head"] = V * d0
                 comp_f["main_aux_head"] = 2 * V * d0 if cv.count_lm_head else 0.0
