@@ -1,0 +1,9 @@
+{
+ "checkpoint": "runs/gcp/exp002_tiny2m/paper_s0/ckpt/step_0001763",
+ "positions": 35663,
+ "unigram_bits": 3.979,
+ "probe_main_input_bits": 2.081,
+ "probe_main_output_bits": 2.615,
+ "probe_input_and_output_bits": 2.027,
+ "model_bits_same_bytes": 1.452
+}

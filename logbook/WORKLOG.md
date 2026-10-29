@@ -487,3 +487,26 @@ in `logbook/diagnostics/`. Findings on EXP-002 (paper 2-stage (3,3), final check
   - EXP-009 (oracle word chunks vs fixed vs learned at matched FLOPs);
   - EXP-006 (n-gram embeddings);
   - a dense-checkpoint probe run for steps 1–400.
+
+### Linear probes on the main network: it is not a decoder bottleneck (`hnet/analysis/probe_main.py`)
+Question: does the innermost main network compute next-chunk information that the byte decoder cannot spell out
+(a decoder bottleneck), or does it compute nothing useful (a training-signal problem)? Multinomial logistic probes
+on the main network's input x and output z at every innermost position, target = the byte after the chunk's anchor,
+70/30 split, held-out bits (logbook/diagnostics/probe_main_*.json):
+
+| model | positions | unigram | probe on main INPUT x | probe on main OUTPUT z | probe on [x, z] | model's own loss on those bytes |
+|---|---|---|---|---|---|---|
+| paper_s0 | 35.7k | 3.98 | **2.08** | 2.62 | 2.03 | 1.45 |
+| end_mlp_s1 | 37.3k | 4.92 | **3.71** | 3.89 | 3.66 | 3.22 |
+
+- The main network's output is *less* linearly predictive of the next byte than its own input (2.62 vs 2.08 bits
+  for paper_s0; 3.89 vs 3.71 for end_mlp_s1). A 7-layer, 6M-parameter Transformer destroys information its input
+  already carried. Concatenating x and z recovers only ~0.05 bits over x alone.
+- So the hierarchy is not computing next-chunk predictions that the decoder then fails to use. It is simply not
+  trained: this is consistent with the gradient-norm collapse (main-network grad ≈ 1–3% of stage 0's from step 20)
+  and the 0.04-bpb zero-main ablation. The decoder bottleneck hypothesis (item 5 above) is **not** supported for
+  the main network; the gap to BPE at word starts is mostly a capacity/signal problem at the chunk level.
+- Implication: fixes must deliver gradient to the main network early (bottleneck-first residual warmup, main-path
+  auxiliary head; EXP-008/011) rather than widen the decoder.
+- Caveat: the end_mlp probe targets differ (end-of-chunk anchor → the first byte of the next chunk, a harder,
+  higher-entropy target: unigram 4.92 vs 3.98), so the two rows are not comparable to each other, only within row.
