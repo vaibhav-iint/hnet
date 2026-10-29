@@ -1,0 +1,28 @@
+# EXP-021: the word-scale chunk vocabulary with the robust rank decider. EXP-018 `h1_vocab_pred` (1-stage, ratio 6,
+# vocabulary + next-chunk objective) gave -0.09 / -0.05 bpb vs its baseline at step 1000 in two seeds, with the main
+# network worth 0.3-0.56 bpb (baseline 0.13), but the third seed never adopted the hierarchy: its router scores went
+# heavy-tailed (std 15), mean/std standardization pushed every confidence to ~0.5 and the EMA dechunker damped the
+# hierarchy's output below the residual path. The decider now standardizes by median/MAD with clipped z (default).
+# Arms: baseline (`h1r_quant`), vocabulary + prediction (`h1r_vocab_pred`), and the same plus the byte n-gram tables of
+# EXP-006 (`h1r_vocab_pred_ng`: both parameter-side memories, matched to BPE's table twice over, no extra FLOPs).
+name: exp021_word_vocab_robust
+out_root: runs/search/exp021_word_vocab_robust
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp021_word_vocab_robust
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - model.dc.decision=quantile
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {h1r_quant: "1-stage (ratio 6), robust rank decisions",
+           h1r_vocab_pred: "+ chunk vocabulary + next-chunk prediction",
+           h1r_vocab_pred_ng: "+ chunk vocabulary + prediction + byte n-gram tables"}
+runs:
+  - {name: h1r_quant,         config: configs/runs/tiny_hnet1_2m.yaml}
+  - {name: h1r_vocab_pred,    config: configs/runs/tiny_hnet1_2m.yaml,
+     set: ["model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}]"]}
+  - {name: h1r_vocab_pred_ng, config: configs/runs/tiny_hnet1_2m.yaml,
+     set: ["model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}]",
+           "model.ngram_embed={ns: [3, 4, 5, 6, 7, 8], buckets: 12289}"]}
