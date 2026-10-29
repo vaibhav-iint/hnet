@@ -80,3 +80,17 @@ def test_resume_after_crash_drops_records_past_checkpoint(tmp_path):
     with open(os.path.join(tmp_path, "metrics.jsonl")) as f:
         steps = [json.loads(line)["step"] for line in f]
     assert steps == list(range(1, 16))
+
+
+def test_resume_at_final_step_does_not_repeat_final_eval(tmp_path):
+    c = cfg(tmp_path, steps=10)
+    c["eval"]["at_end"] = True
+    Trainer(c).train()
+    with open(os.path.join(tmp_path, "eval.jsonl")) as f:
+        before = f.read()
+    assert before.strip(), "the final eval must have logged a record"
+    tr = Trainer(c)
+    assert tr.step == 10
+    tr.train()
+    with open(os.path.join(tmp_path, "eval.jsonl")) as f:
+        assert f.read() == before

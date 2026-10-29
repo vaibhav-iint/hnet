@@ -434,6 +434,7 @@ class Trainer:
             end_step = min(self.total_steps, self.step + 2)
             log_every = 1
         check_every = 1 if self.world == 1 else int(tc.get("check_signals_every", 10))
+        start_step = self.step
         grad_clip = float(tc.get("grad_clip") or 0.0)
 
         if self.is_main:
@@ -565,7 +566,10 @@ class Trainer:
                     if self.is_main:
                         print(f"[train] stopping at step {self.step}: {self._stop_reason}", flush=True)
                     break
-            if not self.dry_run and self.step == end_step and self._stop_reason != "diverged":
+            # A run resumed from its final checkpoint trains no steps: its final eval was logged before that
+            # checkpoint was written, so neither is repeated (no duplicate eval records).
+            ran_steps = self.step > start_step
+            if not self.dry_run and ran_steps and self.step == end_step and self._stop_reason != "diverged":
                 finished = self.step >= self.total_steps
                 if finished and self.ec.get("at_end", True):
                     self.run_eval(final=True)
