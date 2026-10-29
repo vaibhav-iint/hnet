@@ -294,3 +294,16 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
 ### 01:02 · EXP-002 relaunched (commit f988ba8)
 - Spot L4 `hx-exp002-l4` in us-east1-c, 5-hour cap, 3 runs in parallel on the GPU.
 - Progress figures: `logbook/exp002_progress.py`, which pulls metrics from GCS.
+
+### EXP-002 split across three spot L4s (commits be2fa47, 950576d)
+- The first VM had a sweep stopped by fail-fast (the paper_s0 OOM). It was only finishing the two BPE seeds, so the
+  sweep is now split three ways via the new `hnet-only` VM metadata:
+  - `hx-exp002a-l4`: bpe (2 seeds), resumes from the step-500 checkpoints;
+  - `hx-exp002b-l4`: the boundary routers paper, end_linear, end_mlp and end_cosine_shift;
+  - `hx-exp002c-l4`: the ablations paper_r42, paper_nosmooth, paper_nolrmult and paper_alpha01.
+- `hnet-only` also scopes the GCS restore and the live mirror to that VM's runs (Python regex exclude). Without it,
+  VMs sharing one sweep prefix would overwrite each other's `metrics.jsonl` with stale copies. The failed OOM
+  `paper_s0` directory was removed from GCS for the same reason.
+- Bug found while planning the BPE resume: on resume, `MetricsLogger` appended to `metrics.jsonl`/`eval.jsonl`,
+  so steps between the last checkpoint and the preemption were logged twice. Resume now truncates both files to
+  records with step ≤ checkpoint step. New test `test_resume_after_crash_drops_records_past_checkpoint`.
