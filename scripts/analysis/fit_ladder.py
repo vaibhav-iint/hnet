@@ -44,6 +44,16 @@ def _style():
     return plt, plotstyle
 
 
+def _plain_y(ax):
+    from matplotlib.ticker import LogLocator, NullFormatter, ScalarFormatter
+
+    ax.yaxis.set_major_locator(LogLocator(base=10, subs=np.arange(1, 10) * 0.1, numticks=30))
+    f = ScalarFormatter()
+    f.set_scientific(False)
+    ax.yaxis.set_major_formatter(f)
+    ax.yaxis.set_minor_formatter(NullFormatter())
+
+
 def _color(ps, arch, ref, new):
     return ps.SERIES[0] if arch == ref else ps.SERIES[1] if arch == new else ps.SERIES[2]
 
@@ -82,11 +92,14 @@ def plot_loss_vs_compute(res, runs, path, metric="val", ylabel="validation bpb")
         if law is not None and allC:
             cc = np.logspace(math.log10(min(allC)) - 0.15, math.log10(max(allC)) + 0.3, 100)
             ax.plot(cc, law.loss(cc), color=col, lw=2, zorder=3)
-            ps.direct_label(ax, cc[-1], float(law.loss(cc[-1])), f"α={law.alpha:.3f}", dx=4)
+            ps.direct_label(ax, cc[-1], float(law.loss(cc[-1])), f"{arch} α={law.alpha:.3f}", dx=4,
+                            dy=6 if arch == ref else -6)
     ax.set_xscale("log")
     ax.set_yscale("log")
+    _plain_y(ax)
     ax.set_xlabel("training FLOPs")
     ax.set_ylabel(ylabel)
+    ax.margins(x=0.12)
     m = r.get("multiplier")
     title = f"{ylabel}: compute multiplier {LABEL.get(new, new)} vs {LABEL.get(ref, ref)}"
     ax.set_title(title, fontsize=10)
@@ -125,7 +138,8 @@ def plot_isoflop(res, path, metric="val"):
                 xx = np.linspace(min(c.logN for c in cs) - 0.2, max(c.logN for c in cs) + 0.2, 60)
                 ax.plot(np.exp(xx), c0 + c1 * (xx - xm) + c2 * (xx - xm) ** 2, color=col, lw=2, zorder=2)
             if p:
-                ax.scatter([p["N_opt"]], [p["L"]], marker="*", s=90, color=col, edgecolor=ps.SURFACE, zorder=4)
+                ax.scatter([p["N_opt"]], [p["L"]], marker="*", s=180, color=col, edgecolor=ps.SURFACE,
+                           linewidth=1.0, zorder=4)
         ax.set_xscale("log")
         ax.set_title(f"{b:.2g} FLOPs", fontsize=10)
         ax.set_xlabel("parameters N")
@@ -194,17 +208,18 @@ def plot_code_multipliers(res, path):
     held = {k: bool((meta.get(k) or {}).get("held_out")) for k in ms}
     names = sorted(ms, key=lambda k: (held[k], ms[k]["multiplier"]))
     fig, ax = plt.subplots(figsize=(6.2, 0.36 * len(names) + 1.4))
-    cols = [ps.SERIES[3] if held[n] else ps.SERIES[1] for n in names]
+    c_in, c_out = ps.SERIES[2], ps.SERIES[6]
+    cols = [c_out if held[n] else c_in for n in names]
     labels = [((meta.get(n) or {}).get("lang") or n) for n in names]
     _bars(ax, ps, labels, [ms[n]["multiplier"] for n in names], [ms[n].get("ci95") for n in names], cols)
-    for flag, col, lab in ((False, ps.SERIES[1], "in distribution"), (True, ps.SERIES[3], "held out")):
+    for flag, col, lab in ((False, c_in, "in distribution"), (True, c_out, "held out")):
         v = [ms[n]["multiplier"] for n in names if held[n] == flag]
         if v:
             med = float(np.median(v))
             ax.axvline(med, color=col, lw=1.5, zorder=1)
             ax.bar([0], [0], color=col, label=f"{lab} (median {med:.2f}x)")
-    ax.legend(loc="lower right")
-    ax.set_xlabel("compute multiplier at matched per-language bpb")
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18 - 0.6 / max(len(names), 1)), ncol=2)
+    ax.set_xlabel("compute multiplier at matched per-language bpb (vertical lines: medians)")
     ax.set_title("Compute multiplier per code language", fontsize=11)
     fig.tight_layout()
     fig.savefig(path)

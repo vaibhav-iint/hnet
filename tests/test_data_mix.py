@@ -222,13 +222,19 @@ def test_fetch_resume_is_exact(tmp_path):
     assert 0 < st["units"] <= 2
     M.fetch(spec, cfg, tmp_path / "b", _factory(files), workers=1, log=lambda s: None)  # ... and resumes
     assert _pool_digest(tmp_path / "a", spec) == _pool_digest(tmp_path / "b", spec)
-    # a bigger build extends the same pools (prefix property)
+    # a bigger build extends single-leaf pools in place; capped multi-leaf pools refuse to grow ...
     big = M.BuildConfig(**{**CFG, "train_bytes": 120_000})
-    M.fetch(spec, big, tmp_path / "b", _factory(files), workers=1, log=lambda s: None)
-    pa, pb = M.load_pools(spec, tmp_path / "a"), M.load_pools(spec, tmp_path / "b")
+    M.fetch(spec, big, tmp_path / "b", _factory(files), workers=1, log=lambda s: None, sources=["web", "ml"])
+    with pytest.raises(RuntimeError, match="capped"):
+        M.fetch(spec, big, tmp_path / "b", _factory(files), workers=1, log=lambda s: None, sources=["code"])
+    # ... and a fresh bigger fetch is a superset: every leaf's pool of the small build is a prefix (prefix property)
+    M.fetch(spec, big, tmp_path / "c", _factory(files), workers=1, log=lambda s: None)
+    pa, pb, pc = (M.load_pools(spec, tmp_path / x) for x in "abc")
     for n in pa:
-        assert len(pb[n]) >= len(pa[n])
-        assert (pb[n].meta[: len(pa[n])] == pa[n].meta).all()
+        assert len(pc[n]) >= len(pa[n]) and (pc[n].meta[: len(pa[n])] == pa[n].meta).all(), n
+        if not n.startswith(("code", "heldout")):
+            assert (pb[n].meta == pc[n].meta).all(), n
+    assert len(pc["code.a"]) > len(pa["code.a"])
 
 
 # --------------------------------------------------------------------------------------------- shards

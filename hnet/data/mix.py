@@ -384,9 +384,20 @@ def fetch_source(spec: MixSpec, src: Source, needs: dict, root, reader, log=prin
         if n not in state["bytes"]:
             raise RuntimeError(f"{spath}: leaf {n} is not in this pool; delete the source's pool to refetch")
 
+    def leaf_ok(n):
+        return state["bytes"][n][0] >= needs[n][0] and state["bytes"][n][1] >= needs[n][1]
+
     def satisfied():
-        return all(state["bytes"][n][0] >= needs[n][0] and state["bytes"][n][1] >= needs[n][1]
-                   for n in src.leaves if n not in state["given_up"])
+        return all(leaf_ok(n) for n in src.leaves if n not in state["given_up"])
+
+    # Multi-leaf sources stop saving a leaf once it has its quotas ("capped"), so its pool stays a prefix of its
+    # document stream without storing the surplus of common languages while the rare ones fill up. A capped
+    # pool cannot grow later (the source has moved on), so a bigger build needs a fresh pool for that source.
+    capped = state.setdefault("capped", {})
+    short = [n for n in capped if not leaf_ok(n)]
+    if short:
+        raise RuntimeError(f"source {src.name}: leaves {short} were capped by an earlier, smaller build and cannot "
+                           f"grow; use a fresh data root or delete {spath} and {[str(pool / n) for n in src.leaves]}")
 
     files = state["files"]
     cols = src.columns()
@@ -425,6 +436,8 @@ def fetch_source(spec: MixSpec, src: Source, needs: dict, root, reader, log=prin
             routed = route_unit(spec, src, data, state["dropped"])
             uname = unit_name(fi, a)
             for leaf, (docs, meta) in routed.items():
+                if leaf in capped:
+                    continue
                 d = pool / leaf
                 d.mkdir(parents=True, exist_ok=True)
                 tmp = d / f"{uname}.bin.tmp"
@@ -437,6 +450,10 @@ def fetch_source(spec: MixSpec, src: Source, needs: dict, root, reader, log=prin
                     sel = meta[:, META_VAL] == s
                     state["bytes"][leaf][s] += int(meta[sel, META_NBYTES].sum())
                     state["docs"][leaf][s] += int(sel.sum())
+            if src.select:
+                for leaf in src.leaves:
+                    if leaf not in capped and leaf_ok(leaf):
+                        capped[leaf] = uname
             state["rows"] += len(data[src.text])
             state["units"] += 1
             state["pos"] = [fi, b] if b < n else [fi + 1, 0]
