@@ -173,6 +173,10 @@ class HNetConfig:
     # Hashed byte n-gram embeddings added to the byte embedding (hnet.model.ngram; BLT-style): {"ns": [3, ..., 8],
     # "buckets": int or one per n}. Empty = off. Parameter-rich and FLOP-free (lookups, like the BPE embedding).
     ngram_embed: dict = field(default_factory=dict)
+    # Prefix-trie output vocabulary (hnet.model.trie_head): a hashed table of chunk-prefix rows scored against the
+    # main network's next-chunk prediction and added to the byte logits, {"rows": int, "dim": 32, "n_hash": 2,
+    # "max_len": 16, "query": "main" | "final"}. Empty = off. Needs a 1+-stage H-Net with an "end" stage-0 router.
+    trie_head: dict = field(default_factory=dict)
 
     def attn_res_for_stage(self, s: int) -> int:
         return int(_per_stage(self.attn_res, self.n_stages + 1, "attn_res")[s])

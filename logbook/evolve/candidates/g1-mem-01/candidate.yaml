@@ -1,0 +1,35 @@
+id: g1-mem-01
+parents: [hnet_ws]
+track: memory
+hypothesis: >-
+  A prefix-trie output vocabulary gives the byte model the output half of BPE's string-keyed memory. Insight: a softmax
+  over strings factorizes byte by byte along a trie, P(w | z) = prod_t P(w_t | z, w_<t), and each factor is a score of
+  the extended prefix w_<t.w_t against the main network's prediction z; prefix scores are a FLOP-free hashed table, so
+  no fixed tokenizer is needed, only the learned chunk boundaries (the prefix is the chunk in progress). Mechanism
+  (hnet/model/trie_head.py, flag `trie_head`): every byte's logits get u . sum_k P_k[hash_k(prefix . b)], with
+  u = W_u (dechunked stage-0 main-network output, i.e. the main network's next-chunk prediction) and the prefix = the
+  bytes since the last chunk end (empty at a chunk end: the next chunk's first byte). Today all 15.4M table parameters
+  sit on the input side and the 192x256 byte head plus a 2-layer decoder must spell the main network's prediction from
+  compute; BPE's head stores 32k spellings for free, and the logbook puts most of the gap in the non-initial letters
+  of words. The trie path also gives the main network a direct line to the byte loss that does not pass through the
+  decoder and does not compete with the residual bypass (bypass_ratio 5.1 in hnet_ws), and through the EMA dechunker it
+  sends the router a gradient that rewards boundaries whose prefixes the trie can complete. Budget: half the chunk-
+  vocabulary rows (25733 -> 12853 buckets, -4.95M) pay for the trie (2 x 77383 x 32 + 192 x 32 = 4.96M); FLOPs +0.55%.
+  Builds on: BPE's advantage = FLOP-free consistent string memory; chunk vocab helps once chunks are word-like (the
+  ws warm start makes them so); main-network output carries little next-byte information (the decoder bypasses it).
+prediction:
+  fitness: 0.08
+  fitness_vs_parent: -0.045
+  mechanism: >-
+    zeroing the trie bonus at eval (tables set to 0) raises val bpb by >= 0.08 at the end of training; the bonus
+    rms (stats trie/bonus_rms) grows monotonically past 1.0 by step 300; the hierarchy's share rises: bypass_ratio
+    (residual_rms / dechunk_rms) at the end < 3 (hnet_ws: 5.09); the gain is concentrated on bytes with a non-empty
+    prefix (non-initial chunk bytes). Falsified if fitness_vs_parent > -0.01 or the zeroed-trie eval costs < 0.02 bpb.
+branch: evolve/g1-mem-01
+model: configs/evolve/models/g1-mem-01.yaml
+set: []
+checks:
+  tests: pass
+  fairness: pass
+  grad_audit: logbook/evolve/candidates/g1-mem-01/grad_audit.txt
+  smoke: pass

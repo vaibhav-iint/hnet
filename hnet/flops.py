@@ -338,6 +338,13 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
             if cfg.dc.main_aux_weight > 0:  # training-only auxiliary head on the dechunked main output
                 comp_p["main_aux_head"] = V * d0
                 comp_f["main_aux_head"] = 2 * V * d0 if cv.count_lm_head else 0.0
+            if cfg.trie_head:  # prefix-trie output vocabulary (hnet.model.trie_head), every byte, train and eval
+                th = {"dim": 32, "n_hash": 2, **cfg.trie_head}
+                dim, nh = int(th["dim"]), int(th["n_hash"])
+                comp_p["trie_head"] = nh * int(th["rows"]) * dim + d0 * dim
+                comp_f["trie_head"] = (2 * d0 * dim  # query projection
+                                       + (2 * V * dim if cv.count_lm_head else 0.0)  # V candidate scores
+                                       + (((nh - 1) * V * dim + V) if cv.count_elementwise else 0.0))  # row sums, add
             if cfg.dc.chunk_pred_k > 0:  # training-only chunk-level head, once per innermost position
                 d_in = cfg.d_model[n - 1]
                 comp_p["chunk_pred_head"] = cfg.dc.chunk_pred_k * V * d_in
