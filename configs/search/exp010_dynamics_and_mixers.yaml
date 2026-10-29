@@ -1,0 +1,31 @@
+# EXP-010: fixes aimed at the failure phases seen in the probe run (logbook/figures/probe_dynamics.png), plus
+# Mamba-free outer networks (tiny 2-stage paper (3,3) config, same budget as EXP-002/006/008; baseline = EXP-008
+# `base`, 3 seeds, same config).
+#   Phase 1 (steps 0-20): zero-init residual -> decoder sees only the noisy hierarchy -> the router switches it off
+#     (stage-0 compression 2.3 -> 47 bytes/chunk) and the main network's gradient drops 17x.
+#   Phase 2 (20-40): the weak ratio loss (alpha 0.03) drags compression back; stage 1 collapses (114 bytes/chunk).
+#   Phase 3 (40+): the residual path grows and overtakes the hierarchy signal (~step 80); routers drift to p ~ 0.5.
+# Arms: strong ratio loss (alpha 1.0, the blog's "strong auxiliary loss"); identity-init residual; both; and the
+# outer Mamba-2 layers replaced by FLOP-matched sliding-window attention (windows 256 / 384, +1.1%) or by Kimi Delta
+# Attention (expand_v 1.375, -0.8%).
+name: exp010_dynamics_and_mixers
+out_root: runs/search/exp010_dynamics_and_mixers
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp010_dynamics_and_mixers
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {alpha1: "strong ratio loss (alpha 1.0)", resid_id: "identity-init residual",
+           alpha1_resid_id: "alpha 1.0 + identity residual", swa: "outer Mamba -> sliding-window attention",
+           kda: "outer Mamba -> Kimi Delta Attention"}
+runs:
+  - {name: alpha1,          config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.ratio_loss_alpha=1.0]}
+  - {name: resid_id,        config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.residual_init=identity]}
+  - {name: alpha1_resid_id, config: configs/runs/tiny_hnet2_2m.yaml,
+     set: [model.dc.ratio_loss_alpha=1.0, model.dc.residual_init=identity]}
+  - {name: swa,             config: configs/runs/tiny_hnet2_2m.yaml,
+     set: ["model.mixer_codes={m: attn, t: attn}", "model.attn.window_size=[256, 384, -1]"]}
+  - {name: kda,             config: configs/runs/tiny_hnet2_2m.yaml,
+     set: ["model.mixer_codes={m: kda, t: attn}", "model.mixer_cfg={kda: {expand_v: 1.375}}"]}

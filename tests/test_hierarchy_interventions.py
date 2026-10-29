@@ -73,3 +73,16 @@ def test_residual_dropout_only_in_training_and_per_segment():
                     st.residual_proj.bias.zero_()
     zero.train()
     torch.testing.assert_close(m(ids, labels=ids).loss, zero(ids, labels=ids).loss)
+
+
+def test_residual_identity_init_survives_init_weights():
+    m, _ = _model(residual_init="identity")
+    m.init_weights()
+    for st in m.backbone.stages():
+        if not st.is_innermost:
+            torch.testing.assert_close(st.residual_proj.weight, torch.eye(st.residual_proj.weight.shape[0]))
+    z, _ = _model()
+    z.init_weights()
+    for st in z.backbone.stages():
+        if not st.is_innermost:
+            assert st.residual_proj.weight.abs().sum() == 0

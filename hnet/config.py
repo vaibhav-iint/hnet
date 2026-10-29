@@ -74,6 +74,10 @@ class DCConfig:
     # residual_dropout: training-time probability (scalar or per stage) of zeroing a whole segment's residual path
     #   into the decoder, so the decoder must sometimes predict from the dechunked main-network output alone.
     residual_dropout: Any = 0.0
+    # residual_init: "zero" (official: at init the decoder sees only the dechunked hierarchy, which is noise, and the
+    #   probe run shows the router then switches the hierarchy off) or "identity" (the decoder starts from the
+    #   encoder output, so the untrained hierarchy is an addition rather than the only signal).
+    residual_init: str = "zero"
     # main_aux_weight: weight of an auxiliary next-byte CE on the stage-0 dechunked main-network output alone
     #   (before the residual is added), a direct learning signal for everything below stage 0.
     main_aux_weight: float = 0.0

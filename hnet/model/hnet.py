@@ -83,7 +83,11 @@ class HNet(nn.Module):
             self.chunk_layer = registry.build("chunker", dc["chunker"])
             self.dechunk_layer = registry.build("dechunker", dc["dechunker"])
             self.residual_proj = nn.Linear(d, d, dtype=torch.float32)
-            nn.init.zeros_(self.residual_proj.weight)
+            assert cfg.dc.residual_init in ("zero", "identity"), cfg.dc.residual_init
+            if cfg.dc.residual_init == "identity":
+                nn.init.eye_(self.residual_proj.weight)
+            else:
+                nn.init.zeros_(self.residual_proj.weight)
             self.residual_proj.weight._no_reinit = True
 
         d_prev = cfg.d_model[stage_idx - 1] if stage_idx > 0 else d
