@@ -92,8 +92,9 @@ def alerts(run):
             out.append(f"{k}={v:.0f}")
         if k.startswith("score_std/") and isinstance(v, (int, float)) and v < 0.05:
             out.append(f"{k}→0")
-        if k.startswith("tau/") and isinstance(v, (int, float)) and v > 0.999:
-            out.append(f"{k}=1")
+        if (k.startswith("tau/") and isinstance(v, (int, float)) and v > 0.999
+                and abs(last.get(k.replace("tau", "compression"), 0) - 1 / max(last.get(k.replace("tau", "F"), 1e-9), 1e-9)) > 0.5):
+            out.append(f"{k}=1 with compression off target")  # under rank decisions tau drifts harmlessly
         if k.startswith("p_margin/") and isinstance(v, (int, float)) and v < 0.08:
             out.append(f"{k}={v:.2f} (undecided)")
     w = last.get("bnd_on_ws/s0")
