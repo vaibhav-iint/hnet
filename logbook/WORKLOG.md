@@ -735,3 +735,24 @@ cheapest way to zero a within-group variance is to make every logit (nearly) the
 nothing. Lesson (same family as the EXP-014 drift, mirrored): once decisions are scale-free, every auxiliary term on
 the router must be scale-free too. Fix: penalty = within-group variance / total variance (1 − R² of the 4-gram as a
 predictor of the logit); relaunched as EXP-020 (second launch, same arms).
+
+### EXP-017/018/019 interim (step 1000–1250, 3 seeds): the vocabulary works only at word scale
+| arm | step 1000 bpb | main-network contribution | note |
+|---|---|---|---|
+| EXP-017 `quant_fix` (2-stage, fixed rank decider) | 1.950–1.964 | 0.01–0.02 | on par with / slightly ahead of threshold routers |
+| EXP-017 `vocab` (stage-0 chunk table) | 1.937–1.969 | 0.03–0.05 | neutral at 1000; 0.02–0.04 ahead at 1500 |
+| EXP-017 `vocab_pred` (w 0.5) / `vocab_pred_w1` | +0.04 / +0.08 vs `quant_fix` | ~0 | harmful: predicting 2.6-byte chunk buckets is noise for the decoder |
+| EXP-019 `local` (context-free router) | 1.965–1.969 | 0.015 | identical bpb to contextual routers |
+| EXP-018 `h1_quant` (1-stage, ratio 6) | 1.977–1.998 | 0.13–0.17 | final 1.845 / 1.861 / 1.845 |
+| EXP-018 `h1_vocab_pred` (word-scale chunks + table + prediction) | **1.901 / 2.020 / 1.926** | **0.56 / 0.06 / 0.32** | bimodal across seeds |
+
+- The 2-stage model's stage-0 chunks are character pairs: a table of them is worthless, and training the main
+  network to predict them is harmful. At word scale (ratio 6) the same component gives −0.09 and −0.05 bpb at step
+  1000 in two seeds and the main network's contribution rises from 0.13 to 0.56 bpb: the hierarchy carries the model
+  for the first time in this project.
+- Seed 1 did not adopt it. Its metrics show why: by step 230–560 its raw router scores were heavy-tailed
+  (`score_std` 13–15 vs 6–8; `p_margin` 0.10 vs 0.3–0.4). Standardizing by a std that a few outliers dominate puts
+  every other confidence at ≈ 0.5; the EMA dechunker then smooths with P ≈ 0.5, the hierarchy's output stays weak
+  (`dechunk_rms` 0.65–0.93 vs 1.4–1.6 while `residual_rms` is 2.1) and the decoder commits to the residual path: the
+  same "residual wins the race" failure as in EXP-002, now with a measurable trigger. Fix: median/MAD standardization
+  with clipped z (default of the rank decider, unit test reproduces the failure mode) → EXP-021.
