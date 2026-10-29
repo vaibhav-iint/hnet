@@ -364,7 +364,7 @@ then released; `temp4` = confidence temperature 4 · 3 seeds · status: **done**
 ## EXP-027 · Breaking the adoption race at its mechanism (chunk STE, margin-gated bypass)
 
 *spec `exp027_adoption_mechanism.yaml` · base = EXP-023 `vp_ng` (prior-free best: 1-stage ratio 6, end_mlp router,
-trimmed rank decisions, chunk vocabulary + next-chunk objective, byte n-gram tables; 1.720 / 1.669 / 1.656, seed 1 not
+trimmed rank decisions, chunk vocabulary + next-chunk objective, byte n-gram tables; 1.720 / 1.669 / 1.656, seed 0 not
 adopted) · arms: `cste` = `dc.chunk_ste` (the chunk vectors entering the main network are multiplied by STE(confidence),
 so the next-chunk loss trains the router directly, independent of the decoder's adoption); `rgate` =
 `dc.residual_gate=margin` (the residual bypass into the decoder is scaled by the router's mean margin 2·mean|p−0.5|, so

@@ -3,7 +3,7 @@
 # through the decoder's use of the hierarchy) stops learning and drifts into whichever basin (word vs suffix chunks);
 # the next-chunk objective is indifferent between the two and, computed before dechunking, never reaches the router.
 # Arms on the prior-free best configuration (EXP-023 `vp_ng`: 1-stage ratio 6, vocabulary + next-chunk loss, n-gram
-# tables; 1.720 / 1.669 / 1.656, seed 1 not adopted):
+# tables; 1.720 / 1.669 / 1.656, seed 0 not adopted):
 #   cste       dc.chunk_ste: the chunk-level loss trains the router (gradient independent of the decoder's adoption)
 #   rgate      dc.residual_gate=margin: the bypass is scaled by the router's confidence margin (opens when decided)
 #   cste_rgate both
