@@ -88,9 +88,13 @@ work log without re-measurement. Definitions used throughout:
    short tokens and loses on long whole words (+0.08–0.10 bits/byte on 6–8+-byte tokens). [M]
 9. **Muon is the best tiny H-Net optimizer and removes the dip**, but at LR 0.05 its unbounded bypass growth is
    followed by stage-0 gradient explosions (225–380) at steps 340–410 that kill one seed's hierarchy for good. [M]
-10. **Lazy-optimizer escapes keep recurring.** EXP-020's normalized consistency penalty was met by heavy tails
-    (margin 0.01–0.07); EXP-027's margin gate was met by growing the pre-gate bypass (4.6–6.8 rms) while the margin fell
-    to 0.06–0.11. [M metrics, I mechanism]
+10. **There is no early "switch" away from the hierarchy: it has nothing to say yet.** In the dense paper-router run
+    the hierarchy's information is ≤ 0.005 bits for the first 100 steps (negative for the first 15) while the bypass
+    becomes informative from step 35 (2.2 bits at 100); the large early zero-ablation effects are the decoder's
+    dependence on the hierarchy's constant offset. Gating or delaying the bypass therefore cannot create adoption;
+    only making the hierarchy informative early can (the whitespace warm start does this). Lazy-optimizer escapes
+    recur around such fixes: EXP-027's gate was undone by a growing pre-gate bypass, EXP-020's normalized penalty by
+    heavy tails. [M: `early_dynamics.json`, metrics]
 
 ### Earliest step at which each failure was detectable
 
@@ -145,6 +149,7 @@ work log without re-measurement. Definitions used throughout:
 
 | claim (source) | verdict | evidence |
 |---|---|---|
+| "The decoder switches to the zero-init bypass by step 20–130; the main network's gradient collapses" (CLAUDE.md table, row 2) | **mechanism wrong** | in the dense probe run the hierarchy carries ≤ 0.005 bits of information up to step 100 (mean-ablation; −0.04 to −0.09 at steps 1–10): the decoder never used it. Zero-ablation costs 1.9–2.9 bits at steps 40–60 because the decoder relies on the hierarchy's constant offset (`early_dynamics.json`) |
 | "Steps 60–130: the bypass opens, hierarchy rms crashes 1.6 → 0.7 and the margin collapses 0.36 → 0.15 in all seeds" (WORKLOG, adoption deep dive, item 2) | **timing wrong** | bypass crosses the hierarchy at 70–120 [M]; the hierarchy rms minimum is at 120–190; the margin *rises* to 0.34–0.41 by step 60–100 and collapses only at 150–300, trough at 300–400 (`phase_timelines.png`, `phases_summary.json`) |
 | "The bifurcation is in the router's initialization or the first few hundred steps of data" (WORKLOG, EXP-023 stats) | **sharpened: it is the initialization** | data order is seed-independent (`shuffle_buffer: 0`); arms with the same parameter layout have bit-identical step-0 routers per seed (`init_basin.json`); the worst seed is the same in 3/3 arms of the no-n-gram layout and the full seed order s2 < s1 < s0 is the same in 5/5 prior-free arms of the n-gram layout (chance 1/9 and 1/1296; `seed_rankings.json`). Decider, temperature, residual warmup, chunk STE and margin gate never changed which seed loses; only the whitespace prior did |
 | "The suffix seed learned a morphological tokenizer" (WORKLOG, EXP-018 stats) | **re-described** | the suffix basin is a *predicted-word-end* tokenizer: 57–64% of its boundaries are on the last letter of a word, 27–35% inside words, 0–4% on whitespace; its score separates "next byte is a non-letter" from "next byte is a letter" with AUC 0.75–0.80 [M, Part B]. The router cannot see the next byte (end semantics), so it fires where a word is likely to end (after `s`, `d`, `ing`, `ed`, `ly`); the suffix vocabulary is a side effect of guessing the space |
@@ -265,6 +270,38 @@ adoption = final contribution ≥ 0.3 bpb.
 * **EXP-014**: tau reaches 1.000 at stage 0 or stage 1 in all 9 runs, between steps 20 and 270 (stage 0: 8 runs, median 175); a
   `tau ≥ 0.999` assertion would have stopped every run before step 300.
 
+### A5. The first 400 steps under the microscope: the decoder never "switched away" from an informative hierarchy
+
+Dense checkpoints of the paper 2-stage probe run (`runs/gcp/probe/tiny_hnet2_dyn`, 27 checkpoints, steps 1–400),
+8 validation docs per checkpoint (`scripts/interp/early_dynamics.py` → `data/early_dynamics.json`,
+`figures/early_dynamics.png`):
+
+| step | bpb | hierarchy zeroed | hierarchy mean-replaced (information) | bypass mean-replaced | cos(hier, bypass) | stage-0 bytes/chunk | stage-1 p in (0.4, 0.6) |
+|---|---|---|---|---|---|---|---|
+| 1 | 7.98 | +0.10 | **−0.04** | +0.000 | −0.05 | 2.3 | 0.91 |
+| 10 | 7.33 | +0.10 | **−0.09** | +0.009 | 0.18 | 7.6 | 0.61 |
+| 20 | 6.45 | +0.01 | −0.001 | +0.013 | **0.69** | 40.1 | 0.24 |
+| 30 | 5.43 | +0.17 | −0.000 | +0.028 | 0.54 | 3.3 | 0.10 |
+| 40 | 4.72 | **+1.85** | +0.001 | +0.14 | 0.11 | 1.8 | 0.65 |
+| 50 | 4.29 | **+2.85** | +0.001 | +0.52 | −0.01 | 2.7 | 0.50 |
+| 100 | 3.18 | +0.81 | +0.005 | +2.18 | 0.11 | 2.6 | 0.80 |
+| 400 | 2.31 | +0.46 | +0.049 | +3.16 | 0.06 | 2.7 | 0.86 |
+
+* **The hierarchy carried no information during the whole "race".** Mean-replacing it *improves* the loss for the
+  first 15 steps (it is noise) and costs ≤ 0.005 bits up to step 100 and 0.05 at step 400. The bypass carries
+  information from step 35 on (0.14 bits at 40, 2.18 at 100). The large zero-ablation numbers at steps 40–60 (1.9–2.9
+  bits) are the decoder depending on the hierarchy's *constant offset*, which it then learns to do without. [M]
+* So the work log's picture — the decoder used the hierarchy, then switched to the bypass when it opened, and the
+  router lost its signal — is not what happened in this run: there was nothing to switch away from. The bypass is a
+  linear map of the encoder state and becomes useful within ~40 steps; the hierarchy needs a trained router, encoder
+  and 7-layer main network before it can say anything, and in this run it had not by step 400. [M for the run, I for
+  the generalization]
+* Consequence for interventions: closing or gating the bypass early (EXP-011 warmup / path-drop, EXP-027 gate) can
+  only force the decoder to depend on a signal that carries no information yet; consistent with all of them being
+  neutral or harmful. What could help is making the hierarchy informative earlier (a teacher for the router, a chunk
+  table that is useful from step 0) — which is what the whitespace warm start does. [I]
+* The bypass first aligns with the hierarchy direction (cosine 0.69 at step 20) and then becomes orthogonal to it
+  (≤ 0.11 from step 40): the residual projection first learns to reproduce the hierarchy's offset. [M]
 
 ## Part B. Per experiment: what was tested, how training went, what the activations show, what went wrong, what to do better
 
@@ -305,64 +342,53 @@ EXP-000/001 (reference re-analyses, no training) and EXP-028 (no runs mirrored l
 * **Better.** Mean-ablation (or resample-ablation: the signal of another position) for every "how much does X
   contribute" number.
 
-### EXP-010 · Dynamics fixes (strong ratio loss, identity residual) and Mamba-free outer networks
+### EXP-010 · Strong ratio loss, identity residual, Mamba-free outer networks
 
-* **Tested.** α = 1 ratio loss; identity-initialized residual; both; outer SWA / KDA.
-* **Progress [M].** `resid_id` and `alpha1_resid_id` have the bypass above the hierarchy from step 10 (t_bypass_cross
-  = 10 vs 60 for `alpha1`). Finished seeds: `alpha1` 1.802 / 1.818 (contribution 0.57 / 0.94), `resid_id_s0` 1.783
-  (0.32), `alpha1_resid_id_s2` 1.789 (0.24); the other five runs stopped at step 750 (1.99–2.04 there), SWA at 250.
-* **What went wrong.** The arm summaries rest on one or two finished seeds per arm. "Identity residual starves the
-  hierarchy for good" is supported (contribution 0.24–0.32 vs 0.57–0.94); the bpb differences are within the 2-stage
-  seed spread.
-* **Better.** Print the number of *finished* seeds next to every arm value (runs.csv has it; the narrative did not
-  use it).
+* **Progress [M].** With the identity residual the bypass exceeds the hierarchy from step 10 (vs 60). Finished seeds
+  only: `alpha1` 1.802 / 1.818 (zero-probe contribution 0.57 / 0.94), `resid_id_s0` 1.783 (0.32),
+  `alpha1_resid_id_s2` 1.789 (0.24); five of nine runs stopped at step 750, SWA at 250.
+* **Wrong / better.** Arm-level statements rest on one or two finished seeds; "identity residual starves the hierarchy"
+  is supported in direction (0.24–0.32 vs 0.57–0.94, zero probe), bpb differences are within seed spread. Print the
+  number of finished seeds next to every arm value.
 
 ### EXP-011 · Router-free fixed (3,3) hourglass + training signals
 
-* **Progress [M].** With fixed chunks the router margin is 0.5 by construction, so this is a clean test of the
-  bypass race alone. Identity residual: bypass crosses at step 20 and the contribution ends 0.05 / 0.20 / 0.05;
-  zero-init: crosses at 60, contribution 0.92 / 0.77 / 0.81 (bpb 1.823 / 1.834 / 1.839). Path-drop 0.3: 0.06 / 0.03.
-  Residual warmup: 0.31 / **1.56** / 0.59 with the same bpb (1.839 / 1.847 / 1.848).
-* **Mechanism.** Contribution and bpb are decoupled here: `fixed_rwarm_s1` has a hierarchy worth 1.56 bpb and the
-  same loss as seeds worth 0.31. "How much the hierarchy is used" is not "how good the model is"; a forced
-  dependency (warmup, path-drop) relocates work without adding capability. [I]
-* **Better.** Report contribution next to bpb, never instead of it; the project later treats contribution as the
-  success metric of EXP-027 (`rgate`), which repeats this mistake (Part B, EXP-027).
+* **Progress [M].** A clean test of the bypass race without a router (margin 0.5 by construction). Identity residual:
+  bypass ahead from step 20, contribution 0.05 / 0.20 / 0.05; zero-init: from step 60, 0.92 / 0.77 / 0.81 (bpb 1.823 /
+  1.834 / 1.839); path-drop: 0.06 / 0.03; residual warmup 0.31 / **1.56** / 0.59 at identical bpb (1.839 / 1.847 /
+  1.848).
+* **Mechanism.** Contribution and quality are decoupled: a forced dependency relocates work without adding
+  capability (A5: early on there is nothing for the hierarchy to say). The same mistake recurs in EXP-026 and EXP-027,
+  where the arm with the largest contribution is not the best. [I]
 
 ### EXP-012 · Pooling chunker
 
-* **Progress [M].** Finished: `select` 1.917 / 1.820, `pool_mean_s0` 1.789; `pool_attn`, `pool_attn_rwarm`,
-  `pool_mean_s1`, `select_s2` stopped at steps 250–750. `select_s0` has a burst of grad spikes (steps 240–1000) and a
-  stage-1 compression collapse at step 270.
-* **What went wrong.** One finished seed per pooling arm and a 0.1-bpb spread between the two finished `select`
-  seeds: no conclusion about pooling is supported. Pooling was motivated by "the chunk vector does not know its
-  chunk"; Part B shows that with word-like chunks the boundary state already carries much of the chunk identity, so
-  pooling attacked a smaller problem than believed.
+* **Progress [M].** Finished: `select` 1.917 / 1.820, `pool_mean_s0` 1.789; the other four runs stopped at steps
+  250–750; `select_s0` has a burst of grad spikes (240–1000) and a stage-1 compression collapse at 270.
+* **Wrong / better.** One finished seed per pooling arm and 0.1 bpb between the two `select` seeds: no conclusion is
+  supported. The motivation ("the chunk vector does not know its chunk") holds for character-pair chunks only; with
+  word chunks the boundary state carries 2.7–2.9 bits of chunk identity (EXP-018/023 section).
 
 ### EXP-013 · BPE's LR (6e-3) for the H-Net
 
-* **Progress [M].** Finished seeds: `lr6_s2` 1.867, `lr6_alpha1` 1.927 / 1.940, `lr6_nomult_s0` **1.785**,
-  `lr6_rent` 1.907 / 1.781 (`lr6_mainheavy` and two others stopped). The bypass crosses at step 30 (vs 60–90 at
-  1.5e-3) and the hierarchy dip comes at step 40–50 instead of 150–190; `lr6_alpha1` has 4–5 grad spikes per run.
-* **Reading.** The higher LR does not break the H-Net by itself (`lr6_nomult_s0` 1.785 is as good as any 2-stage
-  run), it compresses the race into the first 50 steps and widens the seed spread. The paper's per-stage LR
-  multipliers (stage 0 at 3.5× base) put the outer stage at 2.1e-2 effective, which is where the instabilities sit [I].
+* **Progress [M].** Finished: `lr6_s2` 1.867, `lr6_alpha1` 1.927 / 1.940, `lr6_nomult_s0` **1.785**, `lr6_rent`
+  1.907 / 1.781. The bypass crosses at step 30 (vs 60–90) and the hierarchy dip comes at 40–50 instead of 150–190;
+  `lr6_alpha1` has 4–5 grad spikes per run.
+* **Reading [I].** High LR compresses the race into the first 50 steps and widens the seed spread rather than
+  breaking the model (`lr6_nomult_s0` equals the best 2-stage runs). The per-stage multipliers put stage 0 at
+  ~2e-2 effective, where the spikes sit.
 
 ### EXP-014 · First rank decider (p-space quantile)
 
-* **Progress [M].** `tau/s*` = 1.000 in all 9 runs by step 270 (stage 0 in 8, median step 175; stage 1 at 20–200);
-  compression collapses follow at 30–290. Detectable at step 20–30 from tau alone.
-* **What went wrong / better.** As the work log says (scale unanchored). The missing piece was a fail-loudly
-  assertion on tau, which would have saved the sweep at step ~100.
+* **Progress [M].** `tau` = 1.000 at stage 0 or 1 in all 9 runs between steps 20 and 270 (stage 0 in 8, median 175);
+  compression collapses follow. A `tau ≥ 0.999` assertion would have stopped the sweep at step ~100. Mechanism as in
+  the work log.
 
 ### EXP-017 · Stage-0 chunk vocabulary (2-stage)
 
-* **Progress [M].** `vocab` 1.802 / 1.774 / 1.777 vs `quant_fix` 1.794 / 1.804 / 1.798; next-chunk prediction makes
-  the score std peak at 9.8–13 (vs 4.1–4.3) and the margin trough 0.12–0.13 (vs 0.30) — the same signature as the
-  non-adopting 1-stage seeds. `vocab_pred_s0` (1.872, contribution 0.15) is the worst seed.
-* **Reading.** At stage 0 the chunks are character pairs (work log, chunk_stats), so a table of them is a byte-bigram
-  table; the next-chunk loss over 2.6-byte buckets destabilizes the router (heavy tails) rather than teaching the
-  main network. Consistent with the work log.
+* **Progress [M].** `vocab` 1.802 / 1.774 / 1.777 vs `quant_fix` 1.794 / 1.804 / 1.798. Adding next-chunk prediction
+  raises the raw-score std peak to 9.8–13 (vs 4.1–4.3) and drops the margin trough to 0.12–0.13 (vs 0.30): the
+  signature of the non-adopting 1-stage seeds. Consistent with the work log (2.6-byte chunks are byte bigrams).
 
 ### EXP-018 / EXP-023 · Word-scale chunk vocabulary: the word seeds vs the suffix seed
 
@@ -440,27 +466,23 @@ mean, which removes its information but keeps its scale; "zero" = the trainer's 
 
 ### EXP-019 · Context-free (`local_mlp`) router
 
-* **Progress [M].** `local` 1.814 / 1.812 / 1.812 (the tightest 2-stage arm in the project), contribution
-  0.77 / 0.61 / 0.68; `local_vocab_pred` 1.872 / 1.821 / 1.814. Score std stays ≤ 5.4 (contextual routers with
-  prediction: 9.8–13).
-* **Reading.** A router that cannot use context is *more* reproducible across seeds (sd 0.001 vs 0.005) at equal
-  mean bpb. Part B shows that even the contextual end_mlp router is ~97–98% a function of the last 4 bytes
-  (4-gram R² of its score), so context-freedom costs little; what it buys is that the score distribution cannot
-  grow heavy tails.
+* **Progress [M].** `local` 1.814 / 1.812 / 1.812 — the most seed-stable 2-stage arm in the project (sd 0.001 vs 0.005
+  for the contextual router at equal mean); its score std stays ≤ 5.4. Part B shows that even the contextual end_mlp
+  router is 95–100% a function of the last 4 bytes (4-gram R² of its score), so context-freedom costs little; what it
+  buys is that the score distribution cannot grow heavy tails.
 
 ### EXP-020 · Router self-consistency penalty
 
-* **Progress [M].** See A4: `cons10` margin 0.014–0.071, raw score std 6.8–11.5 (quant_fix: 0.33 / 2.8–3.3).
-  bpb 1.775 / 1.783 / 1.840 vs 1.794 / 1.804 / 1.798.
-* **What went wrong.** The normalized penalty was satisfied by heavy tails (lazy-optimizer route, rule 4), leaving
-  an undecided router; the experiment was read as "consistency is free". [I: no checkpoint to measure consistency.]
-* **Better.** Every penalty needs its own lazy-route check: here, log the penalty's numerator and denominator
-  separately; a falling ratio with a rising denominator is the tell.
+* **Progress [M].** `cons10` ends with margin 0.014–0.071 (quant_fix 0.33) and raw-score std 6.8–11.5 (2.8–3.3); bpb
+  1.775 / 1.783 / 1.840. The normalized penalty (within-group / total variance) was satisfied by inflating the total
+  variance with a few extreme groups; trimmed standardization then squeezes the bulk to p' ≈ 0.5 [I: no checkpoint].
+  The "neutral, consistency is free" reading hid an undecided router. **Better:** log numerator and denominator of
+  every ratio penalty.
 
 ### EXP-021 · median/MAD decider (stopped)
 
-No local metrics. The work-log account (MAD → 0 under a 5/6 bimodal score) is consistent with the score
-statistics measured in Part B: in a word-tokenizer checkpoint 84–86% of positions sit in one tight mode.
+No local metrics. The work-log account (MAD → 0 under a bimodal score) matches the measured score histograms: in
+word-basin checkpoints 84–86% of positions sit in one narrow mode (`router_hist_by_class.png`).
 
 ### EXP-024 · Whitespace warm start (`prior`) and `temp4`
 
@@ -487,24 +509,20 @@ statistics measured in Part B: in a word-tokenizer checkpoint 84–86% of positi
 * **Better.** Sweep the warm-start arm's LR (it is the only arm that can afford it: seeds agree to 0.003), and report
   the gap to LR-tuned BPE as the headline.
 
-### EXP-025 · Muon vs AdamW (BPE and the warm-started H-Net)
+### EXP-025 · Muon vs AdamW
 
 * **Result [M].** `prior_muon` 0.025: **1.630 / 1.635 / 1.630** (contribution 0.38 / 0.36 / 0.40); 0.05: 1.816 /
-  1.778 / 1.774 (0.01 / 0.26 / 0.25). `bpe_muon` 0.05: 1.713 / 1.710 / 1.707; 0.025: 1.715 / 1.714 / 1.718 (at step
-  750, unfinished). BPE AdamW 1.5e-3: 1.634; 6e-3: 1.564.
-* **Mechanism.** (A3) The bypass rms grows linearly under Muon (no weight decay on `residual_proj`) to 9.3 (0.025)
-  and 26–31 (0.05). At 0.05 a stage-0 gradient explosion (225–380) at steps 340–410 resets two seeds; one never
-  re-adopts. Muon has no adoption dip (A4). The Muon BPE is worse than AdamW BPE because 13 of its 15M parameters
-  (embedding + head) stay on Adam at lr 1.5e-3 [I from the config: `lr_embed = lr_head = 0.0015`].
-* **What it means.** Muon is the best tiny H-Net optimizer measured, at a bypass/hierarchy rms ratio the project's
-  own alert calls a dead hierarchy. The Muon-vs-AdamW comparison for BPE is not about Muon (its table is on Adam).
+  1.778 / 1.774 (0.01 / 0.26 / 0.25). `bpe_muon` 0.05: 1.713 / 1.710 / 1.707 (0.025 stopped at step 750).
+* **Mechanism [M].** Bypass rms grows linearly under Muon (no weight decay on `residual_proj`): 9.3 (0.025), 26–31
+  (0.05). At 0.05 the stage-0 grad norm explodes (225–380) at steps 340–410 in two seeds; one never re-adopts. Muon has
+  no adoption dip (A4). The Muon BPE is worse than AdamW BPE because its embedding + head (13 of 15M parameters) stay
+  on Adam at lr 1.5e-3 [I from the config: `lr_embed = lr_head = 0.0015`] — the comparison is not about Muon.
 
 ### EXP-026 · Mamba-free outer networks
 
-* **Result [M].** `swa` 1.742 / 1.744 / 1.741 with contributions 0.58 / 0.65 / 0.96; `kda` failed at step 270
-  (2.09 at 250) and never started for seeds 1–2.
-* **Reading.** A weaker outer network makes the hierarchy carry more (0.58–0.96 vs 0.56–0.60 for the Mamba prior)
-  and the model worse (+0.11 bpb): another case of contribution ≠ quality.
+* **Result [M].** `swa` 1.742 / 1.744 / 1.741, contributions 0.58 / 0.65 / 0.96 (higher than the Mamba prior's
+  0.56–0.60, at +0.11 bpb); `kda` failed at step 270. A weaker outer network makes the hierarchy carry more and the
+  model worse: contribution is not quality.
 
 ### EXP-027 · Chunk STE and margin-gated bypass
 

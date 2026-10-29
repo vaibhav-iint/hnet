@@ -21,7 +21,7 @@ import pandas as pd
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT = ROOT / "logbook" / "interp"
+OUT = Path(os.environ.get("INTERP_OUT", ROOT / "logbook" / "interp"))  # run_all --quick writes to .../interp/quick
 DATA = OUT / "data"
 FIG = OUT / "figures"
 LIVE = Path("/tmp/claude-0/-home-user-hnet-smollm3/e0ec0617-4cec-5bc8-abcc-216d4a655704/scratchpad/live")
