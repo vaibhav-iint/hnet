@@ -312,7 +312,7 @@ the vocabulary then helps more than in EXP-017, consistency is the missing ingre
 variance / total variance of the stage-0 logit · arms `cons1`, `cons10`, `cons10_vocab_pred` · 3 seeds · status:
 `cons1` **1.768 / 1.812 / 1.813 → 1.798**, `cons10` **1.775 / 1.783 / 1.840 → 1.799**, vs EXP-017 `quant_fix` 1.799
 ± 0.005: neutral on average with a larger seed spread (two seeds −0.02, one +0.04); main-network contribution 0.02–0.06
-(baseline 0.03). `cons10_vocab_pred` pending. Consistency can be imposed on a character-pair tokenizer without cost,
+(baseline 0.03). `cons10_vocab_pred` 1.875 / 1.868 / 1.833 → 1.859 (`vocab_pred` without the penalty: 1.836). Consistency can be imposed on a character-pair tokenizer without cost,
 but it does not by itself make the second level useful at (3,3); the word-scale line (EXP-018/023) is where the gain is.*
 
 ## EXP-021 · (stopped) word-scale vocabulary with the median/MAD decider
@@ -324,12 +324,13 @@ but it does not by itself make the second level useful at (3,3); the word-scale 
 
 *spec `exp023_word_vocab_trimmed.yaml` · 1-stage ratio 6, end_mlp, rank decisions on trimmed-standardized scores,
 chunk vocabulary (2 × 65536 × 96) + next-chunk objective (w 0.5, 1024 candidates) · 3 seeds · baseline EXP-018
-`h1_quant` 1.853 · status: `vp` and `vp_ng` done, `vp_rwarm` finishing*
+`h1_quant` 1.853 · status: **done***
 
 | arm | val bpb (s0 / s1 / s2) | main-network contribution | vs baseline |
 |---|---|---|---|
 | `vp` vocabulary + prediction | **1.732 / 1.855 / 1.733** | 0.72 / 0.18 / 0.64 | −0.12 / 0.00 / −0.11 |
 | `vp_ng` + byte n-gram tables | **1.720 / 1.669 / 1.656** | 0.09 / 0.41 / 0.42 | BPE is 1.634 ± 0.002 |
+| `vp_rwarm` + residual warmup 0.3 | 1.810 / 1.875 / 1.746 | 0.32 / 0.16 / 0.69 | worse than `vp` in every seed; seed 1 still not adopted |
 | EXP-018 `h1_vocab_pred` (same arm, mean/std decider) | 1.720 / 1.863 / 1.737 | 0.75 / 0.13 / 0.55 | replication |
 
 - `vp` replicates EXP-018 seed by seed, including the non-adoption of seed 1 with a different decider: adoption is
