@@ -1,0 +1,42 @@
+id: g1-arch-02
+parents: [hnet_ws]
+track: architecture
+hypothesis: >-
+  Offset-resolved read-back of the chunk vector: each byte of the next chunk reads its own learned projection of the
+  main network's output, indexed by how many bytes of that chunk it has already seen (flag dc.dechunk_slots=4). Under
+  end semantics the main network's output z_j at the last byte of chunk j is the model's prediction of the whole next
+  chunk, the role BPE's last hidden state plays for the whole next token. BPE reads that prediction through a head that
+  scores whole tokens; the H-Net adds the same vector zbar_j (EMA-blended with z_{j-1}) to every byte of chunk j+1,
+  so the 2-layer d=192 Mamba decoder must itself turn one position-invariant vector into "byte 1 is likely X, byte 2
+  is likely Y ...", knowing its offset only from the bypass. The bypass, in contrast, hands every byte its own
+  byte-specific features, which is one reason the decoder leans on it (bypass rms 5-8x the hierarchy's at the end of
+  the L03 runs, the hierarchy's rms flat at ~1 for 900 steps). With K=4 offset slots (W_k zbar_j, k = min(bytes since
+  the boundary, 3); 4.1 bytes per chunk on average, so slots 0-2 cover most bytes) the main network can lay out
+  per-offset predictions in one vector and every byte gets a direct linear readout of the part meant for it, which also
+  lets the main network's gradient be position-specific. The maps are identity-initialized, so at init the model is
+  exactly hnet_ws (test), and they are Muon matrices like residual_proj, so the hierarchy path also gains a scale it
+  can grow (a confound with g1-arch-01 that the mechanism metrics separate: slot_div measures whether the slots
+  specialise). Paid for by 117 fewer n-gram buckets (params 20,022,697 <= BPE's 20,023,040); +1.05% FLOPs/byte
+  (2 K d^2 per chunk, counted).
+prediction:
+  fitness: 0.10          # hnet_ws is +0.127 (1 seed): predict >= 0.025 better
+  mechanism: >-
+    bypass_ratio (residual_rms/dechunk_rms) <= 3 at step 908 (hnet_ws 5.1) and <= 2.5 at step 300 (hnet_ws 3.8);
+    the hierarchy's rms leaves its ~1.0-1.2 plateau (dechunk_rms >= 1.5 by step 300). Falsifier: val bpb not better
+    than hnet_ws by >= 0.01 at matched seeds means offset indexing was not the decoder's bottleneck (if the ratio
+    still drops, the gain belongs to the scale effect that g1-arch-01 isolates). slot_div/s0 (mean ||W_k - W_0|| /
+    ||W_0||, k >= 1) and slot_last_frac/s0 (share of bytes in the shared last slot) are logged; slot_div alone is not
+    a usable falsifier, since Muon moves any matrix by O(1) within ~40 steps (smoke: 1.09 at step 40).
+    Smoke (tiny, 40 steps, vs the flag-off control): bpb last-5 mean 3.608 vs 3.579 (noise level at this horizon),
+    bypass ratio 0.99 vs 1.27, dechunk_rms 1.87 vs 1.45; 42% of bytes sit in slot 3+ (K = 6 would cost +1.57% FLOPs).
+branch: evolve/g1-arch-02
+model: configs/evolve/models/g1-arch-02.yaml
+set: []
+checks:
+  tests: pass
+  fairness: pass
+  grad_audit: logbook/evolve/candidates/g1-arch-02/grad_audit.txt
+  smoke: pass
+  default_forward: logbook/evolve/candidates/g1-arch-02/default_forward.txt
+  smoke_log: logbook/evolve/candidates/g1-arch-02/smoke.txt
+  fairness_report: logbook/evolve/candidates/g1-arch-02/fairness.txt

@@ -1,6 +1,7 @@
 """Upsamplers back to the outer resolution (paper Sec. 2.2.2), registry kind ``dechunker``.
 
-Contract: ``(h_inner [M, D], router_out, ctx, ctx_inner) -> h_outer [T, D]`` (fp32). Outer position t reads inner
+Contract: ``(h_inner [M, D], router_out, ctx, ctx_inner) -> h_outer [T, D]`` (fp32); ``smooth(...)`` returns the
+inner-rate [M, D] fp32 vectors that ``__call__`` upsamples (used by the offset-resolved read-back, ``dc.dechunk_slots``). Outer position t reads inner
 position ``plug_back_idx[t] = cumsum(boundary_mask)[t] - 1``: the last selected position at or before t (eq. 8).
 For "start" semantics that is the chunk containing t; for "end" semantics it is the latest chunk that ended at or
 before t (see ``routing.base``): the same index serves both.
@@ -29,8 +30,12 @@ def plug_back_index(router_out: RouterOutput) -> torch.Tensor:
 class RepeatDechunker:
     """No smoothing: ``out_t = z_{plug_back_idx[t]}`` (paper ablation "w/o smoothing")."""
 
+    def smooth(self, h_inner: torch.Tensor, router_out: RouterOutput, ctx: SeqCtx, ctx_inner: SeqCtx):
+        """[M, D] fp32 inner-rate vectors before upsampling (here: the inner outputs themselves)."""
+        return h_inner.float()
+
     def __call__(self, h_inner: torch.Tensor, router_out: RouterOutput, ctx: SeqCtx, ctx_inner: SeqCtx):
-        return h_inner.float().index_select(0, plug_back_index(router_out))
+        return self.smooth(h_inner, router_out, ctx, ctx_inner).index_select(0, plug_back_index(router_out))
 
 
 @register("dechunker", "ema")
@@ -47,7 +52,10 @@ class EMADechunker:
     def __init__(self, block: int = 64):
         self.block = block
 
-    def __call__(self, h_inner: torch.Tensor, router_out: RouterOutput, ctx: SeqCtx, ctx_inner: SeqCtx):
+    def smooth(self, h_inner: torch.Tensor, router_out: RouterOutput, ctx: SeqCtx, ctx_inner: SeqCtx):
+        """zbar [M, D] fp32: the smoothed inner vectors before upsampling."""
         P = router_out.p.clamp(P_MIN, 1 - P_MIN).index_select(0, ctx_inner.outer_index)
-        zbar = linear_recurrence(P[:, None] * h_inner.float(), torch.log1p(-P), ctx_inner.position_ids == 0, self.block)
-        return zbar.index_select(0, plug_back_index(router_out))
+        return linear_recurrence(P[:, None] * h_inner.float(), torch.log1p(-P), ctx_inner.position_ids == 0, self.block)
+
+    def __call__(self, h_inner: torch.Tensor, router_out: RouterOutput, ctx: SeqCtx, ctx_inner: SeqCtx):
+        return self.smooth(h_inner, router_out, ctx, ctx_inner).index_select(0, plug_back_index(router_out))

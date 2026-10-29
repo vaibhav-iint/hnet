@@ -9,6 +9,7 @@ Stage s with layout ``[enc, inner, dec]`` maps h [T, D^{s-1}] -> [T, D^{s-1}]:
     x, ctx'  = chunker(h, r.boundary_mask, ctx)          (keeps the selected positions)
     z, preds = main_network(x, ctx', **extras')           (HNet stage s+1, or Isotropic if innermost)
     h        = dechunker(z, r, ctx, ctx') * STE(r.selected_probs) + residual      (fp32)
+               (dc.dechunk_slots = K > 0: dechunker(...) -> W_{min(offset, K-1)} zbar, see ``_slot_dechunk``)
     h        = decoder(h)[:, :D^{s-1}]
 
 A layout ``[main]`` is an innermost stage (pad, Isotropic, truncate). Router / chunker / dechunker / STE are
@@ -109,6 +110,10 @@ class HNet(nn.Module):
             else:
                 nn.init.zeros_(self.residual_proj.weight)
             self.residual_proj.weight._no_reinit = True
+            self.dechunk_slots = int(dc["dechunk_slots"] or 0)
+            if self.dechunk_slots > 0:  # offset-resolved read-back (HNetConfig.dc.dechunk_slots); no RNG consumed
+                # rows k*d:(k+1)*d hold W_k (identity at init: slot k reads zbar unchanged)
+                self.slot_proj = nn.Parameter(torch.eye(d, dtype=torch.float32).repeat(self.dechunk_slots, 1))
 
         d_prev = cfg.d_model[stage_idx - 1] if stage_idx > 0 else d
         self.pad_dimension = nn.Parameter(torch.zeros(d - d_prev)) if d > d_prev else None
@@ -148,7 +153,10 @@ class HNet(nn.Module):
             r.vocab_tgt = self.chunk_vocab.next_targets(bucket[0], ctx_inner)
         z, inner_preds = self.main_network(x, ctx_inner, input_ids=inner_ids, boundaries=inner_boundaries,
                                            binfo=inner_binfo)
-        out = self.dechunk_layer(z, r, ctx, ctx_inner)
+        if self.dechunk_slots > 0:
+            out = self._slot_dechunk(z, r, ctx, ctx_inner)
+        else:
+            out = self.dechunk_layer(z, r, ctx, ctx_inner)
         if self.use_ste:
             out = out * STE.apply(r.selected_probs)
         with torch.no_grad():  # how strongly the hierarchy below speaks to the decoder, vs the residual path
@@ -170,6 +178,27 @@ class HNet(nn.Module):
         h = (out + residual).to(h.dtype)
         h = self.decoder(h, ctx)
         return h[:, :D_in], [r, *inner_preds]
+
+    def _slot_dechunk(self, z: torch.Tensor, r: RouterOutput, ctx: SeqCtx, ctx_inner: SeqCtx) -> torch.Tensor:
+        """Offset-resolved read-back (dc.dechunk_slots = K): out_t = W_{min(k_t, K-1)} zbar_{j(t)}, where j(t) is the
+        inner position byte t reads (the dechunker's plug-back index) and k_t = t - (outer position of j(t)). The K maps
+        run once per inner position ([M, K*D], fp32) and each byte gathers its row; causal because j(t) and k_t depend
+        only on boundary decisions at or before t."""
+        from .chunking.dechunk import plug_back_index
+
+        K, D = self.dechunk_slots, z.shape[-1]
+        zbar = self.dechunk_layer.smooth(z, r, ctx, ctx_inner)  # [M, D] fp32
+        with _no_autocast(z.device):
+            y = torch.nn.functional.linear(zbar, self.slot_proj.float())  # [M, K * D]
+        plug = plug_back_index(r)
+        offset = torch.arange(plug.numel(), device=plug.device) - ctx_inner.outer_index.index_select(0, plug)
+        slot = offset.clamp(max=K - 1)
+        with torch.no_grad():  # mechanism metrics: how far the slots have moved apart, and how bytes spread over them
+            W = self.slot_proj.detach().float().view(K, D, D)
+            r.extra["slot_div"] = ((W[1:] - W[:1]).pow(2).sum((1, 2)).sqrt() / W[0].pow(2).sum().sqrt()).mean() \
+                if K > 1 else W.new_zeros(())
+            r.extra["slot_last_frac"] = (slot == K - 1).float().mean()
+        return y.view(-1, D).index_select(0, plug * K + slot)
 
     # ------------------------------------------------------------------ helpers
     def stages(self) -> List["HNet"]:
