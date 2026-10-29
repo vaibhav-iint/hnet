@@ -927,3 +927,20 @@ the chunk-STE test was wrong twice, both times for reasons the audit now prints:
 through G, and the zero-initialised table kills the next-chunk gradient at init). EXP-027 launched (two L4 spot VMs).
 `hnet-ladder-lr` finished its queue (hnet / hnet_ws LR grid, results mirrored) and was deleted; the BPE retries and the
 LR extension run on `hnet-ladder-lr2`, which was preempted and resumed three times in 20 minutes.
+
+### Ladder LR tuning done (L04, 1e16, one seed each; `ladder_lr_1e16` + `lrext_1e16`), 1e16 rungs launched
+| Muon LR | 0.0025 | 0.005 | 0.01 | 0.02 | 0.04 | 0.08 |
+|---|---|---|---|---|---|---|
+| bpe | 1.796 | 1.736 | 1.706 | **1.622** | 1.784 | 2.008 |
+| hnet | 1.934 (router undecided, margin 0.03) | 1.888 | **1.861** | 1.905 | 2.049 | 2.210 |
+| hnet_ws | 1.878 (margin 0.07) | 1.822 | **1.820** | 1.845 | 2.028 | 2.209 |
+
+BPE has a sharp optimum at 0.02 (0.08 bpb worse one grid step either side); both H-Nets prefer 0.01 and are flatter.
+At the prior optimum rung the gap is large: H-Net trails BPE by 0.24 bpb prior-free and 0.20 with the warm start, at
+equal FLOPs and data, against 0.00 at tiny scale with the curriculum (EXP-024). The mechanism panels say why: the
+bypass rms ends 5-25× the hierarchy's in every H-Net run above LR 0.01, and at the lowest LRs the router never
+decides. The iso-FLOP ladder follows the blog's protocol (BPE's best LR transferred to every run, `best_mlr.bpe=0.02`),
+which costs the H-Nets ~0.04 relative to their own optimum; noted as a caveat in the write-up. 1e16 rungs L03-L06
+(bpe / hnet / hnet_ws) launched on `hnet-ladder-1e16` (4×A100 spot, 12 runs); 1e17 held until EXP-027's first evals
+decide whether the ladder's H-Net arm should carry the chunk-STE / gated-bypass change. Both LR VMs deleted
+(hnet-ladder-lr $4.12, hnet-ladder-lr2 ~$3.5).

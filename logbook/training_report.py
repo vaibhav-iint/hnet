@@ -34,7 +34,12 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
+# tiny-scale references (50M token-eq, EXP-0xx sweeps only); ladder sweeps compare arms with each other
 REFERENCES = {"BPE (EXP-006, 3 seeds)": 1.634, "H-Net + whitespace prior (EXP-024)": 1.635}
+
+
+def _refs(sweep):
+    return REFERENCES if sweep.startswith("exp") else {}
 MECH = [("p_margin/s0", "router margin |p-0.5|"), ("p_mid/s0", "undecided fraction (p in 0.4-0.6)"),
         ("score_std/s0", "raw score std (scale drift)"), ("rms", "hierarchy (solid) vs bypass (dashed) rms"),
         ("chunk_vocab_ce/s0", "next-chunk CE"), ("grad_norm", "grad norm")]
@@ -219,7 +224,7 @@ def plot_val(sweep, arms):
         if agg:
             xs = sorted(agg)
             ax.plot(xs, [statistics.mean(agg[x]) for x in xs], color=c, lw=2, label=f"{arm} ({len(runs)} seeds)")
-    for j, (name, v) in enumerate(REFERENCES.items()):
+    for j, (name, v) in enumerate(_refs(sweep).items()):
         ax.axhline(v, ls="--", lw=1, color="gray", alpha=0.8)
         x0, x1 = ax.get_xlim()
         ax.text(x0 if j % 2 == 0 else x1, v, f" {name} {v:.3f} ", va="bottom" if j % 2 == 0 else "top",
@@ -227,7 +232,7 @@ def plot_val(sweep, arms):
     ax.set_xlabel("step")
     ax.set_ylabel("val bpb")
     ax.set_title(f"{sweep}: validation bpb")
-    lo = min([v for v in REFERENCES.values()] + [e["val/bpb"] for runs in arms.values() for r in runs for e in r["evals"]])
+    lo = min(list(_refs(sweep).values()) + [e["val/bpb"] for runs in arms.values() for r in runs for e in r["evals"]])
     ax.set_ylim(lo - 0.05, min(3.0, lo + 1.2))
     ax.grid(alpha=0.3)
     ax.legend(fontsize=7)
@@ -290,7 +295,6 @@ def plot_lr(sweep, rows):
 
 def tldr(all_rows):
     """Bullets from the numbers."""
-    ref = min(REFERENCES.values())
     out = []
     for sweep, rows in all_rows.items():
         scored = [r for r in rows if r["val"] is not None]
@@ -298,10 +302,17 @@ def tldr(all_rows):
         tot = sum(r["seeds"] for r in rows)
         if scored:
             best = min(scored, key=lambda r: r["val"])
-            delta = best["val"] - ref
-            tag = "matches" if abs(delta) < 0.005 else ("beats" if delta < 0 else "trails")
+            refs = _refs(sweep)
+            if refs:
+                ref = min(refs.values())
+                delta = best["val"] - ref
+                tag = "matches" if abs(delta) < 0.005 else ("beats" if delta < 0 else "trails")
+                cmp_ = f"{tag} the BPE reference {ref:.3f} by {abs(delta):.3f}"
+            else:
+                second = sorted(scored, key=lambda r: r["val"])[1:2]
+                cmp_ = f"next `{second[0]['arm']}` {second[0]['val']:.3f}" if second else "single arm"
             out.append(f"**{sweep}**: best arm `{best['arm']}` at {best['val']:.3f} bpb (step {best['eval_step']}), "
-                       f"{tag} the BPE reference {ref:.3f} by {abs(delta):.3f}; {fin}/{tot} runs finished.")
+                       f"{cmp_}; {fin}/{tot} runs finished.")
         else:
             out.append(f"**{sweep}**: no evaluations yet; {fin}/{tot} runs finished.")
         for r in rows:
