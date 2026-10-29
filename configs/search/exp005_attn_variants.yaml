@@ -1,0 +1,66 @@
+# EXP-005: attention variants inside the BPE Transformer and the H-Net, at the tiny 2M FLOPs-matched scale.
+# {BPE, H-Net (best router)} x {attn (baseline), DeepSeek: mla, nsa, dsa (WS-I1); Kimi: kda, kda_hybrid, moba,
+# gated_attn (WS-I2)} x 3 seeds = 48 runs. Same data, budget and eval cadence as EXP-002/003 (FineWeb-Edu shard 1,
+# 50M token-equivalents, WSD 10%/20%, val every 250 steps, paper7 every 500 steps), AdamW.
+# Model files: configs/models/tiny_{bpe,hnet2}_2m_<variant>.yaml (written by WS-I1/WS-I2, FLOPs-matched to
+# tiny_bpe_2m within +-2%); `attn` uses the plain tiny_bpe_2m / tiny_hnet2_2m. `model:` swaps the run file's model
+# include, so data/optimizer/eval come from the same run files as EXP-002/003. While a variant's file does not
+# exist, every command lists it as missing; `--allow-missing` checks/runs the others.
+# Params (fill after EXP-003, then commit; the VMs read the spec from git):
+#   lr.bpe / lr.hnet  best AdamW LR of BPE and of the chosen H-Net in EXP-003 (report.py best_params.yaml);
+#   hnet_router       router registry name of the best H-Net in EXP-002/003 (paper = cosine_lookahead, end_mlp,
+#                     end_cosine_shift, end_linear).
+# Fairness: tuned with per-architecture LR: each family runs at its own best EXP-003 LR (no grid here). If both
+# best LRs are equal the spec also passes `--mode strict`.
+name: exp005_attn_variants
+out_root: runs/search/exp005_attn_variants
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp005_attn_variants
+seeds: [0, 1, 2]
+fairness: {mode: tuned, per_arch: [train.lr]}
+params:
+  lr: {bpe: null, hnet: null}
+  hnet_router: null
+params_note: "lr.bpe / lr.hnet = best AdamW LR in EXP-003 (report.py best_params.yaml); hnet_router = best router"
+set:
+  - train.compile=false
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  baseline: bpe_attn
+  groups:
+    "BPE + DeepSeek attention": [bpe_attn, bpe_mla, bpe_nsa, bpe_dsa]
+    "BPE + Kimi attention": [bpe_attn, bpe_kda, bpe_kda_hybrid, bpe_moba, bpe_gated_attn]
+    "H-Net + DeepSeek attention": [hnet_attn, hnet_mla, hnet_nsa, hnet_dsa]
+    "H-Net + Kimi attention": [hnet_attn, hnet_kda, hnet_kda_hybrid, hnet_moba, hnet_gated_attn]
+runs:
+  - {name: bpe_attn, config: configs/runs/tiny_bpe_2m.yaml, model: configs/models/tiny_bpe_2m.yaml,
+     set: ["train.lr=${lr.bpe}"]}
+  - {name: bpe_mla, config: configs/runs/tiny_bpe_2m.yaml, model: configs/models/tiny_bpe_2m_mla.yaml,
+     set: ["train.lr=${lr.bpe}"]}
+  - {name: bpe_nsa, config: configs/runs/tiny_bpe_2m.yaml, model: configs/models/tiny_bpe_2m_nsa.yaml,
+     set: ["train.lr=${lr.bpe}"]}
+  - {name: bpe_dsa, config: configs/runs/tiny_bpe_2m.yaml, model: configs/models/tiny_bpe_2m_dsa.yaml,
+     set: ["train.lr=${lr.bpe}"]}
+  - {name: bpe_kda, config: configs/runs/tiny_bpe_2m.yaml, model: configs/models/tiny_bpe_2m_kda.yaml,
+     set: ["train.lr=${lr.bpe}"]}
+  - {name: bpe_kda_hybrid, config: configs/runs/tiny_bpe_2m.yaml, model: configs/models/tiny_bpe_2m_kda_hybrid.yaml,
+     set: ["train.lr=${lr.bpe}"]}
+  - {name: bpe_moba, config: configs/runs/tiny_bpe_2m.yaml, model: configs/models/tiny_bpe_2m_moba.yaml,
+     set: ["train.lr=${lr.bpe}"]}
+  - {name: bpe_gated_attn, config: configs/runs/tiny_bpe_2m.yaml, model: configs/models/tiny_bpe_2m_gated_attn.yaml,
+     set: ["train.lr=${lr.bpe}"]}
+  - {name: hnet_attn, config: configs/runs/tiny_hnet2_2m.yaml, model: configs/models/tiny_hnet2_2m.yaml,
+     set: ["model.dc.router=${hnet_router}", "train.lr=${lr.hnet}"]}
+  - {name: hnet_mla, config: configs/runs/tiny_hnet2_2m.yaml, model: configs/models/tiny_hnet2_2m_mla.yaml,
+     set: ["model.dc.router=${hnet_router}", "train.lr=${lr.hnet}"]}
+  - {name: hnet_nsa, config: configs/runs/tiny_hnet2_2m.yaml, model: configs/models/tiny_hnet2_2m_nsa.yaml,
+     set: ["model.dc.router=${hnet_router}", "train.lr=${lr.hnet}"]}
+  - {name: hnet_dsa, config: configs/runs/tiny_hnet2_2m.yaml, model: configs/models/tiny_hnet2_2m_dsa.yaml,
+     set: ["model.dc.router=${hnet_router}", "train.lr=${lr.hnet}"]}
+  - {name: hnet_kda, config: configs/runs/tiny_hnet2_2m.yaml, model: configs/models/tiny_hnet2_2m_kda.yaml,
+     set: ["model.dc.router=${hnet_router}", "train.lr=${lr.hnet}"]}
+  - {name: hnet_kda_hybrid, config: configs/runs/tiny_hnet2_2m.yaml, model: configs/models/tiny_hnet2_2m_kda_hybrid.yaml,
+     set: ["model.dc.router=${hnet_router}", "train.lr=${lr.hnet}"]}
+  - {name: hnet_moba, config: configs/runs/tiny_hnet2_2m.yaml, model: configs/models/tiny_hnet2_2m_moba.yaml,
+     set: ["model.dc.router=${hnet_router}", "train.lr=${lr.hnet}"]}
+  - {name: hnet_gated_attn, config: configs/runs/tiny_hnet2_2m.yaml, model: configs/models/tiny_hnet2_2m_gated_attn.yaml,
+     set: ["model.dc.router=${hnet_router}", "train.lr=${lr.hnet}"]}

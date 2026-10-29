@@ -324,3 +324,16 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
   The likely cause is recompiles around the `torch.compiler.disable`d kernels. EXP-002 runs with `compile=false`.
   Investigate before the 125M runs.
 - About $0.30 spent; all of WS-H's VMs are deleted.
+
+### WS-I2 done: Kimi KDA, MoBA, gated attention (+ Attention Residuals option)
+- New mixers in `hnet/model/mixers/kimi.py`:
+  - `kda`: chunkwise gated delta rule in pure torch. Matches the recurrent reference to about 1e-12 in fp64.
+  - `moba`: top-k block attention, with flex or SDPA backends. Equals `attn` when every block is selected.
+  - `gated_attn`: the G1 sigmoid output gate. Equals `attn` when the gate is forced open.
+- Each new mixer defines `flops_per_position`.
+- Eight tiny configs (BPE and H-Net, including the KDA:attn 5:2 hybrid), all within ±2% FLOPs/byte of
+  `tiny_bpe_2m`.
+- Tests: 50 Kimi mixer tests; the full suite gave 463 passed.
+- Attention Residuals (arXiv 2603.15031; the blog's "1.25×") is implemented as `Isotropic(attn_res=S)` but not yet
+  wired into configs or flops.py; I'll do that wiring.
+- Open: CUDA parity for fla and flex is not run yet; no dense hybrid layout; KDA has no decoding cache.

@@ -37,16 +37,16 @@ report:
 runs:
   - name: bpe
     config: configs/runs/tiny_bpe_2m.yaml
-    set: [train.muon.lr_embed=${best_lr.bpe}, train.muon.lr_head=${best_lr.bpe}, train.muon.lr_other=${best_lr.bpe}]
+    set: ["train.muon.lr_embed=${best_lr.bpe}", "train.muon.lr_head=${best_lr.bpe}", "train.muon.lr_other=${best_lr.bpe}"]
   - name: paper
     config: configs/runs/tiny_hnet2_2m.yaml
-    set: [train.muon.lr_embed=${best_lr.paper}, train.muon.lr_head=${best_lr.paper},
-          train.muon.lr_other=${best_lr.paper}]
+    set: ["train.muon.lr_embed=${best_lr.paper}", "train.muon.lr_head=${best_lr.paper}",
+          "train.muon.lr_other=${best_lr.paper}"]
   - name: end_mlp
     config: configs/runs/tiny_hnet2_2m.yaml
-    set: [model.dc.router=end_mlp, train.muon.lr_embed=${best_lr.end_mlp}, train.muon.lr_head=${best_lr.end_mlp},
-          train.muon.lr_other=${best_lr.end_mlp}]
+    set: [model.dc.router=end_mlp, "train.muon.lr_embed=${best_lr.end_mlp}", "train.muon.lr_head=${best_lr.end_mlp}",
+          "train.muon.lr_other=${best_lr.end_mlp}"]
   - name: end_cosine_shift
     config: configs/runs/tiny_hnet2_2m.yaml
-    set: [model.dc.router=end_cosine_shift, train.muon.lr_embed=${best_lr.end_cosine_shift},
-          train.muon.lr_head=${best_lr.end_cosine_shift}, train.muon.lr_other=${best_lr.end_cosine_shift}]
+    set: [model.dc.router=end_cosine_shift, "train.muon.lr_embed=${best_lr.end_cosine_shift}",
+          "train.muon.lr_head=${best_lr.end_cosine_shift}", "train.muon.lr_other=${best_lr.end_cosine_shift}"]
