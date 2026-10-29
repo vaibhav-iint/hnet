@@ -18,14 +18,10 @@ set:
 report:
   baseline: base
   labels: {base: "paper 2-stage", rdrop: "residual path-drop 0.3", mainaux: "main-path aux head 0.3",
-           rent: "router entropy 0.05", combo: "all three", combo_end: "all three + end-of-chunk MLP router"}
+           rent: "router entropy 0.05"}
+# combo / combo_end removed: the entropy penalty collapsed the routers to select-all (+379% FLOPs; see worklog).
 runs:
   - {name: base,      config: configs/runs/tiny_hnet2_2m.yaml}
   - {name: rdrop,     config: configs/runs/tiny_hnet2_2m.yaml, set: ["model.dc.residual_dropout=0.3"]}
   - {name: mainaux,   config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.main_aux_weight=0.3]}
   - {name: rent,      config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.router_entropy_weight=0.05]}
-  - {name: combo,     config: configs/runs/tiny_hnet2_2m.yaml,
-     set: ["model.dc.residual_dropout=0.3", model.dc.main_aux_weight=0.3, model.dc.router_entropy_weight=0.05]}
-  - {name: combo_end, config: configs/runs/tiny_hnet2_2m.yaml,
-     set: [model.dc.router=end_mlp, "model.dc.residual_dropout=0.3", model.dc.main_aux_weight=0.3,
-           model.dc.router_entropy_weight=0.05]}
