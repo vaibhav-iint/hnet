@@ -234,3 +234,63 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
   - run dirs and checkpoints rsync to the bucket;
   - converted data shards are cached in the bucket;
   - metrics are pulled from GCS, with the serial console as fallback.
+
+### 00:40 · EXP-002 setup; manual audits (user: "go through examples, double-check loss and normalization")
+- Built `hnet/analysis/chunks.py`: per-stage chunk statistics for trained H-Nets, comparable with the EXP-001 blog
+  numbers.
+- Built `scripts/search/sweep.py`: a resumable multi-run sweep with per-run diagnostics and GCS mirroring.
+- Wrote the EXP-002 spec: 9 variants × 2 seeds at ~2M params.
+- Turned on in-training evals: val CE/bpb every 250 steps; paper7 task metrics (acc, acc_norm, soft bpb) every 500
+  steps.
+- **Loss/normalization audit** (`scripts/audit/audit_loss.py`, real FineWeb-Edu windows): all checks pass.
+  - BOS/EOS placement, segment starts and next-byte labels (ignored across documents) are correct.
+  - Token windows decode to exactly the same text as byte windows.
+  - `ce_sum` equals a manual F.cross_entropy, and the loss is ce_sum / n_targets.
+  - The ratio loss matches the paper formula per stage, and aux = α·Σ.
+  - Uniform-model val bpb equals theory exactly: 8.000 for bytes, 3.289 for tokens.
+  - The trainer's token byte count is within 0.024% of exact. It counts input-token bytes; val uses exact counts.
+- **Eval audit** (`scripts/audit/audit_eval.py`; examples in `logbook/audits/eval_examples.md`): 0 mismatches.
+  - Every choice's log-prob was recomputed by an unpacked forward pass, for the byte model and HF GPT-2 on
+    paper7 + smollm3_cf.
+  - acc, acc_norm_char, acc_norm_byte and soft bpb were re-derived independently.
+  - The one initial "mismatch" was an exact tie between two choices of an untrained model.
+- Prompts look right (lm-eval / lighteval formats). smollm3_cf Winogrande keeps lighteval's lower-casing and
+  double space; this is identical for every model.
+
+### 00:55 · Apples-to-apples gate (user: "we need fair comparisons")
+- `scripts/search/fairness.py` composes every run's exact config and checks that these are held equal:
+  - data, shards and window order;
+  - bytes/step, total bytes and FLOPs/byte (±2%);
+  - optimizer, LR, schedule, precision;
+  - val set, eval cadence, downstream suite.
+- It writes `fairness.md`. `sweep.py` refuses to start if the check fails.
+- EXP-002 passes: 231M bytes per run; bytes/step within 1.1%; FLOPs/byte within 1.9% of BPE (0.01189 GFLOPs/byte).
+
+### 01:00 · Launch failures found and fixed (two bugs)
+1. `.gitignore` had unanchored `data/` and `runs/`, which hid `hnet/data`, `scripts/data` and `configs/runs` from
+   GitHub (found by WS-H). Anchored them to `/data/` and `/runs/` and committed the code.
+2. `python scripts/search/sweep.py` cannot import `hnet` without PYTHONPATH. I missed this locally because I used
+   PYTHONPATH=.
+   - Reproduced exactly with a Python 3.10 + torch 2.9.1 env that mirrors the VM image, using a fresh clone.
+   - Scripts now add the repo root themselves.
+   - A 3-step end-to-end mini-sweep then passed in that env: train, val, task evals, diagnostics.
+- The first two EXP-002 VMs died within minutes and cost cents. Their console logs were lost on stop, so the new
+  startup script uploads its full log to GCS.
+
+### 01:00 · Fail-loudly policy (user: "do not swallow exceptions")
+- Removed silent fallbacks:
+  - optional kernels now fall back only if the package is absent; a broken install raises;
+  - the trainer's val set, downstream eval, FLOPs accounting and wandb now raise on failure;
+  - registry imports, data helpers, flops router counting, shard-edge `first_token` and the report reader no longer
+    swallow errors;
+  - the sweep raises on diagnostic and GCS sync errors, and stops starting new runs after the first failure.
+- Fused mamba_ssm/causal_conv1d kernels are wrapped in `torch.compiler.disable`. This fixes the dynamo crash WS-H
+  hit on the GPU with `compile: blocks`.
+- `infra/sweeps/sweep_vm_startup.sh` runs with `set -euo pipefail`, uploads its full log to GCS on exit, and shuts
+  the VM down.
+- Full suite: 376 passed, 26 skipped (CUDA).
+- WS-H was asked to apply the same rule to `infra/gcp`.
+
+### 01:02 · EXP-002 relaunched (commit f988ba8)
+- Spot L4 `hx-exp002-l4` in us-east1-c, 5-hour cap, 3 runs in parallel on the GPU.
+- Progress figures: `logbook/exp002_progress.py`, which pulls metrics from GCS.

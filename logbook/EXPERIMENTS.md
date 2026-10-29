@@ -9,6 +9,7 @@ Status legend: **planned** · **running** · **done** · **failed** · **abandon
 |---|---|---|---|---|
 | EXP-000 | Cartesia Fig. 7 re-analysis (reference data, no training) | done | $0 | Stable-phase data multiplier ≈ 1.7x at 94B tokens and ≈ 3.0x at 189B; the 10x needs the H-Net cooldown |
 | EXP-001 | What the blog's chunk-viewer data says about the improved router | done | $0 | Boundaries mark chunk ENDS (causal); stage-1 chunks are 'word␣' and almost never split words or UTF-8 characters |
+| EXP-002 | Tiny (~2M) architecture search: routers and ablations vs BPE | running | ~$2 est. | (in progress) |
 
 ---
 
@@ -112,3 +113,35 @@ Llama-3  : Ever|␣wondered|␣if|␣you|␣could|␣beat|␣a|␣bear|␣or|␣
   or before t.
 * The router function is still a guess. Candidates `end_linear`, `end_mlp` and `end_cosine_shift` go through the
   1–10M architecture search (PLAN §2b), with the chunk statistics above as the targets for our trained models.
+
+---
+
+## EXP-002 · Tiny architecture search: routers and ablations vs BPE
+
+*2026-10-29 · status: running · hardware: 1× L4 spot (GCP us-east1-c), 3 runs in parallel · spec:
+`configs/search/exp002_tiny2m.yaml` · commit f988ba8 · fairness: `runs/search/exp002_tiny2m/fairness.md`*
+
+**Question.** At tiny scale and equal FLOPs/byte and data:
+* does the paper's 2-stage H-Net beat the BPE baseline;
+* does an end-of-chunk router (the blog's design, EXP-001) beat the paper's lookahead router;
+* which paper components matter?
+
+**Setup.** Nine variants, each with 2 seeds.
+* **Baseline:** BPE (GPT-2 tokenizer, 15M params incl. a 50K-vocab head).
+* **H-Nets** (~7.9M params, 2-stage, (3,3)), with these routers:
+  * the paper's `cosine_lookahead`;
+  * three end-of-chunk guesses: `end_linear`, `end_mlp` and `end_cosine_shift`.
+* **Ablations of the paper router:**
+  * targets (4,2);
+  * no smoothing;
+  * no per-stage LR multipliers;
+  * ratio-loss α = 0.1.
+
+All runs share:
+* **Data:** FineWeb-Edu train shard 1 in the same window order; 231M bytes per run (50M token-equivalents).
+* **Optimizer:** AdamW, peak LR 1.5e-3, WSD (10% warmup, 20% inverse-sqrt decay), bf16, no compile.
+* **Evaluation:** the same 1 MB val text for bpb, plus paper7 task metrics every 500 steps.
+
+**Results.** Training in progress; live figure below (re-rendered by `logbook/exp002_progress.py`).
+
+![EXP-002 progress](figures/exp002_progress.png)
