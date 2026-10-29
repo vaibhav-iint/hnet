@@ -88,6 +88,18 @@ class DCConfig:
     #   themselves; after the curriculum the router is free.
     router_prior_weight: float = 0.0
     router_prior_frac: float = 0.1
+    # router_surprise_weight: prior-free tokenizer teacher from the model's OWN uncertainty (training only; the
+    #   curriculum decays linearly to 0 at router_surprise_frac of training, 0 = constant weight). Teacher: the top
+    #   1/N of the batch's positions by the entropy RISE dH_t = H_t - H_{t-1}, where H_t is the entropy of the full
+    #   model's next-byte distribution at t (detached; an extra no-grad LM-head pass, +0.5% FLOPs/byte at L03). Under
+    #   "end" semantics a chunk should end at t when byte t+1 is where prediction gets hard (Harris' successor
+    #   variety; BLT's patching rule): after "word<space>", not before the space (the suffix basin). The stage-0
+    #   router's decided confidence p (scale-free under rank decisions) is trained toward that set with BCE.
+    #   Measured motivation: the hierarchy's gain is 6x larger at word starts in the word basin, the prior-free
+    #   router is still undecided at step 300 at L03 (p_mid 0.61), and the next-chunk loss cannot tell the basins
+    #   apart; an entropy-rise teacher puts boundaries where that gain is, without naming whitespace.
+    router_surprise_weight: float = 0.0
+    router_surprise_frac: float = 0.3
     chunker: Any = "select"  # keep vectors at boundaries (paper default); "pool" = learned summary over the chunk
     chunker_kwargs: Any = field(default_factory=dict)
     dechunker: Any = "ema"  # EMA smoothing (paper default); "repeat" = no smoothing

@@ -1,0 +1,26 @@
+# CPU smoke, g1-router-01: L03 model (configs/ladder/runs/ladder_hnet.yaml), mix_v1_small, 2 x 2048-byte windows/step, 30 steps, fp32, no compile, benchmark Muon LRs (warmup 3 steps)
+# set: model.dc.router_surprise_weight=1.0 model.dc.router_surprise_frac=0.3 (teacher on for steps 0-8)
+# Result: PASS (CE 5.33 -> 2.55, no NaN, compression 4.13-4.14 vs target 4.145)
+# surprise_ws = share of the teacher's targets on whitespace bytes (diagnostic only, never an input): 0.007 (step 3) -> 0.44 (6) -> 0.65 (9)
+step 3 | loss 9.045 | ce 5.327 | bpb 7.685 | aux_loss 3.718 | grad_norm 4.496 | lr 0.02 | tokens_eq 2962 | bytes_per_sec 174.3 | step_time 23.48 | comp 4.14
+step 6 | loss 7.111 | ce 3.561 | bpb 5.137 | aux_loss 3.55 | grad_norm 1.136 | lr 0.02 | tokens_eq 5925 | bytes_per_sec 195.6 | step_time 20.94 | comp 4.14
+step 9 | loss 6.49 | ce 3.073 | bpb 4.433 | aux_loss 3.417 | grad_norm 1.57 | lr 0.02 | tokens_eq 8888 | bytes_per_sec 171.2 | step_time 23.91 | comp 4.14
+step 12 | loss 5.911 | ce 2.81 | bpb 4.054 | aux_loss 3.101 | grad_norm 1.509 | lr 0.02 | tokens_eq 1.185e+04 | bytes_per_sec 126.2 | step_time 32.45 | comp 4.14
+step 15 | loss 6.374 | ce 3.317 | bpb 4.786 | aux_loss 3.056 | grad_norm 0.7707 | lr 0.02 | tokens_eq 1.481e+04 | bytes_per_sec 129.2 | step_time 31.67 | comp 4.13
+step 18 | loss 5.809 | ce 2.795 | bpb 4.032 | aux_loss 3.014 | grad_norm 1.556 | lr 0.02 | tokens_eq 1.778e+04 | bytes_per_sec 151.8 | step_time 26.97 | comp 4.14
+step 21 | loss 5.961 | ce 2.943 | bpb 4.245 | aux_loss 3.019 | grad_norm 0.8886 | lr 0.02 | tokens_eq 2.074e+04 | bytes_per_sec 196.5 | step_time 20.83 | comp 4.13
+step 24 | loss 5.452 | ce 2.407 | bpb 3.473 | aux_loss 3.045 | grad_norm 0.7066 | lr 0.02 | tokens_eq 2.37e+04 | bytes_per_sec 161.9 | step_time 25.3 | comp 4.14
+step 27 | loss 5.449 | ce 2.54 | bpb 3.665 | aux_loss 2.908 | grad_norm 0.7802 | lr 0.005858 | tokens_eq 2.667e+04 | bytes_per_sec 163.8 | step_time 25 | comp 4.14
+step 30 | loss 5.563 | ce 2.553 | bpb 3.683 | aux_loss 3.01 | grad_norm 0.7404 | lr 0 | tokens_eq 2.963e+04 | bytes_per_sec 256.4 | step_time 15.96 | comp 4.14
+
+# per-step mechanism metrics (metrics.jsonl)
+{'step': 3, 'ce': 5.3267, 'compression/s0': 4.1374, 'dechunk_rms/s0': 0.924, 'entropy_mean/s0': 5.4956, 'p_margin/s0': 0.2955, 'p_mid/s0': 0.1951, 'residual_rms/s0': 0.0602, 'router_surprise/s0': 0.6113, 'score_std/s0': 0.8706, 'surprise_overlap/s0': 0.5051, 'surprise_ws/s0': 0.0071}
+{'step': 6, 'ce': 3.5609, 'compression/s0': 4.1374, 'dechunk_rms/s0': 0.94, 'entropy_mean/s0': 3.0751, 'p_margin/s0': 0.2118, 'p_mid/s0': 0.4338, 'residual_rms/s0': 0.1708, 'router_surprise/s0': 1.0711, 'score_std/s0': 1.0376, 'surprise_overlap/s0': 0.3273, 'surprise_ws/s0': 0.4448}
+{'step': 9, 'ce': 3.0729, 'compression/s0': 4.1374, 'dechunk_rms/s0': 0.9536, 'entropy_mean/s0': 2.9182, 'p_margin/s0': 0.2409, 'p_mid/s0': 0.3159, 'residual_rms/s0': 0.276, 'router_surprise/s0': 1.1809, 'score_std/s0': 1.288, 'surprise_overlap/s0': 0.1925, 'surprise_ws/s0': 0.6515}
+{'step': 12, 'ce': 2.8098, 'compression/s0': 4.1374, 'dechunk_rms/s0': 0.9354, 'p_margin/s0': 0.2335, 'p_mid/s0': 0.3582, 'residual_rms/s0': 0.3872, 'score_std/s0': 1.5397}
+{'step': 15, 'ce': 3.3173, 'compression/s0': 4.1332, 'dechunk_rms/s0': 0.9205, 'p_margin/s0': 0.2259, 'p_mid/s0': 0.3596, 'residual_rms/s0': 0.4845, 'score_std/s0': 1.7573}
+{'step': 18, 'ce': 2.7948, 'compression/s0': 4.1374, 'dechunk_rms/s0': 0.9561, 'p_margin/s0': 0.2378, 'p_mid/s0': 0.3181, 'residual_rms/s0': 0.5713, 'score_std/s0': 1.9857}
+{'step': 21, 'ce': 2.9426, 'compression/s0': 4.1332, 'dechunk_rms/s0': 0.9399, 'p_margin/s0': 0.2378, 'p_mid/s0': 0.3176, 'residual_rms/s0': 0.6598, 'score_std/s0': 2.204}
+{'step': 24, 'ce': 2.4075, 'compression/s0': 4.1374, 'dechunk_rms/s0': 0.9652, 'p_margin/s0': 0.2388, 'p_mid/s0': 0.3398, 'residual_rms/s0': 0.7625, 'score_std/s0': 2.4288}
+{'step': 27, 'ce': 2.5404, 'compression/s0': 4.1374, 'dechunk_rms/s0': 0.9741, 'p_margin/s0': 0.2328, 'p_mid/s0': 0.3525, 'residual_rms/s0': 0.8257, 'score_std/s0': 2.6379}
+{'step': 30, 'ce': 2.5529, 'compression/s0': 4.1374, 'dechunk_rms/s0': 0.9702, 'p_margin/s0': 0.2362, 'p_mid/s0': 0.3599, 'residual_rms/s0': 0.844, 'score_std/s0': 2.8408}

@@ -1,0 +1,36 @@
+# python -m hnet.analysis.grad_audit configs/runs/tiny_hnet1_2m.yaml --set model.dc.router=end_mlp
+#   --set model.dc.decision=quantile --set 'model.dc.chunk_vocab=[{buckets: 4096, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 256}]'
+#   --set 'model.ngram_embed={ns: [3,4,5,6,7,8], buckets: 1024}' --set model.dc.router_surprise_weight=1.0
+#   --text <mix_v1 val-en bytes, 1024-byte binary header stripped> --batch 2 --length 1024 --steps 0 50
+# Terms are unweighted. router_surprise/s0 reaches the router, the encoder, the byte embedding and the n-gram tables,
+# and exactly nothing else (main network, decoder, residual projection, LM head, chunk table: no path; the entropy
+# target is detached). Read before launch: during the curriculum the teacher's gradient on the encoder is 2.4x the
+# byte CE's at step 0 (1.7x after 50 steps); the whitespace teacher of hnet_ws (BCE on raw logits, weight 1) has the
+# same reach. The 50 SGD steps run at progress 1.0 (teacher weight 0), so their p_mid 0.79 is the prior-free router's.
+
+== gradient norms by (objective, parameter group) after 0 steps
+                             embeddings   ngram_embeddings         s0.encoder   s1.pad_dimension    s1.main_network         s0.decoder  s0.routing_module     s0.chunk_vocab   s0.residual_proj            lm_head
+byte_ce                        3.82e-02           2.12e-02           1.04e+00           4.40e-03           4.56e-01           7.36e-01           1.09e-01           1.38e-02           3.85e-01           1.88e+00
+ratio/s0                       1.91e-04           6.45e-05           5.09e-03           0 (none)           0 (none)           0 (none)           1.62e-03           0 (none)           0 (none)           0 (none)
+next_chunk_ce/s0               0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           1.78e-01           0 (none)           0 (none)
+router_surprise/s0             8.91e-02           7.09e-02           2.46e+00           0 (none)           0 (none)           0 (none)           7.99e-01           0 (none)           0 (none)           0 (none)
+
+== mechanism metrics
+  F/s0=0.167  G/s0=0.258  boundary_frac/s0=0.167  compression/s0=5.97  dechunk_rms/s0=1.35  p_margin/s0=0.308  p_mid/s0=0.252  residual_rms/s0=0.0578  score_std/s0=1.64  tau/s0=0.626
+
+== warnings
+  - next_chunk_ce/s0: sends the router no gradient (dc.chunk_ste=false; the STE sits after dechunking)
+
+== gradient norms by (objective, parameter group) after 50 steps
+                             embeddings   ngram_embeddings         s0.encoder   s1.pad_dimension    s1.main_network         s0.decoder  s0.routing_module     s0.chunk_vocab   s0.residual_proj            lm_head
+byte_ce                        3.59e-02           3.51e-02           9.95e-01           1.89e-03           1.73e-01           3.53e-01           3.27e-01           7.45e-03           2.76e-01           1.20e+00
+ratio/s0                       6.33e-05           2.62e-05           1.74e-03           0 (none)           0 (none)           0 (none)           6.24e-04           0 (none)           0 (none)           0 (none)
+next_chunk_ce/s0               1.97e-04           2.01e-04           5.90e-03           2.98e-05           3.28e-03           0 (none)           0 (none)           1.37e-01           0 (none)           0 (none)
+router_surprise/s0             5.86e-02           3.62e-02           1.71e+00           0 (none)           0 (none)           0 (none)           5.63e-01           0 (none)           0 (none)           0 (none)
+
+== mechanism metrics
+  F/s0=0.167  G/s0=0.476  boundary_frac/s0=0.167  compression/s0=5.97  dechunk_rms/s0=1.46  p_margin/s0=0.095  p_mid/s0=0.788  residual_rms/s0=0.0764  score_std/s0=1.89  tau/s0=0.528
+
+== warnings
+  - next_chunk_ce/s0: sends the router no gradient (dc.chunk_ste=false; the STE sits after dechunking)
+  - p_mid/s0 = 0.79: most boundary decisions undecided (p in 0.4-0.6)
