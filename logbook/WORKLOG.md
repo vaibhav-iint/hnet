@@ -377,3 +377,20 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
 - VM c's runs (paper_r42, paper_nosmooth, same micro_batch 16) are healthy at step 170+. WS-H's 177-step run with
   the same kernels used micro_batch 64.
 - Repro: `scripts/debug/repro_ssd_crash.sh` runs five cases one at a time with `CUDA_LAUNCH_BLOCKING=1`.
+
+### Root cause of the EXP-002 crashes: flex attention mask builder, not mamba_ssm (commit after 88237a3)
+- Repro on debug VM `hnet-ssddbg2`, five cases run one at a time with `CUDA_LAUNCH_BLOCKING=1`:
+  `paper_mb16_s1` aborted (rc 134); the other four passed, including `paper_mb16_s0`, which had crashed on VM b.
+  The crash is intermittent.
+- With synchronous launches the faulting kernel is the inductor-compiled `create_block_mask` (`_compile=True`,
+  deprecated) at `attn.py:98`, in the main network's attention. The mamba_ssm backward frame in the VM b logs was
+  only where the asynchronous error surfaced.
+- Inner-stage lengths change every step and are almost never a multiple of 128. During the transient early router
+  collapse (stage 1 reaching up to ~300 bytes/position) they are very short, about one position per document.
+- VM c then hit the same crash in paper_nolrmult_s1 and paper_nosmooth_s1, so it isn't specific to one VM or variant.
+- Fix: `attn.packed_block_mask`. It builds the mask eagerly and clamps the `mask_mod` indices to T−1, using a tensor
+  bound so flex does not recompile when T changes. It is used by attn, NSA, DSA and MoBA.
+- Regression test: flex vs SDPA on ragged packed lengths (`tests/test_flex_mask.py`). Full suite: 584 passed.
+- Verification on GPU: `hnet-ssddbg3` runs paper s0–s3 and end_linear s0–s1.
+- Also found: every healthy H-Net run shows the transient early collapse (it recovers to target by ~10M bytes). To
+  look at after EXP-002: ratio-loss warmup or a lower stage-0 LR multiplier during warmup.
