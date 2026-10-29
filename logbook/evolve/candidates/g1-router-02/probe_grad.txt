@@ -1,0 +1,22 @@
+# Where does the byte CE's gradient reach the router, with and without exploration? (step 0, CPU)
+# tiny_hnet1_2m + end_mlp + rank decisions + chunk vocabulary + n-gram tables, 2 x 1024 bytes of English
+# (mix_v1 val-en, binary header skipped), progress 0. Scripts: probe_explore_grad.py / probe_explore_dir.py
+# (session scratchpad; the logic is a few lines: autograd of out.loss w.r.t. the router params and the router score s).
+
+router-parameter grad norm of the byte CE (3 noise seeds):
+  explore=0.0  ste=True : 0.109 0.109 0.109     ste=False: 0.110 0.110 0.110   <- the STE adds ~nothing: the router's
+  explore=0.5  ste=True : 0.054 0.070 0.077     ste=False: 0.047 0.059 0.070      byte-CE signal is the EMA path
+
+descent direction on the router score s (dL/ds):
+  explore=0.0: |dL/ds| 1.63e-3; mean |descent| on selected positions 7.2e-6 vs unselected 1.4e-6 (5x per position);
+               top-6 |dL/ds| positions all selected, z - z_tau in [0, 0.36] (near-threshold boundaries)
+  explore=0.5: |dL/ds| 1.86e-3; top-6 include tentative boundaries selected by the noise (z - z_tau = -0.10..-0.11)
+
+Reading: at init the router learns almost only through the EMA dechunker's credit at SELECTED positions (the premise
+of g1-router-02); exploration moves that credit onto positions the deterministic top-k would never evaluate, at a
+comparable total gradient.
+
+Caveat found on the way: hnet.analysis.grad_audit --text reads the file from byte 0, and the mix_v1 *.bytes.bin val
+files start with a 1024-byte binary header (zeros). Audits fed that file directly have one degenerate all-zero window
+(it gets a single chunk under batch-rank decisions, and that chunk's EMA credit dominates the router gradient). The
+audits in this directory use the header-stripped text.

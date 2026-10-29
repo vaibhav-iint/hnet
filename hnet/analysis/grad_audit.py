@@ -117,20 +117,23 @@ def grad_table(model, terms: Dict[str, torch.Tensor], groups: Dict[str, List[tor
 
 def mechanism_metrics(out) -> Dict[str, float]:
     keep = ("compression/", "p_mid/", "p_margin/", "dechunk_rms/", "residual_rms/", "score_std/", "tau/", "F/", "G/",
-            "residual_gate/", "trie/", "suffix_gate")
+            "residual_gate/", "trie/", "suffix_gate", "explore_")
     m = {k: float(v) for k, v in out.stats.items() if k.startswith(keep)}
     for s, r in enumerate(out.bpred):
         m[f"boundary_frac/s{s}"] = float(r.boundary_mask.float().mean())
     return m
 
 
-def audit(cfg: HNetConfig, ids: torch.Tensor, steps: int = 0, lr: float = 1e-2, seed: int = 0):
+def audit(cfg: HNetConfig, ids: torch.Tensor, steps: int = 0, lr: float = 1e-2, seed: int = 0,
+          progress: Optional[float] = None):
     """Build + init the model, run forward/backward on ``ids`` [B, T] and return (grad table, mechanism metrics).
     With ``steps`` > 0 first takes that many plain SGD steps on the total loss (the step-10/50/200 views)."""
     torch.manual_seed(seed)
     model = build_model(cfg)
     model.init_weights()
     model.train()
+    if progress is not None:  # training progress seen by curricula / annealed options (default: the model's 1.0)
+        model.set_progress(progress)
     if steps > 0:
         opt = torch.optim.SGD(model.parameters(), lr=lr)
         for _ in range(steps):
@@ -209,13 +212,14 @@ def main(argv=None):
     ap.add_argument("--length", type=int, default=512)
     ap.add_argument("--steps", type=int, nargs="*", default=[0], help="audit after these many SGD steps (default 0)")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--progress", type=float, default=None, help="training progress in [0, 1] for curricula")
     ap.add_argument("--json", default=None, help="write all tables here")
     args = ap.parse_args(argv)
     cfg = _load_cfg(args.config, args.set)
     ids = _ids(args.text, args.batch, args.length, args.seed)
     report = {}
     for n in args.steps:
-        table, metrics, groups = audit(cfg, ids, steps=n, seed=args.seed)
+        table, metrics, groups = audit(cfg, ids, steps=n, seed=args.seed, progress=args.progress)
         print(f"\n== gradient norms by (objective, parameter group) after {n} steps")
         print(format_table(table, groups))
         print("\n== mechanism metrics")

@@ -14,6 +14,18 @@ midway between the k-th and (k+1)-th largest z: 0.5 exactly at the decision boun
 and z_tau serve eval, like BatchNorm statistics. Under this rule the ratio loss is an exact constant (F = 1/N),
 i.e. inert, and the router only has to learn the relative order of positions.
 
+Exploration (``explore`` > 0, training only; off by default): the k selected positions are drawn by Gumbel-top-k,
+i.e. the top k of ``z + tau * g`` with g ~ Gumbel(0, 1) i.i.d., instead of the top k of z. Compression stays exact
+(k positions), the confidence p' and every running statistic are computed from the clean scores as before, so a
+position selected only because of the noise has p' < 0.5: a *tentative* boundary that the EMA dechunker weights by
+p' < 0.5 and whose confidence the STE / EMA credit pushes up (useful) or down (useless). The noise scale is in
+standardized units and anneals linearly, tau = explore * max(0, 1 - progress / explore_frac) (explore_frac = 0:
+constant). Because z is standardized, the noise only reorders positions near the threshold: an undecided router
+explores, a decided (bimodal) one is left alone. Why: the only counterfactual credit the router gets is the EMA's
+"fresh chunk vs stale chunk" gradient, and it exists only at selected positions; with deterministic rank decisions a
+router that fell into the suffix basin never tries a boundary after the space and can never learn that it would be
+worth more (the hierarchy's gain is 6x larger at word starts in the word basin).
+
 Why normalize (EXP-014): with the threshold on p and the batch quantile detached, nothing anchors the scale of the
 router's logits. The STE confidence gradient pushes selected logits up and unselected ones down forever, so in ~70
 steps at lr 1.5e-3 the end_mlp router's logits exceed 17 and p saturates at exactly 1.0 in fp32 for more than 1/N
@@ -40,7 +52,8 @@ class QuantileDecider(nn.Module):
     scale (the EXP-014 behaviour, apart from the rank selection), for ablation."""
 
     def __init__(self, target_ratio: float, momentum: float = 0.99, temp: float = 2.0, normalize: bool = True,
-                 robust: bool = True, z_clip: float = 4.0, trim: float = 0.01):
+                 robust: bool = True, z_clip: float = 4.0, trim: float = 0.01, explore: float = 0.0,
+                 explore_frac: float = 0.3):
         super().__init__()
         assert target_ratio > 1, target_ratio
         self.ratio = float(target_ratio)
@@ -50,6 +63,8 @@ class QuantileDecider(nn.Module):
         self.robust = bool(robust)  # trimmed mean / std (EXP-018: heavy-tailed scores; EXP-021: MAD collapses)
         self.trim = float(trim)  # fraction trimmed at each end before the mean / std
         self.z_clip = float(z_clip)
+        self.explore = float(explore)  # Gumbel-top-k noise scale (standardized units) at the start of training
+        self.explore_frac = float(explore_frac)  # anneals linearly to 0 at this fraction of training (0 = constant)
         self.register_buffer("mu", torch.tensor(0.0))
         self.register_buffer("sigma", torch.tensor(1.0))
         self.register_buffer("z_tau", torch.tensor(0.0))
@@ -66,7 +81,15 @@ class QuantileDecider(nn.Module):
         else:
             buf.copy_(value)
 
-    def forward(self, r: RouterOutput, ctx: SeqCtx) -> RouterOutput:
+    def explore_tau(self, progress: float) -> float:
+        """Gumbel noise scale at training progress ``progress`` in [0, 1]."""
+        if self.explore <= 0:
+            return 0.0
+        if self.explore_frac <= 0:
+            return self.explore
+        return self.explore * max(0.0, 1.0 - float(progress) / self.explore_frac)
+
+    def forward(self, r: RouterOutput, ctx: SeqCtx, progress: float = 1.0) -> RouterOutput:
         s = (r.logit if r.logit is not None else torch.logit(r.p.clamp(EPS, 1 - EPS))).float()
         free = ctx.position_ids != 0  # the first position of every segment is forced selected (as in router_output)
         n_free = int(free.sum())
@@ -95,7 +118,16 @@ class QuantileDecider(nn.Module):
                 top = torch.topk(zf, k + 1)  # ties broken by rank, not by a comparison with the threshold
                 z_tau = 0.5 * (top.values[k - 1] + top.values[k])
                 mask = torch.zeros_like(free)
-                mask[torch.nonzero(free).squeeze(1)[top.indices[:k]]] = True
+                tau_x = self.explore_tau(progress)
+                if tau_x > 0:  # Gumbel-top-k: sample k positions without replacement, ~ softmax(z / tau)
+                    u = torch.rand_like(zf).clamp_(1e-6, 1 - 1e-6)
+                    chosen = torch.topk(zf - tau_x * torch.log(-torch.log(u)), k).indices
+                    clean = torch.zeros_like(zf, dtype=torch.bool)
+                    clean[top.indices[:k]] = True
+                    swapped = 1.0 - clean[chosen].float().mean()  # share of the k boundaries moved by the noise
+                else:
+                    chosen = top.indices[:k]
+                mask[torch.nonzero(free).squeeze(1)[chosen]] = True
                 self._update(self.mu, mu.detach())
                 self._update(self.sigma, sigma.detach())
                 self._update(self.z_tau, z_tau)
@@ -114,4 +146,7 @@ class QuantileDecider(nn.Module):
             out.extra["tau"] = torch.sigmoid(self.tau).float()  # threshold in p space, for the logs
             out.extra["score_mu"] = self.mu.clone()
             out.extra["score_std"] = self.sigma.clone()  # raw-score scale: the drift diagnostic
+            if self.training and self.explore > 0 and n_free >= 2:
+                out.extra["explore_tau"] = s.new_tensor(tau_x)
+                out.extra["explore_swap"] = swapped if tau_x > 0 else s.new_zeros(())
         return out

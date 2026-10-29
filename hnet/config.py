@@ -70,6 +70,9 @@ class DCConfig:
     router_kwargs: Any = field(default_factory=dict)
     decision: Any = "threshold"  # "threshold" (p > 0.5, paper) or "quantile" (top 1/N by rank; see routing/decide.py)
     decision_kwargs: Any = None  # QuantileDecider options: {temp: 2.0, normalize: true, momentum: 0.99}
+    #   explore: 0.0 (off), explore_frac: 0.3 -> annealed Gumbel-top-k exploration of the rank decisions in training
+    #   (noise scale `explore` in standardized score units, linearly to 0 at explore_frac of training; exact
+    #   compression; see routing/decide.py)
     # chunk_vocab: a hashed vocabulary for the learned chunks (model/chunk_vocab.py), dict or per-stage list:
     #   {buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 4096}; null = off. Needs "end" routers.
     #   Optional suffix keys: suffix_lens: [2, 3, ...] (each <= max_len), suffix_gate_init: 0.0 -- the chunk vector also
