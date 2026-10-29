@@ -22,6 +22,14 @@ bytes, FLOPs/byte, optimizer, schedule, eval for every run) and refuses to start
 
 from __future__ import annotations
 
+import sys as _sys
+from pathlib import Path as _Path
+
+REPO_ROOT = _Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in _sys.path:  # allow `python scripts/...` from anywhere without PYTHONPATH
+    _sys.path.insert(0, str(REPO_ROOT))
+
+
 import argparse
 import json
 import os
@@ -84,8 +92,14 @@ def run_diag(out_dir: str, texts) -> dict:
 
 
 def gcs_sync(local: str, remote: str):
-    subprocess.run(["gcloud", "storage", "rsync", "-r", local, remote], check=False,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    """Mirror a directory to GCS; a failed upload is an error (results must not silently stay local)."""
+    r = subprocess.run(["gcloud", "storage", "rsync", "-r", local, remote], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise RuntimeError(f"gcloud storage rsync {local} -> {remote} failed:\n{r.stderr[-2000:]}")
+
+
+def log_tail(path: Path, n: int = 40) -> str:
+    return "\n".join(path.read_text(errors="replace").splitlines()[-n:]) if path.exists() else "(no log)"
 
 
 def main(argv=None):
@@ -112,11 +126,16 @@ def main(argv=None):
     def save_status():
         status_path.write_text(json.dumps(status, indent=1))
 
+    failed = []  # first failure stops new runs from starting; running ones finish
+
     def run(job):
         nonlocal texts
         done = Path(job["out"]) / "done.json"
         if done.exists():
             status[job["name"]] = "done"
+            return
+        if failed:
+            status[job["name"]] = "skipped (earlier failure)"
             return
         cmd = [sys.executable, "-m", "hnet.train.train", "--config", job["config"]]
         for s in job["sets"]:
@@ -128,34 +147,40 @@ def main(argv=None):
         save_status()
         t0 = time.time()
         Path(job["out"]).mkdir(parents=True, exist_ok=True)
-        with open(Path(job["out"]) / "stdout.log", "a") as log:
+        log_path = Path(job["out"]) / "stdout.log"
+        with open(log_path, "a") as log:
             rc = subprocess.call(cmd, stdout=log, stderr=subprocess.STDOUT, cwd=ROOT)
+        if rc != 0:
+            status[job["name"]] = f"failed rc={rc}"
+            failed.append(job["name"])
+            save_status()
+            print(f"[sweep] FAILED {job['name']} rc={rc}; last lines of {log_path}:\n{log_tail(log_path)}", flush=True)
+            if a.gcs:
+                gcs_sync(job["out"], f"{a.gcs.rstrip('/')}/{Path(job['out']).name}")
+            return
+        if texts is None:
+            texts = diag_texts()
+        diag = run_diag(job["out"], texts)
+        if diag:
+            (Path(job["out"]) / "diag.json").write_text(json.dumps(diag, indent=1))
         result = {"rc": rc, "seconds": round(time.time() - t0, 1)}
-        if rc == 0:
-            try:
-                if texts is None:
-                    texts = diag_texts()
-                diag = run_diag(job["out"], texts)
-                if diag:
-                    (Path(job["out"]) / "diag.json").write_text(json.dumps(diag, indent=1))
-            except Exception as e:  # diagnostics must never lose a finished run
-                result["diag_error"] = repr(e)
-            done.write_text(json.dumps(result))
-        status[job["name"]] = "done" if rc == 0 else f"failed rc={rc}"
+        done.write_text(json.dumps(result))
+        status[job["name"]] = "done"
         save_status()
         print("[sweep] end", job["name"], result, flush=True)
         if a.gcs:
             gcs_sync(job["out"], f"{a.gcs.rstrip('/')}/{Path(job['out']).name}")
 
     with ThreadPoolExecutor(max_workers=a.parallel) as ex:
-        list(ex.map(run, jobs))
+        list(ex.map(run, jobs))  # re-raises the first exception from any worker
     save_status()
     if a.gcs:
-        subprocess.run(["gcloud", "storage", "cp", str(status_path), f"{a.gcs.rstrip('/')}/sweep_status.json"],
-                       check=False)
-    failed = [k for k, v in status.items() if v.startswith("failed")]
+        gcs_sync(str(Path(spec["out_root"])), a.gcs.rstrip("/"))
     print("[sweep] finished:", json.dumps(status), flush=True)
-    return 1 if failed else 0
+    if failed:
+        print(f"[sweep] FAILED runs: {failed}", flush=True)
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

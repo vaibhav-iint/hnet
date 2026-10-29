@@ -22,7 +22,6 @@ import json
 import math
 import os
 import signal
-import sys
 import time
 from typing import Optional
 
@@ -219,11 +218,9 @@ class Trainer:
             self.loader.load_state_dict(self.loader_state)
         self.val_batches = None
         if self.ec.get("val") and self.ec["val"] != "none":
-            try:
-                self.val_batches = build_val_batches(dc, self.ec, self.kind, seed)
-            except Exception as e:
-                if self.is_main:
-                    print(f"[train] val set unavailable: {e!r}", file=sys.stderr)
+            self.val_batches = build_val_batches(dc, self.ec, self.kind, seed)
+            if self.val_batches is None:
+                raise RuntimeError(f"eval.val={self.ec['val']!r} is configured but no val batches could be built")
 
         # ---- metrics
         self.flops = FlopsEstimator(self.mcfg, self.raw, self.seq_len, self.kind)
@@ -335,20 +332,14 @@ class Trainer:
         ds = self.ec.get("downstream")
         if not ds:
             return {}
-        try:  # lazy, optional
-            from hnet.eval.harness import evaluate_suite
-            from hnet.eval.scorers import make_scorer
-        except ImportError as e:
-            print(f"[train] downstream eval unavailable: {e!r}", file=sys.stderr)
-            return {}
+        from hnet.eval.harness import evaluate_suite
+        from hnet.eval.scorers import make_scorer
+
         was_training = self.raw.training
         try:
             scorer = make_scorer(self.raw, "byte" if self.kind == "bytes" else "token", device=self.device)
             summary, _ = evaluate_suite(scorer, ds.get("suite", "paper7"), tasks=ds.get("tasks"),
                                         limit=ds.get("limit"), n_boot=int(ds.get("n_boot", 200)))
-        except Exception as e:  # never kill a training run over eval
-            print(f"[train] downstream eval failed: {e!r}", file=sys.stderr)
-            return {}
         finally:
             self.raw.train(was_training)
         flat = {}

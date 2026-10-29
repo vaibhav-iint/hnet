@@ -17,6 +17,14 @@ Exit code 1 if any held-equal field differs. Writes <out_root>/fairness.md.
 
 from __future__ import annotations
 
+import sys as _sys
+from pathlib import Path as _Path
+
+REPO_ROOT = _Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in _sys.path:  # allow `python scripts/...` from anywhere without PYTHONPATH
+    _sys.path.insert(0, str(REPO_ROOT))
+
+
 import argparse
 import json
 import sys

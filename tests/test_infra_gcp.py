@@ -696,7 +696,10 @@ def test_gcs_data_cache_roundtrip(tmp_path, monkeypatch):
               "bytes/finewebedu_train_000001.bytes.bin", "bytes/finewebedu_train_000002.bytes.bin",
               "bytes/convert_report.json"):
         (d / n).write_bytes(n.encode())
+    (d / ".cache" / "huggingface").mkdir(parents=True)
+    (d / ".cache" / "huggingface" / "x.metadata").write_text("junk")
     assert ag.gcs.upload_data("finewebedu10B", str(root)) == 6
+    assert not any(".cache" in k for k in bk.obj)
     assert ag.gcs.upload_data("finewebedu10B", str(root)) == 0  # already cached
     assert "gs://b/data/finewebedu10B/bytes/finewebedu_train_000002.bytes.bin" in bk.obj
     # a fresh VM needing 1 train shard copies val + shard 1 + reports, not shard 2

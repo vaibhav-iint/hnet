@@ -166,9 +166,10 @@ def create_with_fallback(spec: CreateSpec, zones: list[str], log=print) -> Creat
 
 def _short(stderr: str) -> str:
     lines = [ln.strip() for ln in (stderr or "").splitlines() if ln.strip()]
-    for ln in lines:
-        if ln.startswith("- ") or "ERROR" in ln:
-            return ln[:300]
+    for pick in (lambda ln: ln.startswith("- ") or ln.startswith("message:"), lambda ln: "ERROR" in ln):
+        for ln in lines:
+            if pick(ln):
+                return ln[:300]
     return (lines[-1] if lines else "")[:300]
 
 

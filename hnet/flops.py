@@ -201,17 +201,14 @@ _ROUTER_CACHE: dict = {}
 def _router_from_registry(name, d, kwargs, target_ratio):
     key = (name, d, repr(sorted((kwargs or {}).items())), target_ratio)
     if key not in _ROUTER_CACHE:
-        try:
-            import torch
+        import torch
 
-            import hnet.model  # noqa: F401  (registers the built-in routers)
-            from hnet.registry import build
+        import hnet.model  # noqa: F401  (registers the built-in routers)
+        from hnet.registry import build
 
-            with torch.device("meta"):
-                r = build("router", name, d, target_ratio=target_ratio, **(kwargs or {}))
-            _ROUTER_CACHE[key] = sum(x.numel() for x in r.parameters())
-        except Exception:  # hnet.model not available (or router not registered): use the table
-            _ROUTER_CACHE[key] = None
+        with torch.device("meta"):
+            r = build("router", name, d, target_ratio=target_ratio, **(kwargs or {}))
+        _ROUTER_CACHE[key] = sum(x.numel() for x in r.parameters())
     return _ROUTER_CACHE[key]
 
 

@@ -72,11 +72,6 @@ def _ensure_builtins_imported():
     _IMPORTED = True
     import importlib
 
-    # Packages register their built-ins on import; optional modules are owned by separate
-    # workstreams and may not exist yet.
+    # Packages register their built-ins on import.
     for mod in ("hnet.model", "hnet.model.dense_modded", "hnet.optim", "hnet.optim.muon"):
-        try:
-            importlib.import_module(mod)
-        except ModuleNotFoundError as e:  # package not written yet during development
-            if e.name not in (mod, *mod.split(".")):
-                raise
+        importlib.import_module(mod)

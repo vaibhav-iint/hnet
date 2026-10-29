@@ -10,6 +10,13 @@ Checks, each recomputed independently of the code under test:
     python scripts/audit/audit_loss.py
 """
 
+import sys as _sys
+from pathlib import Path as _Path
+
+REPO_ROOT = _Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in _sys.path:  # allow `python scripts/...` from anywhere without PYTHONPATH
+    _sys.path.insert(0, str(REPO_ROOT))
+
 import math
 
 import numpy as np

@@ -116,17 +116,15 @@ def first_token(dataset: str, fname: str, root=None) -> int | None:
     if path.exists() and _shard_ok(path):
         t = S.read_token_shard(path)
         return int(t[0]) if len(t) else None
-    try:
-        import requests
-        from huggingface_hub import hf_hub_url
+    import requests
+    from huggingface_hub import hf_hub_url
 
-        url = hf_hub_url(DATASETS[dataset][0], fname, repo_type="dataset")
-        r = requests.get(url, headers={"Range": f"bytes={S.HEADER_BYTES}-{S.HEADER_BYTES + 1}"}, timeout=30)
-        if r.status_code in (200, 206) and len(r.content) >= 2:
-            return int(np.frombuffer(r.content[:2], dtype=np.uint16)[0])
-    except Exception:
-        pass
-    return None
+    url = hf_hub_url(DATASETS[dataset][0], fname, repo_type="dataset")
+    r = requests.get(url, headers={"Range": f"bytes={S.HEADER_BYTES}-{S.HEADER_BYTES + 1}"}, timeout=30)
+    r.raise_for_status()
+    if len(r.content) < 2:
+        raise RuntimeError(f"range request for the first token of {fname} returned {len(r.content)} bytes")
+    return int(np.frombuffer(r.content[:2], dtype=np.uint16)[0])
 
 
 # ---------------------------------------------------------------- conversion

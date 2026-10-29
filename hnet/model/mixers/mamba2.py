@@ -34,11 +34,16 @@ from hnet.model.mixers.conv import _causal_conv1d_fn, causal_conv1d
 from hnet.model.ssd import ssd_chunk_scan, use_kernel
 from hnet.registry import register
 
-try:  # optional fast paths
+try:  # optional fast paths; only a missing package falls back, a broken install raises
     from mamba_ssm.ops.triton.layernorm_gated import rmsnorm_fn as _rmsnorm_gated_fn
     from mamba_ssm.ops.triton.ssd_combined import mamba_split_conv1d_scan_combined as _split_conv1d_scan
-except Exception:
+except ModuleNotFoundError as e:
+    if e.name != "mamba_ssm":
+        raise
     _rmsnorm_gated_fn = _split_conv1d_scan = None
+else:  # Triton/CUDA kernels are opaque to torch.compile: run them eagerly inside compiled graphs
+    _rmsnorm_gated_fn = torch.compiler.disable(_rmsnorm_gated_fn)
+    _split_conv1d_scan = torch.compiler.disable(_split_conv1d_scan)
 
 __all__ = ["Mamba2", "RMSNormGated"]
 

@@ -18,10 +18,14 @@ import torch.nn.functional as F
 
 from hnet.model.ssd import use_kernel
 
-try:  # optional fast path
+try:  # optional fast path; only a missing package falls back, a broken install raises
     from causal_conv1d import causal_conv1d_fn as _causal_conv1d_fn
-except Exception:
+except ModuleNotFoundError as e:
+    if e.name != "causal_conv1d":
+        raise
     _causal_conv1d_fn = None
+else:  # CUDA kernel is opaque to torch.compile: run it eagerly inside compiled graphs
+    _causal_conv1d_fn = torch.compiler.disable(_causal_conv1d_fn)
 
 __all__ = ["causal_conv1d", "causal_conv1d_torch"]
 

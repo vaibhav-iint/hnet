@@ -254,14 +254,9 @@ def _builtin_corpus(data_cfg: dict, split: str, seed: int) -> Corpus:
 
 
 def _hnet_data():
-    try:
-        import hnet.data as hd  # WS-C
+    import hnet.data as hd
 
-        return hd
-    except ModuleNotFoundError as e:
-        if e.name in ("hnet.data",):
-            return None
-        raise
+    return hd
 
 
 def build_train_loader(data_cfg: dict, kind: str, grad_accum: int, rank: int, world_size: int, seed: int):
@@ -339,12 +334,7 @@ def default_bytes_per_token(data_cfg: dict, model_cfg) -> float:
     if data_cfg.get("bytes_per_token"):
         return float(data_cfg["bytes_per_token"])
     if data_cfg.get("source") not in ("synthetic", "text"):
-        hd = _hnet_data()
-        if hd is not None:
-            try:
-                return float(hd.bytes_per_token(data_cfg.get("dataset", "finewebedu10B")))
-            except Exception:
-                pass
+        return float(_hnet_data().bytes_per_token(data_cfg.get("dataset", "finewebedu10B")))
     return float(getattr(model_cfg, "lr_multiplier_n_gpt", None) or 4.6)
 
 

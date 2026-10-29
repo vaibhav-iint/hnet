@@ -421,7 +421,8 @@ class Gcs:
         todo: dict[str, list[str]] = {}
         for u, size in objs.items():
             rel = u[len(base):]
-            if not rel or rel.endswith("/") or not wanted_data_object(rel, n_train):
+            if (not rel or rel.endswith("/") or any(x.startswith(".") for x in rel.split("/"))
+                    or not wanted_data_object(rel, n_train)):
                 continue
             dst = os.path.join(root, ds, rel)
             if os.path.exists(dst) and os.path.getsize(dst) == size:
@@ -440,7 +441,8 @@ class Gcs:
         have = {u[len(base):]: s for u, s in self.ls_sizes(base).items()}
         local = os.path.join(root, ds)
         n = 0
-        for dp, _, files in os.walk(local):
+        for dp, dirs, files in os.walk(local):
+            dirs[:] = [d for d in dirs if not d.startswith(".")]  # e.g. .cache/huggingface download metadata
             for fn in files:
                 if fn.startswith(".") or fn.endswith((".tmp", ".part", ".lock")):
                     continue

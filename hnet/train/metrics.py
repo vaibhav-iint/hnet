@@ -20,7 +20,6 @@ from __future__ import annotations
 import json
 import math
 import os
-import sys
 import time
 from typing import Dict, List, Optional
 
@@ -141,12 +140,9 @@ class FlopsEstimator:
         from hnet.config import DenseConfig, HNetConfig
 
         if isinstance(model_cfg, (HNetConfig, DenseConfig)):
-            try:
-                from hnet.flops import model_flops  # WS-B
+            from hnet.flops import model_flops
 
-                self._mf = model_flops
-            except ImportError:
-                pass
+            self._mf = model_flops
         from hnet.optim.groups import classify_params
 
         self._stage_params = {}
@@ -172,13 +168,8 @@ class FlopsEstimator:
 
     def _compute(self, bpp, bpt):
         if self._mf is not None:
-            try:
-                r = self._mf(self.cfg, bytes_per_position=bpp, seq_len=self.seq_len, bytes_per_token=bpt,
-                             training=True)
-                return float(r["flops_per_byte"])
-            except Exception as e:  # never let FLOPs accounting kill a run
-                print(f"[metrics] hnet.flops.model_flops failed: {e!r}", file=sys.stderr)
-                self._mf = None
+            r = self._mf(self.cfg, bytes_per_position=bpp, seq_len=self.seq_len, bytes_per_token=bpt, training=True)
+            return float(r["flops_per_byte"])
         if bpt is not None:
             return 6.0 * sum(self._stage_params.values()) / bpt
         return sum(6.0 * n / bpp[min(s, len(bpp) - 1)] for s, n in self._stage_params.items())
@@ -200,14 +191,10 @@ class MetricsLogger:
         mode = "a" if resume else "w"
         self.f = open(os.path.join(out_dir, "metrics.jsonl"), mode)
         self.fe = open(os.path.join(out_dir, "eval.jsonl"), mode)
-        if wandb_project and os.environ.get("WANDB_API_KEY"):
-            try:
-                import wandb
+        if wandb_project and os.environ.get("WANDB_API_KEY"):  # opted in: a failing wandb is an error
+            import wandb
 
-                self.wandb = wandb.init(project=wandb_project, name=run_name, config=config, resume="allow",
-                                        dir=out_dir)
-            except Exception as e:
-                print(f"[metrics] wandb disabled: {e!r}", file=sys.stderr)
+            self.wandb = wandb.init(project=wandb_project, name=run_name, config=config, resume="allow", dir=out_dir)
 
     def log(self, rec: dict, kind: str = "train"):
         if not self.enabled:

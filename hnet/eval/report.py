@@ -39,10 +39,7 @@ def read_jsonl(path: str) -> List[dict]:
         for line in f:
             line = line.strip()
             if line:
-                try:
-                    out.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
+                out.append(json.loads(line))
     return out
 
 

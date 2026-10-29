@@ -28,10 +28,14 @@ from typing import Optional, Tuple
 import torch
 import torch.nn.functional as F
 
-try:  # optional fast path
+try:  # optional fast path; only a missing package falls back, a broken install raises
     from mamba_ssm.ops.triton.ssd_combined import mamba_chunk_scan_combined as _mamba_chunk_scan_combined
-except Exception:  # ImportError, or a broken triton/CUDA install
+except ModuleNotFoundError as e:
+    if e.name != "mamba_ssm":
+        raise
     _mamba_chunk_scan_combined = None
+else:  # Triton kernel is opaque to torch.compile: run it eagerly inside compiled graphs
+    _mamba_chunk_scan_combined = torch.compiler.disable(_mamba_chunk_scan_combined)
 
 # Read once so the dispatch is a static Python branch (torch.compile friendly). Tests may override it.
 FORCE_TORCH = os.environ.get("HNET_FORCE_TORCH", "0") == "1"

@@ -35,9 +35,11 @@ from hnet.registry import register
 from ..ctx import SeqCtx
 from ..rotary import apply_rotary, rotary_cos_sin
 
-try:  # optional fast path
+try:  # optional fast path; only a missing package falls back, a broken install raises
     from flash_attn import flash_attn_varlen_func as _flash_varlen
-except Exception:  # ImportError or broken CUDA install
+except ModuleNotFoundError as e:
+    if e.name != "flash_attn":
+        raise
     _flash_varlen = None
 
 try:

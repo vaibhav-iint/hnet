@@ -14,6 +14,13 @@ harness records. Output: logbook/audits/eval_examples.md
     PYTHONPATH=. python scripts/audit/audit_eval.py
 """
 
+import sys as _sys
+from pathlib import Path as _Path
+
+REPO_ROOT = _Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in _sys.path:  # allow `python scripts/...` from anywhere without PYTHONPATH
+    _sys.path.insert(0, str(REPO_ROOT))
+
 import math
 from pathlib import Path
 
@@ -31,7 +38,7 @@ torch.manual_seed(0)
 LN2 = math.log(2)
 OUT = Path("logbook/audits/eval_examples.md")
 TASKS = {"paper7": ["hellaswag", "arc_easy", "arc_challenge", "piqa", "winogrande", "openbookqa", "lambada_openai"],
-         "smollm3_cf": ["hellaswag", "arc", "piqa", "winogrande", "commonsenseqa", "mmlu", "boolq"]}
+         "smollm3_cf": ["hellaswag", "arc_easy", "piqa", "winogrande", "commonsenseqa", "mmlu", "boolq"]}
 lines, fails = [], []
 
 
@@ -98,12 +105,16 @@ for suite, names in TASKS.items():
                            "acc_norm_char": int(np.argmax(np.array(manual) / np.maximum(nc, 1))),
                            "acc_norm_byte": int(np.argmax(np.array(manual) / np.maximum(nb, 1)))}
                     for m, p in exp.items():
-                        check(rec["pred"][m] == p, f"{suite}/{name}/{scorer_name} doc {it.doc_id}: {m} pred mismatch")
+                        score = {"acc": np.array(manual), "acc_norm_char": np.array(manual) / np.maximum(nc, 1),
+                                 "acc_norm_byte": np.array(manual) / np.maximum(nb, 1)}[m]
+                        tie = abs(score[rec["pred"][m]] - score[p]) < 1e-4  # argmax among numerically tied choices
+                        check(rec["pred"][m] == p or tie, f"{suite}/{name}/{scorer_name} doc {it.doc_id}: {m} pred mismatch "
+                              f"(harness lp {np.round(lp_h, 4).tolist()} vs manual {np.round(manual, 4).tolist()})")
                     g = it.gold[0]
                     check(abs(rec["gold_nll_bits"] - (-manual[g] / LN2)) < 3e-3 and rec["gold_bytes"] == nb[g],
                           f"{suite}/{name}/{scorer_name} doc {it.doc_id}: soft bpb inputs mismatch")
                 if scorer_name == "gpt2":  # print strings once
-                    lines.append(f"**doc {it.doc_id}**, gold = {it.gold}  \n")
+                    lines.append(f"**doc {it.doc_id}**, gold = {getattr(it, 'gold', '(single continuation)')}  \n")
                     for i, (ctx, cont) in enumerate(reqs):
                         mark = "✓" if i in getattr(it, "gold", [0]) else " "
                         nt = it.norm_texts[i] if isinstance(it, MCItem) else ""
