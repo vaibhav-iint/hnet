@@ -199,6 +199,8 @@ DEFAULTS = {
         "precision": "bf16",  # bf16 (autocast on CUDA, fp32 master weights) | fp32
         "compile": False,  # false | blocks | model
         "compile_dynamic": None,  # None = auto (True for H-Net)
+        "compile_backend": "inductor",  # torch.compile backend (aot_eager / eager: debugging graph breaks)
+        "compile_mode": None,  # torch.compile mode (None = default; e.g. max-autotune-no-cudagraphs)
         "activation_checkpointing": False,
         "max_hours": None,
         "ckpt_every": 1000,

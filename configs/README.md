@@ -88,6 +88,8 @@ Byte and token runs see the same text per step up to the ~1% gap between 256×17
 | `precision` | `bf16` | bf16 autocast on CUDA with fp32 master weights; `fp32` |
 | `compile` | false | `blocks` (each `model.blocks()` unit; dynamic shapes for H-Nets) or `model` |
 | `compile_dynamic` | auto | dynamic-shape flag for torch.compile (auto = true for H-Nets) |
+| `compile_backend` | inductor | torch.compile backend (`aot_eager` / `eager` to debug graph breaks without codegen) |
+| `compile_mode` | null | torch.compile mode (e.g. `max-autotune-no-cudagraphs`) |
 | `activation_checkpointing` | false | non-reentrant checkpointing of each `model.blocks()` unit |
 | `max_hours` | null | wall-clock guard: checkpoint and exit before exceeding it |
 | `ckpt_every` | 1000 | rolling checkpoints every N steps, keep `ckpt_keep` |

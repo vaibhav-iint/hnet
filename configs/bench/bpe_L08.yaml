@@ -1,4 +1,4 @@
-# Provisional BPE rung L08 (depth 8, D=640, head dim 128, SwiGLU ~3.6D, 32k vocab). Benchmark only.
+# Provisional BPE rung L08 (depth 8, D=640, heads = depth, head dim 128, SwiGLU ~3.6D, 32k vocab). Benchmark only.
 include: _bench_bpe.yaml
 model:
   type: dense
@@ -7,6 +7,7 @@ model:
   d_model: 640
   n_layers: 8
   d_intermediate: 2304
-  num_heads: 5
+  num_heads: 8
+  head_dim: 128
   tie_embeddings: false
 train: {out_dir: runs/bench/bpe_L08}

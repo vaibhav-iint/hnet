@@ -209,11 +209,12 @@ class Trainer:
             dyn = tc.get("compile_dynamic")
             if dyn is None:
                 dyn = True if self.is_hnet else None
+            ckw = {"dynamic": dyn, "backend": tc.get("compile_backend") or "inductor", "mode": tc.get("compile_mode")}
             if comp == "blocks" and blocks:
                 for b in blocks:
-                    b.compile(dynamic=dyn)
+                    b.compile(**ckw)
             else:
-                self.raw.compile(dynamic=dyn)
+                self.raw.compile(**ckw)
         if self.world > 1:
             from torch.nn.parallel import DistributedDataParallel as DDP
 

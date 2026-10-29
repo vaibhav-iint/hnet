@@ -1,4 +1,4 @@
-# Provisional BPE rung L04 (depth 4, D=256, head dim 128, SwiGLU ~3.6D, 32k vocab). Benchmark only.
+# Provisional BPE rung L04 (depth 4, D=256, heads = depth, head dim 128, SwiGLU ~3.6D, 32k vocab). Benchmark only.
 include: _bench_bpe.yaml
 model:
   type: dense
@@ -7,6 +7,7 @@ model:
   d_model: 256
   n_layers: 4
   d_intermediate: 896
-  num_heads: 2
+  num_heads: 4
+  head_dim: 128
   tie_embeddings: false
 train: {out_dir: runs/bench/bpe_L04}
