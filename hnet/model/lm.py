@@ -264,6 +264,13 @@ class HNetForCausalLM(nn.Module):
                 prior = F.binary_cross_entropy_with_logits(bpred[0].logit.float(), tgt)
                 out.aux_loss = out.aux_loss + dc.router_prior_weight * scale * prior
                 stats["router_prior/s0"] = prior.detach()
+        if dc.router_surprise_weight > 0 and self.training and bpred:
+            frac = dc.router_surprise_frac
+            scale = max(0.0, 1.0 - self.backbone.progress / frac) if frac > 0 else 1.0
+            if scale > 0:
+                surprise, sstats = self._router_surprise_loss(h, bpred[0], ids, ctx)
+                out.aux_loss = out.aux_loss + dc.router_surprise_weight * scale * surprise
+                stats.update(sstats)
         if dc.router_gain_weight > 0 and self.training and labels is not None and bpred:
             gain_loss, gstats = self._router_gain_loss(h, bpred[0], ctx, labels.reshape(-1))
             out.aux_loss = out.aux_loss + dc.router_gain_weight * gain_loss
@@ -326,6 +333,47 @@ class HNetForCausalLM(nn.Module):
         dev = ((lg - mean[idx]) ** 2 * valid).sum()
         total = (((lg - (lg * valid).sum() / ones.sum().clamp(min=1)) ** 2) * valid).sum()
         return dev / (total + 1e-6)
+
+    @torch.no_grad()
+    def next_byte_entropy(self, h: torch.Tensor) -> torch.Tensor:
+        """fp32 [T] entropy (nats) of the model's next-byte distribution softmax(lm_head(h_t)), in row chunks."""
+        rows = max(1, CE_CHUNK_ELEMENTS // self.lm_head.out_features)
+        out = []
+        for hs in h.detach().split(rows):
+            lg = self.lm_head(hs).float()
+            logp = torch.log_softmax(lg, dim=-1)
+            out.append(-(logp.exp() * logp).sum(-1))
+        return torch.cat(out)
+
+    def _router_surprise_loss(self, h: torch.Tensor, r: RouterOutput, ids: torch.Tensor, ctx: SeqCtx):
+        """dc.router_surprise_weight: BCE of the stage-0 router's decided confidence p toward the top 1/N positions
+        of the batch by the entropy rise dH_t = H_t - H_{t-1} of the model's own next-byte distribution (detached).
+        Rank-based target (any distribution of H), scale-free prediction (p of the rank decider depends on the
+        standardized score only). Returns (loss, detached stats)."""
+        free = ctx.position_ids.reshape(-1) != 0  # segment starts are forced boundaries (router_output)
+        n_free = int(free.sum())
+        if n_free < 2:
+            return h.new_zeros((), dtype=torch.float32), {}
+        with torch.no_grad():
+            H = self.next_byte_entropy(h)
+            dH = H - torch.cat([H[:1], H[:-1]])  # within a segment for every free position
+            k = max(1, min(n_free - 1, int(round(n_free / float(self.backbone.target_ratio)))))
+            idx = torch.nonzero(free).squeeze(1)
+            top = torch.topk(dH[idx], k).indices
+            tgt = torch.zeros_like(H)
+            tgt[idx[top]] = 1.0
+        p = r.p.float().clamp(1e-6, 1 - 1e-6)
+        loss = F.binary_cross_entropy(p[free], tgt[free])
+        with torch.no_grad():
+            sel = r.boundary_mask.reshape(-1) & free
+            ws = (ids.reshape(-1) == 0x20) | (ids.reshape(-1) == 0x0A)  # diagnostic only, never an input
+            stats = {
+                "router_surprise/s0": loss.detach(),
+                "surprise_overlap/s0": (sel & (tgt > 0)).float().sum() / max(k, 1),  # router boundaries on the teacher's
+                "surprise_ws/s0": ws[tgt > 0].float().mean(),  # teacher targets on whitespace (diagnostic)
+                "entropy_mean/s0": H.mean(),
+            }
+        return loss, stats
 
     def _router_gain_loss(self, h: torch.Tensor, r: RouterOutput, ctx: SeqCtx, labels: torch.Tensor):
         """REINFORCE on the hierarchy's measured usefulness (dc.router_gain_weight): the stage-0 decoder and the LM

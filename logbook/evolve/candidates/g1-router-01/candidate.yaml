@@ -1,0 +1,37 @@
+id: g1-router-01
+parents: [hnet]
+track: router
+hypothesis: >-
+  Self-surprise tokenizer teacher (prior-free; a decaying curriculum, labelled as such). For the first 30% of training
+  the stage-0 router's decided confidence p is also trained (BCE, weight 1 decaying linearly to 0) toward the top 1/N
+  positions of the batch ranked by the entropy RISE dH_t = H_t - H_{t-1} of the model's own next-byte distribution
+  (detached; one extra no-grad LM-head pass). Insight: under end-of-chunk semantics a chunk should close at t when
+  byte t+1 is where prediction gets hard, because that is where a fresh main-network output is worth most; this is
+  Harris' successor-variety / BLT's patching rule, but computed by the model being trained, so it needs no whitespace
+  rule and transfers to code and other scripts. It points at the word basin ("word<space>": the space is followed by
+  the hard first letter of the next word) and away from the suffix basin (cuts before the space, where the next byte
+  is an easy space). Measured facts it builds on: the hierarchy's gain is 2.4x larger per byte (6x at word starts) in
+  the word basin at step 500 while the next-chunk loss cannot tell the basins apart; the prior-free L03 router is
+  still undecided at step 300 (p_mid 0.61 vs 0.21 with the whitespace teacher), i.e. it spends the adoption race
+  without a direction; a 10% whitespace teacher already buys 0.056 bpb at L03 (hnet_ws vs hnet); the offline 5-gram
+  entropy-spike segmentation put 66% of cuts on word ends (a far weaker predictor than the model itself). The term is
+  scale-free under rank decisions (BCE on the decider's standardized confidence; unit test) and reaches only the
+  router and the encoder (grad audit), so the lazy optimizer cannot satisfy it by shrinking scores, and it cannot
+  move the teacher (the entropy is detached).
+prediction:
+  fitness: 0.12            # <= hnet_ws (+0.127) without naming whitespace; >= 0.04 better than hnet (+0.183)
+  mechanism: >-
+    p_mid/s0 at step 300 <= 0.35 (hnet 0.61); bypass_ratio at step 300 <= 4.0 (hnet 4.9) and at the end <= 6
+    (hnet 8.2); surprise_ws/s0 (teacher targets on whitespace) >= 0.5 by step 100 on mix_v1; surprise_overlap/s0
+    (router boundaries on teacher targets) >= 0.6 by step 270; both seeds within 0.03 of each other.
+  falsified_if: fitness >= hnet's (+0.18) or p_mid at step 300 >= 0.5 or surprise_ws < 0.3 at step 270
+branch: evolve/g1-router-01
+set: [model.dc.router_surprise_weight=1.0, model.dc.router_surprise_frac=0.3]
+cost: >-
+  +0.48% training FLOPs/byte (one forward LM-head pass, 2 x 192 x 256 FLOPs/byte, no backward) that hnet/flops.py does
+  not count; fairness.py passes at identical configured FLOPs. Zero parameters. Wall clock: negligible.
+checks:
+  tests: pass                # tests/test_router_surprise.py + test_model_hnet / test_invariances / test_flops
+  fairness: pass             # logbook/evolve/candidates/g1-router-01/fairness.txt
+  grad_audit: logbook/evolve/candidates/g1-router-01/grad_audit.txt
+  smoke: pass                # logbook/evolve/candidates/g1-router-01/smoke.txt

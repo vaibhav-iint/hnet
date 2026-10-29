@@ -65,6 +65,12 @@ def objective_terms(model, out, ids) -> Dict[str, torch.Tensor]:
     if dc.router_prior_weight > 0 and out.bpred and out.bpred[0].logit is not None:
         tgt = ((ids == 0x20) | (ids == 0x0A)).float()
         terms["router_prior/s0"] = torch.nn.functional.binary_cross_entropy_with_logits(out.bpred[0].logit.float(), tgt)
+    if dc.router_surprise_weight > 0 and out.bpred and getattr(model, "_audit_h", None) is not None:
+        from hnet.model.lm import pack_inputs
+
+        B = out.logits.shape[0] if out.logits is not None and out.logits.dim() == 3 else 1
+        _, ctx, _ = pack_inputs(ids.view(B, -1), None, None)  # the audit's [B, L] segments
+        terms["router_surprise/s0"] = model._router_surprise_loss(model._audit_h, out.bpred[0], ids, ctx)[0]
     if dc.router_consistency_weight > 0 and out.bpred and out.bpred[0].logit is not None:
         from hnet.model.lm import pack_inputs
 
