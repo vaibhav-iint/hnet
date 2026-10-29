@@ -1139,3 +1139,16 @@ self-surprise teacher is exactly the suggested next-byte-entropy prior); LR-tune
 `residual_proj` under Muon (g1-opt-02). Evolve consequence: with deterministic data order, prior-free candidates'
 seed outcomes are partly a function of their parameter layout's init; generation 1 compares candidates with controls at
 the same seeds and now logs `bnd_on_ws/s0` so each run's basin is visible.
+
+### 1e17 ladder L05-L07 finals (one seed; BPE's Muon LR 0.02 for all)
+| rung | BPE | H-Net | gap | H-Net ws | gap |
+|---|---|---|---|---|---|
+| L05 | 1.224 | 1.360 | +0.14 | 1.353 | +0.13 |
+| L06 | 1.246 | 1.474 | +0.23 | 1.567 | +0.32 |
+| L07 | 1.267 | 1.624 | +0.36 | 1.627 | +0.36 |
+The H-Net degrades much faster than BPE as tokens/param fall; both are best at the smallest rung run (L05). Add L03/L04
+at 1e17 before fitting multipliers (the iso-FLOP minimum is at the grid edge).
+
+Evolve generation 1, seed-1 finals so far: g1-arch-02 (offset-resolved read-back of chunk vectors) 1.798 vs the warm-start
+control 1.827 (-0.029); g1-arch-01 and g1-alloc-01 tie the control (1.826); g1-alloc-02 (8 bytes/chunk) 1.867. At 6-8
+bytes/chunk 90-98% of boundaries land on whitespace (controls at 4.15: 63-69%), so word alignment alone does not help.
