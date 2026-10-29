@@ -1,0 +1,133 @@
+# mix_v1: small-scale reproduction of the "From Tokens to Bytes" (Cartesia, part I, Figure 2) training mixture.
+# Built by scripts/data/build_mix.py (see docs/DATA_MIX.md). Shares are fractions of training *bytes* (UTF-8 text),
+# like the blog: 70% English / 20% code / 5% math / 5% multilingual. A leaf's share of the whole mix is
+# category share x weight / (sum of the category's weights). Held-out leaves are evaluation-only (never in train).
+#
+# Revisions are pinned so that the local small build and the remote full build read exactly the same documents.
+# Split rule (documents are never split; train and val are disjoint):
+#   * each document is assigned to val iff hash(seed, key) < p_val, key = the document text, or the repository
+#     name for code (whole repositories go to val, so val code files do not share a repo with train files);
+#   * held-out languages: every document is val;
+#   * train documents whose exact text equals any val-assigned document are dropped.
+name: mix_v1
+seed: 0
+tokenizer: configs/tokenizers/mix_v1_bpe32k.json
+max_doc_bytes: 1000000          # documents longer than this (UTF-8 bytes) are dropped, not truncated
+categories: {en: 0.70, code: 0.20, math: 0.05, ml: 0.05}
+
+sources:
+  fineweb_edu:
+    repo: HuggingFaceFW/fineweb-edu
+    revision: 87f09149ef4734204d70ed1d046ddc9ca3f2b8f9
+    files: [sample/10BT/*.parquet]
+    text: text
+    rg_per_unit: 4                # ~1000 docs / row group
+    p_val: 0.02
+    leaves:
+      en.fineweb_edu: {weight: 1}
+
+  github_code:
+    # Stand-in for the blog's Stack v2 (which needs Software Heritage access). Rows are shuffled across languages.
+    repo: codeparrot/github-code-clean
+    revision: c48d40f9e70f0196f8236901ee35807f7d6c44c0
+    files: [data/*.parquet]
+    text: code
+    select: language              # column whose value routes a row to a leaf; rows of other languages are skipped
+    split_key: repo_name
+    rg_per_unit: 1                # 10k files / row group
+    p_val: 0.10
+    max_units: 3000
+    leaves:
+      # weights = the blog's Figure 2 byte shares (% of the whole mix) of its 15 Stack v2 languages; Swift is not
+      # in github-code-clean, so the other 14 are renormalized to the 20% code share.
+      code.c:          {value: C,          weight: 3.29}
+      code.cpp:        {value: C++,        weight: 2.50}
+      code.javascript: {value: JavaScript, weight: 2.33}
+      code.python:     {value: Python,     weight: 2.29}
+      code.java:       {value: Java,       weight: 2.27}
+      code.php:        {value: PHP,        weight: 2.00}
+      code.csharp:     {value: C#,         weight: 1.92}
+      code.markdown:   {value: Markdown,   weight: 1.28}
+      code.typescript: {value: TypeScript, weight: 0.58}
+      code.sql:        {value: SQL,        weight: 0.40}
+      code.go:         {value: GO,         weight: 0.31}
+      code.ruby:       {value: Ruby,       weight: 0.27}
+      code.shell:      {value: Shell,      weight: 0.16}
+      code.rust:       {value: Rust,       weight: 0.15}
+      # held out (eval only); the blog used 10 Stack v2 languages outside its mix (Haskell ... Prolog)
+      heldout.haskell:      {value: Haskell,      heldout: true}
+      heldout.fortran:      {value: FORTRAN,      heldout: true}
+      heldout.lua:          {value: Lua,          heldout: true}
+      heldout.julia:        {value: Julia,        heldout: true}
+      heldout.perl:         {value: Perl,         heldout: true}
+      heldout.scala:        {value: Scala,        heldout: true}
+      heldout.assembly:     {value: Assembly,     heldout: true}
+      heldout.visual_basic: {value: Visual Basic, heldout: true}
+      heldout.powershell:   {value: PowerShell,   heldout: true}
+      heldout.tex:          {value: TeX,          heldout: true}
+
+  finemath:
+    repo: HuggingFaceTB/finemath
+    revision: e92b25a616738fe95dc186b64dfb19f9c8525594
+    files: [finemath-3plus/*.parquet]
+    text: text
+    rg_per_unit: 4
+    p_val: 0.02
+    leaves:
+      math.finemath: {weight: 3.07}      # blog: finemath-3plus 3.07% + infiwebmath-3plus 1.93%
+
+  infiwebmath:
+    repo: HuggingFaceTB/finemath
+    revision: e92b25a616738fe95dc186b64dfb19f9c8525594
+    files: [infiwebmath-3plus/*.parquet]
+    text: text
+    rg_per_unit: 4
+    p_val: 0.02
+    leaves:
+      math.infiwebmath: {weight: 1.93}
+
+  # Multilingual: FineWeb-2 (the blog used FineWeb2-HQ, epfml/FineWeb2-HQ, a quality-filtered subset; switch by
+  # changing repo/files to e.g. `repo: epfml/FineWeb2-HQ, files: [rus_Cyrl/*.parquet]`). Equal bytes per language.
+  fw2_rus:
+    {repo: HuggingFaceFW/fineweb-2, revision: af9c13333eb981300149d5ca60a8e9d659b276b9,
+     files: [data/rus_Cyrl/train/*.parquet], text: text, rg_per_unit: 2, p_val: 0.05, leaves: {ml.rus_Cyrl: {weight: 1}}}
+  fw2_cmn:
+    {repo: HuggingFaceFW/fineweb-2, revision: af9c13333eb981300149d5ca60a8e9d659b276b9,
+     files: [data/cmn_Hani/train/*.parquet], text: text, rg_per_unit: 2, p_val: 0.05, leaves: {ml.cmn_Hani: {weight: 1}}}
+  fw2_deu:
+    {repo: HuggingFaceFW/fineweb-2, revision: af9c13333eb981300149d5ca60a8e9d659b276b9,
+     files: [data/deu_Latn/train/*.parquet], text: text, rg_per_unit: 2, p_val: 0.05, leaves: {ml.deu_Latn: {weight: 1}}}
+  fw2_fra:
+    {repo: HuggingFaceFW/fineweb-2, revision: af9c13333eb981300149d5ca60a8e9d659b276b9,
+     files: [data/fra_Latn/train/*.parquet], text: text, rg_per_unit: 2, p_val: 0.05, leaves: {ml.fra_Latn: {weight: 1}}}
+  fw2_spa:
+    {repo: HuggingFaceFW/fineweb-2, revision: af9c13333eb981300149d5ca60a8e9d659b276b9,
+     files: [data/spa_Latn/train/*.parquet], text: text, rg_per_unit: 2, p_val: 0.05, leaves: {ml.spa_Latn: {weight: 1}}}
+  fw2_ita:
+    {repo: HuggingFaceFW/fineweb-2, revision: af9c13333eb981300149d5ca60a8e9d659b276b9,
+     files: [data/ita_Latn/train/*.parquet], text: text, rg_per_unit: 2, p_val: 0.05, leaves: {ml.ita_Latn: {weight: 1}}}
+  fw2_por:
+    {repo: HuggingFaceFW/fineweb-2, revision: af9c13333eb981300149d5ca60a8e9d659b276b9,
+     files: [data/por_Latn/train/*.parquet], text: text, rg_per_unit: 2, p_val: 0.05, leaves: {ml.por_Latn: {weight: 1}}}
+  fw2_arb:
+    {repo: HuggingFaceFW/fineweb-2, revision: af9c13333eb981300149d5ca60a8e9d659b276b9,
+     files: [data/arb_Arab/train/*.parquet], text: text, rg_per_unit: 2, p_val: 0.05, leaves: {ml.arb_Arab: {weight: 1}}}
+
+# Build sizes (scripts/data/build_mix.py --preset). Bytes are UTF-8 text bytes.
+presets:
+  full:
+    dataset: mix_v1
+    train_bytes: 25.0e9           # enough for an iso-FLOP ladder up to ~1e18 FLOPs
+    shard_bytes: 256.0e6          # text bytes per train shard (docs never split across shards)
+    val_leaf_bytes: 2.0e6         # one val set per leaf (source / language, held-out languages included)
+    val_group_bytes: 5.0e6        # one per category (en, code, math, ml, heldout), leaf shares as in the mix
+    val_mix_bytes: 10.0e6         # the combined val set (<dataset>_val_000000.bin), same mixture as train
+    tokenizer_sample_bytes: 1.0e9
+  small:
+    dataset: mix_v1_small
+    train_bytes: 50.0e6
+    shard_bytes: 8.0e6
+    val_leaf_bytes: 64.0e3
+    val_group_bytes: 128.0e3
+    val_mix_bytes: 512.0e3
+    tokenizer_sample_bytes: 50.0e6
