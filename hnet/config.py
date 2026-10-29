@@ -91,6 +91,13 @@ class DCConfig:
     # main_aux_weight: weight of an auxiliary next-byte CE on the stage-0 dechunked main-network output alone
     #   (before the residual is added), a direct learning signal for everything below stage 0.
     main_aux_weight: float = 0.0
+    # chunk_pred_k / chunk_pred_weight: chunk-level multi-byte prediction. A training-only head on the innermost
+    #   main network's OUTPUT (before dechunking) predicts the first k bytes after each innermost position's byte
+    #   (end semantics: the next chunk's first k bytes). A direct next-chunk training signal for the main network,
+    #   bypassing the dechunker, the residual sum and the byte decoder (logbook: the main network's output carries
+    #   less next-byte information than its input). 0 = off.
+    chunk_pred_k: int = 0
+    chunk_pred_weight: float = 0.0
     # router_entropy_weight: weight of the mean binary entropy of boundary probabilities (all stages); the ratio
     #   loss has zero gradient w.r.t. G once F is on target, so nothing else pushes decisions away from p = 0.5.
     router_entropy_weight: float = 0.0

@@ -120,6 +120,11 @@ class HNetForCausalLM(nn.Module):
         self.backbone = HNet(cfg, stage_idx=0)
         self.lm_head = nn.Linear(d0, cfg.vocab_size, bias=False)
         self.main_aux_head = nn.Linear(d0, cfg.vocab_size, bias=False) if cfg.dc.main_aux_weight > 0 else None
+        self.chunk_pred_head = None
+        if cfg.dc.chunk_pred_k > 0:
+            assert cfg.dc.chunk_pred_weight > 0 and cfg.n_stages > 0, "chunk_pred_k needs a weight and a hierarchy"
+            d_in = cfg.d_model[cfg.n_stages - 1]  # the innermost stage returns its output at its input width
+            self.chunk_pred_head = nn.Linear(d_in, cfg.dc.chunk_pred_k * cfg.vocab_size, bias=False)
         if cfg.tie_embeddings:
             self.lm_head.weight = self.embeddings.weight
         self._param_stage = {}
@@ -161,9 +166,14 @@ class HNetForCausalLM(nn.Module):
             n = (lab != IGNORE_INDEX).sum().clamp(min=1)
             main_ce = chunked_ce_sum(bpred[0].main_out.to(h.dtype), self.main_aux_head, lab) / n
             out.aux_loss = out.aux_loss + dc.main_aux_weight * main_ce
+        if self.chunk_pred_head is not None and labels is not None:
+            chunk_ce = self._chunk_pred_loss(bpred, ids, labels.reshape(-1), ctx)
+            out.aux_loss = out.aux_loss + dc.chunk_pred_weight * chunk_ce
         stats = {"positions/s0": ids.new_full((), ids.numel(), dtype=torch.float32)}
         if self.main_aux_head is not None and labels is not None:
             stats["main_aux_ce"] = main_ce.detach()
+        if self.chunk_pred_head is not None and labels is not None:
+            stats["chunk_pred_ce"] = chunk_ce.detach()
         for s, (r, (loss, st)) in enumerate(zip(bpred, aux_terms)):
             n_sel = r.boundary_mask.sum().float()
             stats[f"aux/s{s}"] = loss.detach()
@@ -186,10 +196,29 @@ class HNetForCausalLM(nn.Module):
         nn.init.normal_(self.lm_head.weight, std=std)
         if self.main_aux_head is not None:
             nn.init.normal_(self.main_aux_head.weight, std=std)
+        if self.chunk_pred_head is not None:
+            nn.init.normal_(self.chunk_pred_head.weight, std=std)
         nn.init.normal_(self.embeddings.weight, std=1.0)
         if self.ngram_embeddings is not None:
             self.ngram_embeddings.reset_parameters()
         self.backbone.init_weights(std)
+
+    def _chunk_pred_loss(self, bpred, ids: torch.Tensor, labels: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
+        """Mean CE of predicting, from the innermost main network's output at each innermost position, the k bytes
+        after that position's byte (targets outside the segment are ignored)."""
+        k = self.config.dc.chunk_pred_k
+        T = ids.numel()
+        pos = torch.arange(T, device=ids.device)
+        for r in bpred:  # byte position of every innermost position
+            pos = pos[r.boundary_mask]
+        z = bpred[-1].inner_out
+        assert z.shape[0] == pos.numel(), (z.shape, pos.shape)
+        seg_end = ctx.cu_seqlens[1:].long()[ctx.seq_idx[0, pos].long()]  # exclusive end of each position's segment
+        tgt_pos = pos[:, None] + 1 + torch.arange(k, device=ids.device)[None, :]  # [M, k]
+        valid = tgt_pos < seg_end[:, None]
+        tgt = torch.where(valid, labels[(tgt_pos - 1).clamp(max=T - 1)], torch.full_like(tgt_pos, IGNORE_INDEX))
+        logits = self.chunk_pred_head(z).float().reshape(-1, self.config.vocab_size)
+        return F.cross_entropy(logits, tgt.reshape(-1), ignore_index=IGNORE_INDEX)
 
     def set_progress(self, progress: float):
         """Training progress in [0, 1] (called by the trainer before each step); drives dc.residual_warmup."""
@@ -205,7 +234,7 @@ class HNetForCausalLM(nn.Module):
         """Stage index owning parameter ``name`` (DDP ``module.`` / compile ``_orig_mod.`` prefixes allowed);
         embeddings and lm_head belong to stage 0."""
         name = name.replace("_orig_mod.", "").removeprefix("module.")
-        if name.startswith(("embeddings.", "ngram_embeddings.", "lm_head.", "main_aux_head.")):
+        if name.startswith(("embeddings.", "ngram_embeddings.", "lm_head.", "main_aux_head.", "chunk_pred_head.")):
             return 0
         return self._param_stage[name]
 

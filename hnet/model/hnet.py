@@ -137,6 +137,7 @@ class HNet(nn.Module):
             r.extra["dechunk_rms"] = out.detach().float().pow(2).mean().sqrt()
             r.extra["residual_rms"] = residual.detach().pow(2).mean().sqrt()
         r.main_out = out  # with grad: read by an optional auxiliary head (HNetConfig.dc.main_aux_weight)
+        r.inner_out = z  # with grad: the main network's output at this stage's inner resolution [M, D_inner]
         if self.residual_warmup > 0 and self.progress < self.residual_warmup:
             residual = residual * (self.progress / self.residual_warmup)
         if self.residual_warmup > 0 and self.progress < self.residual_warmup:

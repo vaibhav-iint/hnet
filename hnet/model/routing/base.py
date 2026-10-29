@@ -43,6 +43,7 @@ class RouterOutput:
     semantics: str = "start"
     extra: dict = field(default_factory=dict)  # detached diagnostics filled in by the owning stage
     main_out: Optional[torch.Tensor] = None  # the stage's dechunked main-network output (with grad), [T, D]
+    inner_out: Optional[torch.Tensor] = None  # the stage's main-network output before dechunking (with grad), [M, D]
 
     @property
     def p(self) -> torch.Tensor:

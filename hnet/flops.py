@@ -338,6 +338,10 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
             if cfg.dc.main_aux_weight > 0:  # training-only auxiliary head on the dechunked main output
                 comp_p["main_aux_head"] = V * d0
                 comp_f["main_aux_head"] = 2 * V * d0 if cv.count_lm_head else 0.0
+            if cfg.dc.chunk_pred_k > 0:  # training-only chunk-level head, once per innermost position
+                d_in = cfg.d_model[n - 1]
+                comp_p["chunk_pred_head"] = cfg.dc.chunk_pred_k * V * d_in
+                comp_f["chunk_pred_head"] = (2 * cfg.dc.chunk_pred_k * V * d_in / bpp[n]) if cv.count_lm_head else 0.0
         if s > 0 and d > cfg.d_model[s - 1]:
             comp_p["pad_dimension"] = d - cfg.d_model[s - 1]
             comp_f["pad_dimension"] = 0.0
