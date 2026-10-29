@@ -53,8 +53,10 @@ def main(argv=None):
     ap.add_argument("--quick", action="store_true")
     ap.add_argument("--only", default=None)
     ap.add_argument("--docs", type=int, default=32)
+    ap.add_argument("--shard", default="0/1", help="i/n: run every n-th checkpoint starting at i")
     a = ap.parse_args(argv)
-    todo = [(n, p) for n, p in CKPTS if (not a.quick or n in QUICK) and (a.only is None or a.only in n)]
+    i, k = map(int, a.shard.split("/"))
+    todo = [(n, p) for n, p in CKPTS if (not a.quick or n in QUICK) and (a.only is None or a.only in n)][i::k]
     for name, path in todo:
         out = DATA / "ckpt" / f"{name}.json"
         if out.exists() or not (ROOT / path).exists():

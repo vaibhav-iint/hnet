@@ -259,6 +259,10 @@ def adoption_label(df):
 
 def analyse(df: pd.DataFrame) -> dict:
     out = {}
+    # outcome statistics only on finished runs (tiny: final eval at >= step 1700; ladder: its own last step)
+    fin = (df.scale != "tiny") | (df.final_eval_step.fillna(0) >= 1700)
+    out["n_unfinished_excluded"] = int((~fin).sum())
+    df = df[fin]
     h = df[(df.kind == "hnet")].copy()
     tiny = h[h.scale == "tiny"]
     out["n_runs"] = {"all": int(len(df)), "hnet": int(len(h)), "hnet_tiny": int(len(tiny)),

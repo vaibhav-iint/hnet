@@ -1058,3 +1058,18 @@ projection's live bias is as in the official code (only the weight is zero-initi
 - B3 fixed: casting a whole H-Net to bf16 crashed in residual_proj (eval only). B4: duplicate `set_progress` removed.
 - Deviations that may matter (not bugs): no weight decay on norms / A_log / D / dt_bias (official decays them); the
   rank decider's batch coupling and eval-time running threshold; the paper's AdamW LR multipliers applied under Muon.
+
+### 1e17 L05 finished: more data per run halves the gap at fixed model size
+Same L05 model (D 384), 1e16 vs 1e17 FLOPs (0.10B vs 0.52B BPE tokens), one seed, BPE's Muon LR for all:
+| budget | BPE | H-Net prior-free | gap | H-Net warm start | gap |
+|---|---|---|---|---|---|
+| 1e16 | 1.756 | 1.985 | +0.23 | 1.939 | +0.18 |
+| 1e17 | 1.224 | 1.360 | +0.14 | 1.353 | +0.13 |
+At matched steps inside the 1e17 run the gap went +0.25 (step 394) → +0.41 (788) → +0.34 (985) → +0.20 (1379) → +0.14
+(final): the H-Net is slower early and catches up late, and the warm start's advantage shrinks to 0.007 with data.
+Consistent with the blog's per-run data (H-Net loses in its most data-starved runs, lead grows with tokens/param).
+
+EXP-028 interim (step 1500): gain 1.804 / 1.797, gain_cste 1.801 / 1.851, gain_rgate 1.819 / 1.823, against `vp_ng`
+1.757 / 1.710 / 1.699 at the same step: 0.05-0.10 worse. The two `gain` seeds agree to 0.007 (the reference's
+spread is 0.06), so the objective does remove the lottery, but into a worse basin; tokenizer statistics of the
+finals will say which.
