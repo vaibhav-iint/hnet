@@ -1,0 +1,349 @@
+{
+ "bytes": 126939,
+ "whitespace": {
+  "chunks": 20837,
+  "mean_len": 6.092,
+  "types": 7394,
+  "type_token_ratio": 0.3548,
+  "singleton_frac": 0.2522,
+  "unigram_bits_per_chunk": 10.617,
+  "unigram_bits_per_byte": 1.7427,
+  "top": [
+   [
+    "the ",
+    1062
+   ],
+   [
+    "of ",
+    692
+   ],
+   [
+    "and ",
+    570
+   ],
+   [
+    "to ",
+    514
+   ],
+   [
+    "a ",
+    448
+   ],
+   [
+    "in ",
+    398
+   ],
+   [
+    "is ",
+    294
+   ],
+   [
+    "for ",
+    184
+   ],
+   [
+    "that ",
+    179
+   ],
+   [
+    "The ",
+    166
+   ],
+   [
+    "are ",
+    159
+   ],
+   [
+    "as ",
+    131
+   ],
+   [
+    "on ",
+    126
+   ],
+   [
+    "with ",
+    105
+   ],
+   [
+    "have ",
+    100
+   ],
+   [
+    "be ",
+    99
+   ],
+   [
+    "by ",
+    95
+   ],
+   [
+    "or ",
+    92
+   ],
+   [
+    "from ",
+    90
+   ],
+   [
+    "it ",
+    81
+   ],
+   [
+    "can ",
+    76
+   ],
+   [
+    "was ",
+    74
+   ],
+   [
+    "you ",
+    74
+   ],
+   [
+    "- ",
+    73
+   ],
+   [
+    "at ",
+    69
+   ]
+  ]
+ },
+ "stages": [
+  {
+   "chunks": 47625,
+   "mean_len": 2.665,
+   "types": 8765,
+   "type_token_ratio": 0.184,
+   "singleton_frac": 0.1238,
+   "unigram_bits_per_chunk": 9.676,
+   "unigram_bits_per_byte": 3.6303,
+   "top": [
+    [
+     " ",
+     2936
+    ],
+    [
+     "e",
+     1731
+    ],
+    [
+     ",",
+     1029
+    ],
+    [
+     "s",
+     1018
+    ],
+    [
+     ".",
+     925
+    ],
+    [
+     "n",
+     868
+    ],
+    [
+     "a",
+     813
+    ],
+    [
+     "i",
+     813
+    ],
+    [
+     "t",
+     723
+    ],
+    [
+     "o",
+     698
+    ],
+    [
+     "l",
+     575
+    ],
+    [
+     "u",
+     566
+    ],
+    [
+     "r",
+     563
+    ],
+    [
+     "\n",
+     502
+    ],
+    [
+     " the",
+     471
+    ],
+    [
+     "e ",
+     388
+    ],
+    [
+     "n ",
+     355
+    ],
+    [
+     "d ",
+     339
+    ],
+    [
+     "m",
+     333
+    ],
+    [
+     "c",
+     325
+    ],
+    [
+     " a",
+     319
+    ],
+    [
+     "g",
+     263
+    ],
+    [
+     "b",
+     261
+    ],
+    [
+     " i",
+     254
+    ],
+    [
+     " c",
+     243
+    ]
+   ],
+   "boundaries_on_whitespace_frac": 0.1747,
+   "whitespace_boundaries_hit_frac": 0.3992,
+   "word_types_seen_3plus": 1114,
+   "words_segmented_consistently_frac": 0.6732,
+   "dominant_segmentation_share": 0.897
+  },
+  {
+   "chunks": 15843,
+   "mean_len": 8.012,
+   "types": 8388,
+   "type_token_ratio": 0.5294,
+   "singleton_frac": 0.4762,
+   "unigram_bits_per_chunk": 10.994,
+   "unigram_bits_per_byte": 1.3721,
+   "top": [
+    [
+     ".",
+     875
+    ],
+    [
+     " ",
+     727
+    ],
+    [
+     ",",
+     490
+    ],
+    [
+     "\n",
+     456
+    ],
+    [
+     "s",
+     206
+    ],
+    [
+     " the",
+     141
+    ],
+    [
+     "e",
+     119
+    ],
+    [
+     " an",
+     105
+    ],
+    [
+     " a",
+     103
+    ],
+    [
+     "n",
+     97
+    ],
+    [
+     "e ",
+     85
+    ],
+    [
+     "d ",
+     84
+    ],
+    [
+     "I",
+     81
+    ],
+    [
+     " i",
+     80
+    ],
+    [
+     "n ",
+     79
+    ],
+    [
+     "?",
+     75
+    ],
+    [
+     " The",
+     70
+    ],
+    [
+     "be",
+     69
+    ],
+    [
+     "The",
+     65
+    ],
+    [
+     "t",
+     63
+    ],
+    [
+     "A",
+     58
+    ],
+    [
+     "o",
+     57
+    ],
+    [
+     "s ",
+     50
+    ],
+    [
+     "t i",
+     50
+    ],
+    [
+     ")",
+     46
+    ]
+   ],
+   "boundaries_on_whitespace_frac": 0.1396,
+   "whitespace_boundaries_hit_frac": 0.1061,
+   "word_types_seen_3plus": 1114,
+   "words_segmented_consistently_frac": 0.526,
+   "dominant_segmentation_share": 0.8372
+  }
+ ],
+ "checkpoint": "runs/gcp/exp008_hierarchy_use/base_s0/ckpt/step_0001763"
+}

@@ -681,3 +681,34 @@ here; the remaining budget (~$120 of the $200 cap) goes to this line.
   gap is memory for identity, not signal routing. Hence EXP-017.
 - EXP-014 (p-space quantile) rows are the collapsed runs (compression 440–1800, −20% to −58% realized compute),
   recorded for the post-mortem only.
+
+### What tokenizer did the router learn? (`hnet/analysis/chunk_stats.py`, 128 val docs, 127 kB)
+Three fully trained 2-stage runs (paper cosine router EXP-008 `base`; end-of-chunk MLP router EXP-003 `end_mlp` at
+lr 1.5e-3; paper router at lr 6e-3 EXP-013 `lr6_nomult`) against a whitespace tokenizer on the same text
+(`logbook/diagnostics/cs_*.json`):
+
+| segmentation | bytes/chunk | types / chunks | singleton chunks | boundaries on word boundaries | word types segmented the same way every time |
+|---|---|---|---|---|---|
+| whitespace | 6.1 | 0.35 | 25% | 100% | 100% |
+| stage 0, paper router | 2.7 | 0.18 | 12% | 17% | 67% |
+| stage 0, end_mlp | 2.6 | 0.15 | 9% | **3%** | 73% |
+| stage 0, paper lr 6e-3 | 2.7 | 0.17 | 12% | 19% | 82% |
+| stage 1, paper router | 8.0 | 0.53 | **48%** | 14% | 53% |
+| stage 1, end_mlp | 7.7 | 0.62 | **55%** | 7% | 30% |
+| stage 1, paper lr 6e-3 | 7.8 | 0.58 | **52%** | 17% | 23% |
+
+- Stage 0 learns a *character-pair* tokenizer: the most frequent chunks are single letters and punctuation
+  (`' '`, `e`, `,`, `s`, `.`), and almost no boundary sits on a word boundary (3–19%, vs 44% of word boundaries hit
+  at best). This is the level that the chunk vocabulary of EXP-017 sits on: it will behave like a character
+  bigram/trigram table (useful, cf. the n-gram tables, but it cannot carry word identity).
+- Stage 1 is **not a tokenizer**: half of its chunks are strings that occur once in 127 kB, and a word seen 3+ times
+  is segmented the same way only 23–53% of the time. The innermost main network therefore sees mostly unique
+  "tokens". No embedding table, no auxiliary loss and no capacity can give it word identity under this segmentation:
+  this is the mechanism behind "main output less predictive than its input" and the 0.04-bpb contribution.
+- The paper's end-to-end router objective (CE through the STE confidence + a ratio loss) contains nothing that
+  rewards *consistency*: the router is free to place boundaries by context, and it does. A vocabulary needs types.
+- Consequences: (i) EXP-018's 1-stage ratio-6 shape is the right place for a vocabulary (word-scale chunks, but
+  only if they recur); (ii) next: routers that are consistent by construction, a **context-free router** whose
+  score is a function of the last k bytes only (the same string is always cut the same way, like BPE), and a
+  **surprise router** (boundary where the model's own next-byte entropy is high, the BLT patching rule) — both as
+  scores for the rank decider, so compression stays pinned; measured with `chunk_stats` before looking at bpb.
