@@ -1,0 +1,27 @@
+# EXP-020: make the learned tokenizer consistent. chunk_stats (logbook): the contextual router starts 92% consistent
+# (same word -> same cut) and training drives it to 30-73%, because nothing in the CE-through-STE objective rewards
+# agreement across contexts; the second stage then sees mostly unique chunks. `dc.router_consistency_weight` penalizes
+# the variance of the stage-0 boundary logit across positions that end in the same 4 bytes (hashed group means).
+# Arms: weight 1 and 10 (`cons1`, `cons10`), and weight 10 with the chunk vocabulary + next-chunk objective
+# (`cons10_vocab_pred`; baselines: EXP-017 `quant_fix` and `vocab_pred`). 2-stage (3,3), end_mlp router, rank
+# decisions, lr 1.5e-3, EXP-002 budget.
+name: exp020_router_consistency
+out_root: runs/search/exp020_router_consistency
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp020_router_consistency
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - model.dc.decision=quantile
+  - model.dc.router_consistency_n=4
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {cons1: "consistency penalty w 1", cons10: "consistency penalty w 10",
+           cons10_vocab_pred: "consistency w 10 + vocabulary + next-chunk prediction"}
+runs:
+  - {name: cons1,  config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.router_consistency_weight=1.0]}
+  - {name: cons10, config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.router_consistency_weight=10.0]}
+  - {name: cons10_vocab_pred, config: configs/runs/tiny_hnet2_2m.yaml,
+     set: [model.dc.router_consistency_weight=10.0,
+           "model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}, null]"]}
