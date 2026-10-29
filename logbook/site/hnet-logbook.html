@@ -64,7 +64,7 @@ a { color: var(--accent); }
 <div class="wrap">
   <header class="top">
     <h1>H-Net Logbook</h1>
-    <span class="meta">updated 2026-10-29 06:20 UTC</span>
+    <span class="meta">updated 2026-10-29 10:47 UTC</span>
   </header>
   <p class="lede">Byte-level H-Net vs tokenized Transformers at 100M–500M parameters, built from scratch on a $500 budget.
   The experiment log records each run with configs, costs and loss curves. The work log records everything else.</p>
@@ -490,10 +490,87 @@ multipliers, main-heavy multipliers [1, 1, 4] · 3 seeds · status: <span class=
 <p><em>spec <code>exp014_quantile_decision.yaml</code> · <code>hnet/model/routing/decide.py</code>: select the top 1/N positions by p (batch
 quantile, running threshold for eval, p recentred so the threshold is 0.5). Compression is pinned exactly and the
 ratio loss becomes inert. Arms: quantile, quantile + attention pooling, each at lr 1.5e-3 and 6e-3 · 3 seeds ·
-status: <span class="chip chip-running">running</span></em></p>
+status: <strong>stopped at step ~500, invalid</strong> (see work log: the p-space quantile saturated and collapsed the selection in
+most runs; the decider was rewritten to rank batch-normalized fp32 logits and is validated as the <code>quant_fix</code> arm of
+EXP-017). EXP-015/016 were built on the same rule and were stopped with it; they will be re-run on the fixed rule only
+if EXP-017 says the hierarchy is worth more training signals.</em></p>
 <h2>EXP-015 · Which training signals make the hierarchy carry the model, at honest compute</h2>
 <p><em>spec <code>exp015_hierarchy_factorial.yaml</code> · end-of-chunk router + quantile decisions, with path-drop, aux head, both,
-both + mean pooling · 3 seeds · status: launching (spot capacity)</em></p></section>
+both + mean pooling · 3 seeds · status: launching (spot capacity)</em></p>
+<h2>EXP-017 · A vocabulary for the learned chunks (learned tokenization with a token table)</h2>
+<p><em>spec <code>exp017_chunk_vocab.yaml</code> · <code>hnet/model/chunk_vocab.py</code> · 2-stage (3,3), end-of-chunk MLP router, rank
+decisions, lr 1.5e-3, EXP-002 budget · arms: <code>quant_fix</code> (fixed rank decisions, no vocabulary), <code>vocab</code> (each
+stage-0 chunk's byte content hashed by 2 hashes into 65536-row tables, 12.6M parameters ≈ BPE's 12.9M embedding +
+head, zero FLOPs, added to the chunk vector), <code>vocab_pred</code> / <code>vocab_pred_w1</code> (plus a sampled-softmax next-chunk
+objective for the main network, 1024 candidates, +1.6% FLOPs, weight 0.5 / 1.0) · 3 seeds · status: launching</em></p>
+<p>Hypothesis: the gap to BPE is word identity, which BPE stores in a FLOP-free table and the H-Net must compute; and the
+main network gets no word-level training signal. A hashed vocabulary over the router's chunks gives both, and makes
+the segmentation matter (a chunk's identity is its token), which is what a learned tokenizer needs to be trained on.</p>
+<h2>EXP-018 · Where should the chunk vocabulary sit? (1-stage, word-scale chunks)</h2>
+<p><em>spec <code>exp018_vocab_shapes.yaml</code> · 1-stage H-Net (ratio 6, chunks ≈ words), end-of-chunk MLP router, rank decisions
+· arms <code>h1_quant</code> (no vocabulary), <code>h1_vocab_pred</code> (vocabulary + next-chunk prediction) · 3 seeds · status: <strong>done</strong>:
+<code>h1_quant</code> 1.853 (1.854/1.861/1.845); <code>h1_vocab_pred</code> <strong>1.720 / 1.863 / 1.737</strong>, main-network contribution 0.75 /
+0.13 / 0.55 bpb (baseline 0.13–0.17). Two seeds: −0.13 / −0.11 bpb at identical FLOPs, best honest-compute H-Net so
+far; seed 1 did not adopt the hierarchy (heavy-tailed router scores → confidences ≈ 0.5 → residual path wins; fixed by
+the robust decider, EXP-021).</em></p>
+<h2>EXP-019 · A router that is a tokenizer: context-free boundary scores</h2>
+<p><em>spec <code>exp019_local_router.yaml</code> · <code>hnet/model/routing/local.py</code> (<code>local_mlp</code>: logit from the last 8 bytes only, so
+the same string is always cut the same way) + rank decisions · arms <code>local</code>, <code>local_vocab</code>, <code>local_vocab_pred</code>
+(same vocabulary arms as EXP-017, which uses the contextual end_mlp router) · 3 seeds · status: <span class="chip chip-running">running</span></em></p>
+<p>Motivation: <code>chunk_stats</code> on trained routers (work log): stage-1 chunks are 48–55% singletons and recurring words
+are segmented consistently only 23–53% of the time. Prediction: <code>local*</code> arms score far higher on consistency; if
+the vocabulary then helps more than in EXP-017, consistency is the missing ingredient of learned tokenization.</p>
+<h2>EXP-020 · Router self-consistency penalty (second launch, scale-free)</h2>
+<p><em>spec <code>exp020_router_consistency.yaml</code> · 2-stage (3,3), end_mlp, rank decisions · penalty = within-4-gram-group
+variance / total variance of the stage-0 logit · arms <code>cons1</code>, <code>cons10</code>, <code>cons10_vocab_pred</code> · 3 seeds · status:
+<code>cons1</code> <strong>1.768 / 1.812 / 1.813 → 1.798</strong>, <code>cons10</code> <strong>1.775 / 1.783 / 1.840 → 1.799</strong>, vs EXP-017 <code>quant_fix</code> 1.799
+± 0.005: neutral on average with a larger seed spread (two seeds −0.02, one +0.04); main-network contribution 0.02–0.06
+(baseline 0.03). <code>cons10_vocab_pred</code> pending. Consistency can be imposed on a character-pair tokenizer without cost,
+but it does not by itself make the second level useful at (3,3); the word-scale line (EXP-018/023) is where the gain is.</em></p>
+<h2>EXP-021 · (stopped) word-scale vocabulary with the median/MAD decider</h2>
+<p><em>Stopped at step ~1000: the MAD of a word tokenizer's boundary scores is ~0 (5/6 identical "not a boundary" logits),
+1/σ blew up the gradient and seed 0 diverged (work log). Replaced by EXP-023.</em></p>
+<h2>EXP-023 · Word-scale chunk vocabulary, trimmed-statistics rank decider (+ n-gram tables, + residual warmup)</h2>
+<p><em>spec <code>exp023_word_vocab_trimmed.yaml</code> · 1-stage ratio 6, end_mlp, rank decisions on trimmed-standardized scores,
+chunk vocabulary (2 × 65536 × 96) + next-chunk objective (w 0.5, 1024 candidates) · 3 seeds · baseline EXP-018
+<code>h1_quant</code> 1.853 · status: <code>vp</code> and <code>vp_ng</code> done, <code>vp_rwarm</code> finishing</em></p>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>arm</th>
+<th>val bpb (s0 / s1 / s2)</th>
+<th>main-network contribution</th>
+<th>vs baseline</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vp</code> vocabulary + prediction</td>
+<td><strong>1.732 / 1.855 / 1.733</strong></td>
+<td>0.72 / 0.18 / 0.64</td>
+<td>−0.12 / 0.00 / −0.11</td>
+</tr>
+<tr>
+<td><code>vp_ng</code> + byte n-gram tables</td>
+<td><strong>1.720 / 1.669 / 1.656</strong></td>
+<td>0.09 / 0.41 / 0.42</td>
+<td>BPE is 1.634 ± 0.002</td>
+</tr>
+<tr>
+<td>EXP-018 <code>h1_vocab_pred</code> (same arm, mean/std decider)</td>
+<td>1.720 / 1.863 / 1.737</td>
+<td>0.75 / 0.13 / 0.55</td>
+<td>replication</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li><code>vp</code> replicates EXP-018 seed by seed, including the non-adoption of seed 1 with a different decider: adoption is
+  decided by the seed's initialization / data order, early (steps 200–600), not by the score-scale pathology.</li>
+<li><code>vp_ng</code>: the adopted seeds are 0.02–0.035 bpb from BPE at identical training FLOPs, with a learned word tokenizer
+  and a main network that carries 0.42 bpb. The two parameter-side memories are complementary: n-gram tables give
+  the byte stage local identity, the chunk table gives the hierarchy word identity.</li>
+</ul></section>
   <section class="log" id="work" hidden><h1>Work log</h1>
 <p>Chronological record of what was done, why, and what came out of it. Newest entries at the bottom.
 Times are UTC. Experiments (anything with a result) are written up in <a href="EXPERIMENTS.md">EXPERIMENTS.md</a>.</p>
@@ -1311,7 +1388,502 @@ compression (last 10 logged steps):</p>
   what the hierarchy can do when it gets positions and training signal, which is the point of the next sweep.</li>
 <li>Policy from here: H-Net arms use rank (quantile) decisions, which pin compression exactly, or α ≥ 1; every
   summary reports realized FLOPs vs budget and flags &gt; 2%.</li>
-</ul></section>
+</ul>
+<h3>Interim readouts of EXP-008/010/011 (honest-compute view; <code>logbook/sweep_summary.py</code>)</h3>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>arm</th>
+<th>val bpb</th>
+<th>realized compute</th>
+<th>main-network contribution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>paper router, strong ratio loss (α 1)</td>
+<td>1.810 ± 0.012 (2 seeds)</td>
+<td>+0.8%</td>
+<td>0.065</td>
+</tr>
+<tr>
+<td>paper router, residual path-drop 0.3</td>
+<td>1.846</td>
+<td><strong>+31%</strong></td>
+<td>0.053</td>
+</tr>
+<tr>
+<td>paper router, entropy penalty</td>
+<td>1.921</td>
+<td>+6.6%</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>fixed pooling, identity-init residual</td>
+<td>1.862</td>
+<td>+0.2%</td>
+<td>0.000</td>
+</tr>
+<tr>
+<td>fixed pooling (zero-init residual)</td>
+<td>1.823</td>
+<td>+0.2%</td>
+<td>0.059</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>Path-drop makes the decoder lean on the hierarchy, which makes the LM loss's pull on the router <em>stronger</em>: the
+  model answers by selecting 31% more positions. Any fix that makes the hierarchy useful inflates compression unless
+  compression is pinned (quantile decisions, EXP-014/015/016).</li>
+<li>Identity-init residual: the bypass is strong from step 0 and the decoder never uses the hierarchy (contribution
+  0.000, worse than zero-init). Zero-init starves the hierarchy early; identity-init starves it for good. The
+  hierarchy needs a window where it is necessary but not noise: residual warmup (EXP-011 <code>fixed_rwarm</code>, pending).</li>
+<li>Entropy penalty: kills the stage-1 hierarchy outright (contribution 0.000) even where it does not collapse
+  compression. Dropped from further use.</li>
+<li>New intervention (EXP-016): chunk-level multi-byte prediction, a head on the innermost main network's output
+  predicting the next chunk's first k bytes, bypassing dechunker, residual and decoder.</li>
+</ul>
+<h3>EXP-014 post-mortem: the p-space quantile rule saturates and collapses</h3>
+<p><code>metrics.jsonl</code> of the stopped runs: <code>tau/s1</code> climbs to 1.000 within 70–90 steps, then <code>compression/s1</code> jumps to
+440–600 (only forced boundaries) and stays there (<code>quant__lr0.0015_s1</code>, <code>quant__lr0.006_s0</code>, ...); in
+<code>quant__lr0.0015_s2</code> the same happens at stage 0 at step ~290 (<code>compression/s0</code> 1300–1800, then stage 1 selects
+everything because it sees no free positions). The one healthy-looking run had <code>tau/s0 = 1.000</code> too.</p>
+<p>Mechanism: the quantile threshold was detached, so nothing anchored the <em>scale</em> of the router's logits; the STE
+confidence gradient pushes selected logits up and unselected ones down forever (the same force that makes the paper
+router over-select, now with no ratio loss to oppose it). Once logits exceed ~17, <code>sigmoid</code> is exactly 1.0 in fp32
+for more than 1/N of the positions, the quantile sits on the tie, recentring gives p' = 0.5 for all of them, the
+strict <code>&gt;</code> selects none, and the stage is dead (no selected positions → no gradient → no recovery).</p>
+<p>Fix (<code>routing/decide.py</code>, tests <code>test_quantile_decision.py</code>): rank the router's raw fp32 logit (<code>RouterOutput.logit</code>)
+with <code>topk</code> (ties broken by rank, never "none"); standardize the scores over the batch <em>in the graph</em> (BatchNorm
+style) before the threshold and the confidence, which makes the gradient's common-shift and common-scale components
+exactly zero (unit test), so the logits cannot inflate; midpoint threshold between the k-th and (k+1)-th score;
+running mean/std/threshold for eval; <code>temp</code> controls the confidence margins; <code>score_std/s*</code> is logged as the drift
+diagnostic. A general lesson for H-Net routers: any decision rule needs a scale anchor; the paper's is the ratio loss
+(weak), ours is normalization.</p>
+<h3>Zooming out: the hierarchy needs a vocabulary (EXP-017)</h3>
+<p>The user asked for coarser-grained ideas and reminded that the point of H-Net is <em>learned tokenization</em>. Reading the
+findings as one story: (1) 84% of the gap to BPE is word identity; (2) BPE gets it from a FLOP-free 12.9M-parameter
+table, the H-Net has to compute it; (3) the main network receives the boundary byte's state, not the chunk's
+identity, and gets no word-level training signal; (4) oracle word boundaries barely move bpb, so routing quality is
+not the bottleneck at this scale: what the main network is fed and trained on is. EXP-017 treats the router's chunks
+as tokens: hashed chunk-content embeddings (parameter-matched to BPE, zero FLOPs) enter the main network, and a
+sampled-softmax next-chunk objective trains it. This also makes the segmentation matter to the loss (a chunk's
+identity is its token), so the learned tokenizer finally has something to be good at. Router-dynamics work stops
+here; the remaining budget (~$120 of the $200 cap) goes to this line.</p>
+<h3>Harvest of the finished sweeps (<code>logbook/sweep_summary.py --all</code>, honest-compute view)</h3>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>arm (3 seeds unless noted)</th>
+<th>val bpb</th>
+<th>main-network contribution (below stage 0)</th>
+<th>realized compute</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>BPE (EXP-006)</td>
+<td>1.634 ± 0.002</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>paper + n-gram tables (EXP-006 <code>paper_ng</code>)</td>
+<td>1.714 ± 0.016</td>
+<td></td>
+<td>+1.2%</td>
+</tr>
+<tr>
+<td>1-stage + n-gram tables (<code>hnet1_ng</code>, 2 seeds)</td>
+<td>1.722 ± 0.023</td>
+<td></td>
+<td>+0.6%</td>
+</tr>
+<tr>
+<td>oracle word-end chunks (EXP-009 <code>space_end</code>)</td>
+<td>1.806 ± 0.026</td>
+<td>0.56</td>
+<td>+0.7%</td>
+</tr>
+<tr>
+<td>fixed (3,3) pooling + byte aux head (EXP-011 <code>fixed_aux</code>)</td>
+<td><strong>1.821 ± 0.002</strong></td>
+<td>0.37</td>
+<td>+0.2%</td>
+</tr>
+<tr>
+<td>fixed (3,3) pooling (EXP-011 <code>fixed</code>)</td>
+<td>1.832 ± 0.008</td>
+<td>0.84</td>
+<td>+0.2%</td>
+</tr>
+<tr>
+<td>fixed + residual warmup (<code>fixed_rwarm</code>)</td>
+<td>1.844 ± 0.005</td>
+<td>0.82</td>
+<td>+0.2%</td>
+</tr>
+<tr>
+<td>fixed + identity residual (<code>fixed_rid</code>)</td>
+<td>1.854 ± 0.035</td>
+<td>0.10</td>
+<td>+0.2%</td>
+</tr>
+<tr>
+<td>fixed + path-drop 0.3 (<code>fixed_rdrop</code>, 2 seeds)</td>
+<td>1.889 ± 0.009</td>
+<td>0.04</td>
+<td>+0.2%</td>
+</tr>
+<tr>
+<td>paper router α 0.03 (EXP-008 <code>base</code>)</td>
+<td>1.796 ± 0.001</td>
+<td>0.69</td>
+<td><strong>+11.1%</strong></td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>At honest compute the best learned-router or fixed-chunk H-Net is ~1.82, i.e. 0.19 bpb behind BPE; every
+  "training signal" intervention (warmup, path-drop, identity residual) is neutral or harmful, the aux head gives
+  0.01. The n-gram tables (parameters, not FLOPs) give 0.11. This is the quantitative version of the zoom-out: the
+  gap is memory for identity, not signal routing. Hence EXP-017.</li>
+<li>EXP-014 (p-space quantile) rows are the collapsed runs (compression 440–1800, −20% to −58% realized compute),
+  recorded for the post-mortem only.</li>
+</ul>
+<h3>What tokenizer did the router learn? (<code>hnet/analysis/chunk_stats.py</code>, 128 val docs, 127 kB)</h3>
+<p>Three fully trained 2-stage runs (paper cosine router EXP-008 <code>base</code>; end-of-chunk MLP router EXP-003 <code>end_mlp</code> at
+lr 1.5e-3; paper router at lr 6e-3 EXP-013 <code>lr6_nomult</code>) against a whitespace tokenizer on the same text
+(<code>logbook/diagnostics/cs_*.json</code>):</p>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>segmentation</th>
+<th>bytes/chunk</th>
+<th>types / chunks</th>
+<th>singleton chunks</th>
+<th>boundaries on word boundaries</th>
+<th>word types segmented the same way every time</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>whitespace</td>
+<td>6.1</td>
+<td>0.35</td>
+<td>25%</td>
+<td>100%</td>
+<td>100%</td>
+</tr>
+<tr>
+<td>stage 0, paper router</td>
+<td>2.7</td>
+<td>0.18</td>
+<td>12%</td>
+<td>17%</td>
+<td>67%</td>
+</tr>
+<tr>
+<td>stage 0, end_mlp</td>
+<td>2.6</td>
+<td>0.15</td>
+<td>9%</td>
+<td><strong>3%</strong></td>
+<td>73%</td>
+</tr>
+<tr>
+<td>stage 0, paper lr 6e-3</td>
+<td>2.7</td>
+<td>0.17</td>
+<td>12%</td>
+<td>19%</td>
+<td>82%</td>
+</tr>
+<tr>
+<td>stage 1, paper router</td>
+<td>8.0</td>
+<td>0.53</td>
+<td><strong>48%</strong></td>
+<td>14%</td>
+<td>53%</td>
+</tr>
+<tr>
+<td>stage 1, end_mlp</td>
+<td>7.7</td>
+<td>0.62</td>
+<td><strong>55%</strong></td>
+<td>7%</td>
+<td>30%</td>
+</tr>
+<tr>
+<td>stage 1, paper lr 6e-3</td>
+<td>7.8</td>
+<td>0.58</td>
+<td><strong>52%</strong></td>
+<td>17%</td>
+<td>23%</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>Stage 0 learns a <em>character-pair</em> tokenizer: the most frequent chunks are single letters and punctuation
+  (<code>' '</code>, <code>e</code>, <code>,</code>, <code>s</code>, <code>.</code>), and almost no boundary sits on a word boundary (3–19%, vs 44% of word boundaries hit
+  at best). This is the level that the chunk vocabulary of EXP-017 sits on: it will behave like a character
+  bigram/trigram table (useful, cf. the n-gram tables, but it cannot carry word identity).</li>
+<li>Stage 1 is <strong>not a tokenizer</strong>: half of its chunks are strings that occur once in 127 kB, and a word seen 3+ times
+  is segmented the same way only 23–53% of the time. The innermost main network therefore sees mostly unique
+  "tokens". No embedding table, no auxiliary loss and no capacity can give it word identity under this segmentation:
+  this is the mechanism behind "main output less predictive than its input" and the 0.04-bpb contribution.</li>
+<li>The paper's end-to-end router objective (CE through the STE confidence + a ratio loss) contains nothing that
+  rewards <em>consistency</em>: the router is free to place boundaries by context, and it does. A vocabulary needs types.</li>
+<li>Consequences: (i) EXP-018's 1-stage ratio-6 shape is the right place for a vocabulary (word-scale chunks, but
+  only if they recur); (ii) next: routers that are consistent by construction, a <strong>context-free router</strong> whose
+  score is a function of the last k bytes only (the same string is always cut the same way, like BPE), and a
+  <strong>surprise router</strong> (boundary where the model's own next-byte entropy is high, the BLT patching rule) — both as
+  scores for the rank decider, so compression stays pinned; measured with <code>chunk_stats</code> before looking at bpb.</li>
+</ul>
+<h3>Consistency at initialization vs after training: the router objective is anti-tokenizer</h3>
+<p><code>chunk_stats</code> on freshly initialized models (96 val docs): the contextual <code>end_mlp</code> router starts out <strong>92–95%
+consistent</strong> (a recurring word is cut the same way almost every time: a random Mamba encoder has short memory, so
+its state at a byte is a near-function of the last few bytes), while the trained <code>end_mlp</code> is 73% (stage 0) / 30%
+(stage 1). Training <em>removes</em> consistency: the CE-through-STE signal rewards boundaries that help prediction in
+context, never agreement across contexts. The context-free <code>local_mlp</code> is, counter-intuitively, <em>less</em> consistent at
+init (8% at k = 8, 32% at k = 4): an 8-byte window reaches into the previous word, so the same word gets different
+scores after different predecessors; a tokenizer is a function of the <em>current chunk's</em> string, not of a fixed
+window. (EXP-019 stays as the cheap test of whether training fixes this; its windowed design is not the answer.)</p>
+<p>Direct answer (new, <code>dc.router_consistency_weight</code>): a <strong>self-consistency regularizer</strong> on the byte-level router,
+the variance of its logit across all positions in the batch that end in the same <code>n</code> = 4 bytes (hashed group means
+via <code>index_add</code>, differentiable, negligible cost). The router keeps its context, but is pulled to agree with itself:
+the same string → the same decision, which is what gives the hierarchy types to work with.</p>
+<h3>EXP-020 first launch invalid: an unnormalized consistency penalty is satisfied by shrinking the logits</h3>
+<p><code>cons1_s0</code> metrics: <code>router_consistency/s0</code> falls to 0.000 while <code>score_std/s0</code> falls 1.2 → 0.15 (the baseline's
+rises to 3.9). Under rank decisions on normalized scores the forward pass is invariant to the logit scale, so the
+cheapest way to zero a within-group variance is to make every logit (nearly) the same constant: the penalty bound
+nothing. Lesson (same family as the EXP-014 drift, mirrored): once decisions are scale-free, every auxiliary term on
+the router must be scale-free too. Fix: penalty = within-group variance / total variance (1 − R² of the 4-gram as a
+predictor of the logit); relaunched as EXP-020 (second launch, same arms).</p>
+<h3>EXP-017/018/019 interim (step 1000–1250, 3 seeds): the vocabulary works only at word scale</h3>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>arm</th>
+<th>step 1000 bpb</th>
+<th>main-network contribution</th>
+<th>note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>EXP-017 <code>quant_fix</code> (2-stage, fixed rank decider)</td>
+<td>1.950–1.964</td>
+<td>0.01–0.02</td>
+<td>on par with / slightly ahead of threshold routers</td>
+</tr>
+<tr>
+<td>EXP-017 <code>vocab</code> (stage-0 chunk table)</td>
+<td>1.937–1.969</td>
+<td>0.03–0.05</td>
+<td>neutral at 1000; 0.02–0.04 ahead at 1500</td>
+</tr>
+<tr>
+<td>EXP-017 <code>vocab_pred</code> (w 0.5) / <code>vocab_pred_w1</code></td>
+<td>+0.04 / +0.08 vs <code>quant_fix</code></td>
+<td>~0</td>
+<td>harmful: predicting 2.6-byte chunk buckets is noise for the decoder</td>
+</tr>
+<tr>
+<td>EXP-019 <code>local</code> (context-free router)</td>
+<td>1.965–1.969</td>
+<td>0.015</td>
+<td>identical bpb to contextual routers</td>
+</tr>
+<tr>
+<td>EXP-018 <code>h1_quant</code> (1-stage, ratio 6)</td>
+<td>1.977–1.998</td>
+<td>0.13–0.17</td>
+<td>final 1.845 / 1.861 / 1.845</td>
+</tr>
+<tr>
+<td>EXP-018 <code>h1_vocab_pred</code> (word-scale chunks + table + prediction)</td>
+<td><strong>1.901 / 2.020 / 1.926</strong></td>
+<td><strong>0.56 / 0.06 / 0.32</strong></td>
+<td>bimodal across seeds</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>The 2-stage model's stage-0 chunks are character pairs: a table of them is worthless, and training the main
+  network to predict them is harmful. At word scale (ratio 6) the same component gives −0.09 and −0.05 bpb at step
+  1000 in two seeds and the main network's contribution rises from 0.13 to 0.56 bpb: the hierarchy carries the model
+  for the first time in this project.</li>
+<li>Seed 1 did not adopt it. Its metrics show why: by step 230–560 its raw router scores were heavy-tailed
+  (<code>score_std</code> 13–15 vs 6–8; <code>p_margin</code> 0.10 vs 0.3–0.4). Standardizing by a std that a few outliers dominate puts
+  every other confidence at ≈ 0.5; the EMA dechunker then smooths with P ≈ 0.5, the hierarchy's output stays weak
+  (<code>dechunk_rms</code> 0.65–0.93 vs 1.4–1.6 while <code>residual_rms</code> is 2.1) and the decoder commits to the residual path: the
+  same "residual wins the race" failure as in EXP-002, now with a measurable trigger. Fix: median/MAD standardization
+  with clipped z (default of the rank decider, unit test reproduces the failure mode) → EXP-021.</li>
+</ul>
+<h3>EXP-017/018 finals (step 1763, honest compute, 3 seeds)</h3>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>arm</th>
+<th>val bpb</th>
+<th>main-network contribution</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>EXP-017 <code>quant_fix</code> (2-stage, end_mlp, fixed rank decider)</td>
+<td>1.7944 / 1.8043 / 1.7982 → <strong>1.799 ± 0.005</strong></td>
+<td>0.03–0.04</td>
+</tr>
+<tr>
+<td>EXP-017 <code>vocab</code> (+ stage-0 chunk table)</td>
+<td>1.8015 / 1.7743 / 1.7770 → 1.784 ± 0.015</td>
+<td>0.07–0.09</td>
+</tr>
+<tr>
+<td>EXP-017 <code>vocab_pred_w1</code></td>
+<td>1.895 / 1.857 / 1.834 → 1.862</td>
+<td>0.005–0.05</td>
+</tr>
+<tr>
+<td>EXP-018 <code>h1_quant</code> (1-stage, ratio 6, rank decider)</td>
+<td>1.854 / 1.861 / 1.845 → 1.853</td>
+<td>0.13–0.17</td>
+</tr>
+<tr>
+<td>EXP-018 <code>h1_vocab_pred</code> (word-scale chunks + table + next-chunk prediction)</td>
+<td><strong>1.720 / 1.863 / 1.737</strong></td>
+<td><strong>0.75 / 0.13 / 0.55</strong></td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>The fixed rank decider alone is worth as much as the paper router's 11% extra compute: 1.799 at budget vs 1.796
+  at +11% (EXP-008 <code>base</code>), and 0.02 better than the previous honest-compute best (<code>fixed_aux</code>, 1.821).</li>
+<li>Word-scale learned chunks with a vocabulary and a chunk-level objective: −0.13 / −0.11 bpb vs the same model
+  without them, at identical FLOPs, and the main network goes from decorative (0.13) to carrying the model (0.75 bpb:
+  zeroing it gives 2.47). 1.72 equals the n-gram-table arms (1.714–1.722), which cheat the hierarchy by giving word
+  identity to the byte stage; here the hierarchy earns it. The gap to BPE (1.634) is 0.09 for the adopted seeds.</li>
+<li>Seed 1 (1.863, contribution 0.13) is the heavy-tailed-scores failure diagnosed above; EXP-021 (robust decider,
+  plus an arm that adds the n-gram tables as well) is running.</li>
+<li>Interpretation for learned tokenization: the paper's hierarchy was starved of <em>types</em>. Give the router's chunks an
+  identity (a table keyed by their content) and a token-level objective, and the second level has something to
+  learn; compression pinning (rank decisions) is what makes the comparison honest.</li>
+</ul>
+<h3>What tokenizer did EXP-018 learn? (<code>chunk_stats</code>, final checkpoints, <code>logbook/diagnostics/cs_exp018_*.json</code>)</h3>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>model</th>
+<th>bytes/chunk</th>
+<th>singletons</th>
+<th>boundaries on word boundaries</th>
+<th>word boundaries hit</th>
+<th>words cut consistently</th>
+<th>top chunks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>whitespace tokenizer</td>
+<td>6.1</td>
+<td>25%</td>
+<td>100%</td>
+<td>100%</td>
+<td>100%</td>
+<td>the, of, and</td>
+</tr>
+<tr>
+<td><code>h1_quant_s0</code> (no vocabulary)</td>
+<td>6.0</td>
+<td>32%</td>
+<td>84%</td>
+<td>86%</td>
+<td>88%</td>
+<td><code>of</code>, <code>and</code>, <code>to</code>, <code></code>, <code>(</code>, <code>m</code>, <code>fro</code></td>
+</tr>
+<tr>
+<td><code>h1_vocab_pred_s0</code> (adopted, 1.720)</td>
+<td>6.0</td>
+<td><strong>24%</strong></td>
+<td><strong>97.7%</strong></td>
+<td><strong>100%</strong></td>
+<td><strong>99.9%</strong></td>
+<td><code>the</code>, <code>of</code>, <code>and</code>, <code>to</code>, <code>a</code>, <code>in</code>, <code>is</code></td>
+</tr>
+<tr>
+<td><code>h1_vocab_pred_s1</code> (not adopted, 1.863)</td>
+<td>6.0</td>
+<td>37%</td>
+<td>0.6%</td>
+<td>0.6%</td>
+<td>87%</td>
+<td><code>s</code>, <code>d</code>, <code>e</code>, <code>ing</code>, <code>ed</code>, <code>er</code>, <code>ly</code>, <code>ion</code>, <code>ment</code>, <code>ation</code></td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li>Given a vocabulary and a chunk-level objective, the router converged to a <em>word tokenizer</em> by itself: every word
+  boundary is a chunk boundary and the same word is always one token. That is the learned tokenization H-Net
+  promised, obtained without heuristics, and it is what let the main network take over 0.75 bpb of the work.</li>
+<li>The non-adopted seed learned a <em>morphological</em> tokenizer (suffixes <code>ing</code>/<code>ed</code>/<code>ly</code>/<code>ion</code>/<code>ment</code>/<code>ation</code> as
+  tokens, cuts before the space): also a consistent segmentation (87%), but more fragmented (37% singletons) and
+  slower to make the hierarchy useful; the residual path won the race first. Both outcomes are reachable from the
+  same objective: adoption is decided early (step 200–600), by whether the hierarchy's signal reaches the decoder
+  before the residual path consolidates. That is the next dynamics problem (EXP-021 removes one trigger, the
+  heavy-tailed-score damping).</li>
+</ul>
+<h3>EXP-021 (median/MAD decider) stopped: the MAD collapses under a word tokenizer</h3>
+<p><code>h1r_vocab_pred_s0</code>: from step ~650 the robust scale <code>score_std/s0</code> falls 4.4 → 0.0 while <code>p_margin</code> pins at 0.50;
+grad norm 0.3 → 4.6e3 (step 900) → 1.9e6 (step 1050), val bpb 3.25 at step 1000. With a word tokenizer 5/6 of the
+positions are "not a boundary" and get near-identical logits, so the median and the MAD both sit inside that mode and
+the MAD → 0; the ±4 clip protects the forward pass, not the gradient through 1/σ. Seeds 1–2 did not diverge but did
+not adopt the hierarchy either (1.98 / 2.00 at step 1000 ≈ baseline). <code>h1r_quant</code> ≡ <code>h1_quant</code> (the decider change
+is invisible without a vocabulary), <code>h1r_vocab_pred_ng</code> reached 1.82 at step 1000 (= <code>paper_ng</code>) before the stop.
+Fix: mean/std over the central 98% of the scores (outlier-proof, cannot collapse unless 98% of scores coincide; unit
+test with 5/6 identical scores). Rule, stated generally: a scale estimator for boundary scores must straddle both
+modes of a bimodal distribution; medians do not. → EXP-023 (same arms + residual warmup; EXP-022 draft superseded).</p>
+<h3>EXP-023 tokenizer statistics: adoption and the kind of tokenizer go together (<code>cs_exp023_*.json</code>)</h3>
+<div class="tablewrap"><table>
+<thead>
+<tr>
+<th>checkpoint</th>
+<th>bpb</th>
+<th>main contribution</th>
+<th>boundaries on word boundaries</th>
+<th>words cut consistently</th>
+<th>top chunks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vp_ng_s2</code> (adopted)</td>
+<td>1.656</td>
+<td>0.42</td>
+<td>95%</td>
+<td>99.4%</td>
+<td><code>the</code>, <code>of</code>, <code>and</code>, <code>to</code>, <code>a</code></td>
+</tr>
+<tr>
+<td><code>vp_s1</code> (not adopted)</td>
+<td>1.855</td>
+<td>0.18</td>
+<td>4%</td>
+<td>89%</td>
+<td><code>s</code>, <code>d</code>, <code>ing</code>, <code>ed</code>, <code>er</code>, <code>ly</code>, <code>ion</code>, <code>ment</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>Same picture as EXP-018 with the same seed: the seed that ends up with a <em>suffix/morpheme</em> tokenizer is the one whose
+hierarchy is not adopted; the seeds that find the <em>word</em> tokenizer are adopted and reach 1.66–1.73. Deterministic per
+seed across two deciders, so the bifurcation is in the router's initialization or the first few hundred steps of
+data, not in the decision rule. Open question whether the tokenizer causes the non-adoption (morpheme chunks are
+less predictable, a weaker chunk-level signal) or both follow from the same early state; either way the fix is to
+steer the first ~300 steps (residual warmup <code>vp_rwarm</code>, pending; or a brief whitespace-prior on the router).</p></section>
 </div>
 
 <script>
