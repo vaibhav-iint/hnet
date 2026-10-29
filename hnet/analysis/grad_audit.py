@@ -70,8 +70,12 @@ def objective_terms(model, out, ids) -> Dict[str, torch.Tensor]:
 
         _, ctx, _ = pack_inputs(ids.unsqueeze(0), None, None)
         terms["router_consistency/s0"] = model._router_consistency(out.bpred[0].logit, ids, ctx)
-    if model.main_aux_head is not None:
-        terms["main_aux_ce/s0"] = out.stats["main_aux_ce"]  # detached in stats; recomputed below if needed
+    if dc.router_gain_weight > 0 and out.bpred and getattr(out.bpred[0], "residual_in", None) is not None \
+            and getattr(model, "_audit_h", None) is not None:
+        from hnet.model.lm import pack_inputs
+
+        _, ctx, _ = pack_inputs(ids.unsqueeze(0), None, None)
+        terms["router_gain/s0"] = model._router_gain_loss(model._audit_h, out.bpred[0], ctx, ids)[0]
     return terms
 
 
@@ -114,7 +118,9 @@ def audit(cfg: HNetConfig, ids: torch.Tensor, steps: int = 0, lr: float = 1e-2, 
             opt.zero_grad()
             (o.loss + o.aux_loss).backward()
             opt.step()
+    hook = model.backbone.register_forward_hook(lambda mod, args, res: setattr(model, "_audit_h", res[0]))
     out = model(ids, labels=ids)
+    hook.remove()
     flat = ids.reshape(-1)
     terms = objective_terms(model, out, flat)
     groups = param_groups(model)
