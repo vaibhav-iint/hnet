@@ -864,3 +864,36 @@ H-Net arm is dropped at 1e18 to fit +$100 (~$73 + preemption overhead).
 25.0 GB train (4.96M docs, 98 shards) + 41 val sets, 2906 s on an 8-core CPU VM; 4.126 bytes/token overall with the
 32k in-corpus BPE (en 4.53, code 3.46, math 3.50, multilingual 3.15). The ladder configs use 4.145 (measured on the
 small build); the 0.5% mismatch in the H-Net's target compression is kept for consistency across the ladder.
+
+### Deep dive: the adoption race, step by step (`logbook/figures/adoption_dynamics.png`, `cs_exp023_vp_s{0,1}_step*.json`)
+EXP-023 `vp` (1-stage ratio 6, vocabulary + next-chunk loss), adopted seeds 0/2 (1.73) vs non-adopted seed 1 (1.85),
+plus the warm-started `prior_s1` (1.63):
+1. **Steps 0–60, identical in every seed.** The hierarchy is the only path (zero-init residual): its output rms is
+   1.5, the router starts confident (margin 0.36) and, per the init analysis, ~92% consistent.
+2. **Steps 60–130, the escape hatch opens.** The residual projection comes alive (rms 0 → 1.0) and the decoder
+   switches to it: hierarchy output rms crashes 1.6 → 0.7 in *all* seeds and the router's margin collapses 0.36 →
+   0.15. The router's only training signal is the decoder's use of the dechunked output (through the STE), so when
+   the decoder stops listening the router stops learning and drifts.
+3. **Steps 130–500, the bifurcation.** The undecided router falls into a basin. Seeds 0/2: word boundaries (93% of
+   cuts on whitespace by step 500); seed 1: suffix boundaries (0.7% on whitespace; top chunks `s`, `d`, `ed`, `ing`,
+   `ion`). The next-chunk CE is *the same* in both (4.9 at step 500): a suffix sequence is as predictable as a word
+   sequence, so the chunk-level objective does not prefer the useful tokenizer. Besides, that objective is computed on
+   the inner outputs before dechunking and the STE sits on the dechunked path, so it sends the router no gradient at
+   all; the tokenizer objective never trained the tokenizer.
+4. **Steps 400–600, lock-in.** Word chunks carry identity the byte decoder can use, so the decoder returns to the
+   hierarchy (rms 0.75 → 1.4), the STE gradient returns, the margin recovers to 0.4 and the segmentation hardens to
+   99.9% consistency. Suffix chunks tell the decoder about the word that just ended, not the one coming; the decoder
+   never returns, the router's raw logits go heavy-tailed (std 17), margin stays 0.10, residual grows to 2.3.
+5. **The warm start short-circuits step 2–3:** the hierarchy's output never falls below 0.95, the margin never below
+   0.29, and the next-chunk CE is lower from step 0.
+
+So the failure is a positive-feedback race between two parallel paths into the decoder, started by the bypass opening
+while the router is undecided, and the router has no objective of its own that favours word-like types. Three things
+follow: (a) the router needs a training signal that does not pass through the decoder's adoption (`dc.chunk_ste`: the
+next-chunk loss now reaches the router); (b) the bypass should not open while the tokenizer is undecided
+(`dc.residual_gate=margin`, or no residual at all in the vocabulary regime, never tested); (c) at this scale the outer
+networks hold 60% of the compute, so the bypass can do most of the job by itself; at L12 they hold 12% (docs/LADDER.md),
+so the race may be a small-scale artefact — the ladder decides. The next-chunk objective's indifference between word
+and suffix tokenizers is the deeper problem: predictability is not usefulness; a tokenizer objective must be tied to
+the byte-level loss (BPE's "compress the corpus" criterion is also predictability-blind, which is why it needs the
+pretokenizer). EXP-027 tests (a), (b) and a thin-outer/heavy-main allocation at equal FLOPs.

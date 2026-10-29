@@ -103,10 +103,13 @@ class DCConfig:
     #   ("bottleneck first": early on all information must pass through the hierarchy, so the main network learns
     #   chunk-level representations before the decoder may bypass it). 0 = off.
     residual_warmup: float = 0.0
-    # residual_warmup: fraction of training over which the residual path into each decoder is scaled from 0 to 1
-    #   ("bottleneck first": early on all information must pass through the hierarchy, so routers and the main
-    #   network learn chunk-level representations before the decoder may bypass them). 0 = off.
-    residual_warmup: float = 0.0
+    # residual_gate: "none" or "margin": the residual path into each decoder is scaled by the stage router's mean
+    #   confidence margin 2*mean|p-0.5| (detached), so the bypass only opens once the router has decided (logbook
+    #   "Deep dive: the adoption race": the bypass opens at steps 60-130 while the router is still undecided).
+    residual_gate: str = "none"
+    # chunk_ste: multiply the chunk vectors entering the main network by STE(selected_probs), so chunk-level losses
+    #   (next-chunk CE, main_aux) reach the router directly instead of only through the decoder's use of the output.
+    chunk_ste: bool = False
     # main_aux_weight: weight of an auxiliary next-byte CE on the stage-0 dechunked main-network output alone
     #   (before the residual is added), a direct learning signal for everything below stage 0.
     main_aux_weight: float = 0.0

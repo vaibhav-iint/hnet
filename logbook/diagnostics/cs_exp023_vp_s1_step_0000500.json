@@ -1,0 +1,233 @@
+{
+ "bytes": 95053,
+ "whitespace": {
+  "chunks": 15589,
+  "mean_len": 6.097,
+  "types": 5894,
+  "type_token_ratio": 0.3781,
+  "singleton_frac": 0.2719,
+  "unigram_bits_per_chunk": 10.481,
+  "unigram_bits_per_byte": 1.7189,
+  "top": [
+   [
+    "the ",
+    799
+   ],
+   [
+    "of ",
+    530
+   ],
+   [
+    "and ",
+    414
+   ],
+   [
+    "to ",
+    358
+   ],
+   [
+    "a ",
+    331
+   ],
+   [
+    "in ",
+    276
+   ],
+   [
+    "is ",
+    207
+   ],
+   [
+    "for ",
+    141
+   ],
+   [
+    "that ",
+    139
+   ],
+   [
+    "The ",
+    126
+   ],
+   [
+    "are ",
+    118
+   ],
+   [
+    "on ",
+    102
+   ],
+   [
+    "as ",
+    91
+   ],
+   [
+    "with ",
+    78
+   ],
+   [
+    "have ",
+    76
+   ],
+   [
+    "be ",
+    72
+   ],
+   [
+    "by ",
+    71
+   ],
+   [
+    "or ",
+    66
+   ],
+   [
+    "from ",
+    64
+   ],
+   [
+    "you ",
+    62
+   ],
+   [
+    "- ",
+    61
+   ],
+   [
+    "can ",
+    60
+   ],
+   [
+    "at ",
+    56
+   ],
+   [
+    "this ",
+    53
+   ],
+   [
+    "it ",
+    52
+   ]
+  ]
+ },
+ "stages": [
+  {
+   "chunks": 14623,
+   "mean_len": 6.5,
+   "types": 7043,
+   "type_token_ratio": 0.4816,
+   "singleton_frac": 0.387,
+   "unigram_bits_per_chunk": 11.025,
+   "unigram_bits_per_byte": 1.6961,
+   "top": [
+    [
+     "s",
+     949
+    ],
+    [
+     ",",
+     435
+    ],
+    [
+     " and",
+     325
+    ],
+    [
+     "d",
+     283
+    ],
+    [
+     "n",
+     126
+    ],
+    [
+     "r",
+     122
+    ],
+    [
+     " of",
+     120
+    ],
+    [
+     "ed",
+     117
+    ],
+    [
+     " that",
+     109
+    ],
+    [
+     "ing",
+     88
+    ],
+    [
+     "l",
+     77
+    ],
+    [
+     "e",
+     76
+    ],
+    [
+     " are",
+     74
+    ],
+    [
+     "t",
+     68
+    ],
+    [
+     "ly",
+     67
+    ],
+    [
+     "y",
+     67
+    ],
+    [
+     "er",
+     59
+    ],
+    [
+     " it",
+     56
+    ],
+    [
+     " is",
+     55
+    ],
+    [
+     "0",
+     54
+    ],
+    [
+     " or",
+     51
+    ],
+    [
+     "al",
+     47
+    ],
+    [
+     "g",
+     44
+    ],
+    [
+     " have",
+     41
+    ],
+    [
+     " by",
+     40
+    ]
+   ],
+   "boundaries_on_whitespace_frac": 0.0066,
+   "whitespace_boundaries_hit_frac": 0.0062,
+   "word_types_seen_3plus": 848,
+   "words_segmented_consistently_frac": 0.7453,
+   "dominant_segmentation_share": 0.9257
+  }
+ ],
+ "checkpoint": "runs/gcp/exp023_word_vocab_trimmed/vp_s1/ckpt/step_0000500"
+}

@@ -76,8 +76,9 @@ class HNet(nn.Module):
             self.residual_dropout = float(dc["residual_dropout"] or 0.0)
             self.residual_warmup = float(cfg.dc.residual_warmup or 0.0)
             self.progress = 1.0  # training progress in [0, 1], set by HNetForCausalLM.set_progress
-            self.residual_warmup = float(cfg.dc.residual_warmup or 0.0)
-            self.progress = 1.0  # training progress in [0, 1], set by HNetForCausalLM.set_progress
+            assert cfg.dc.residual_gate in ("none", "margin"), cfg.dc.residual_gate
+            self.residual_gate = cfg.dc.residual_gate
+            self.chunk_ste = bool(cfg.dc.chunk_ste)
             self.encoder = iso(layout[0])
             self.main_network = HNet(cfg, stage_idx + 1)
             self.decoder = iso(layout[2])
@@ -135,6 +136,8 @@ class HNet(nn.Module):
         if self.decider is not None:
             r = self.decider(r, ctx)
         x, ctx_inner = self.chunk_layer(h, r.boundary_mask, ctx)
+        if self.chunk_ste:  # chunk-level losses (next-chunk CE, main_aux) reach the router through the chunk vectors
+            x = x * STE.apply(r.selected_probs.index_select(0, ctx_inner.outer_index)).to(x.dtype)
         inner_ids = input_ids.index_select(0, ctx_inner.outer_index) if input_ids is not None else None
         inner_boundaries = boundaries[1:] if boundaries else None
         inner_binfo = binfo.select(ctx_inner.outer_index) if binfo is not None else None
@@ -155,8 +158,10 @@ class HNet(nn.Module):
         r.inner_out = z  # with grad: the main network's output at this stage's inner resolution [M, D_inner]
         if self.residual_warmup > 0 and self.progress < self.residual_warmup:
             residual = residual * (self.progress / self.residual_warmup)
-        if self.residual_warmup > 0 and self.progress < self.residual_warmup:
-            residual = residual * (self.progress / self.residual_warmup)
+        if self.residual_gate == "margin":  # the bypass opens only once the router has decided
+            margin = (2 * (r.p.detach().float() - 0.5).abs().mean()).clamp(0, 1)
+            residual = residual * margin
+            r.extra["residual_gate"] = margin
         if self.training and self.residual_dropout > 0:  # drop the residual path for whole segments
             n_seg = ctx.cu_seqlens.numel() - 1
             keep = (torch.rand(n_seg, device=residual.device) >= self.residual_dropout).to(residual.dtype)

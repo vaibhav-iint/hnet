@@ -1,0 +1,30 @@
+# EXP-027: break the adoption race at its mechanism (work log, "Deep dive: the adoption race"). The race: the residual
+# bypass opens at steps 60-130 while the router is undecided, the decoder switches to it, the router (trained only
+# through the decoder's use of the hierarchy) stops learning and drifts into whichever basin (word vs suffix chunks);
+# the next-chunk objective is indifferent between the two and, computed before dechunking, never reaches the router.
+# Arms on the prior-free best configuration (EXP-023 `vp_ng`: 1-stage ratio 6, vocabulary + next-chunk loss, n-gram
+# tables; 1.720 / 1.669 / 1.656, seed 1 not adopted):
+#   cste       dc.chunk_ste: the chunk-level loss trains the router (gradient independent of the decoder's adoption)
+#   rgate      dc.residual_gate=margin: the bypass is scaled by the router's confidence margin (opens when decided)
+#   nores      no bypass at all (residual_dropout 1.0 at train time... see note: uses residual_gate=margin AND cste)
+#   cste_rgate both
+# No whitespace prior anywhere. 3 seeds. Reference: `vp_ng` and EXP-024 `prior` (1.635 with the prior).
+name: exp027_adoption_mechanism
+out_root: runs/search/exp027_adoption_mechanism
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp027_adoption_mechanism
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - model.dc.decision=quantile
+  - "model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}]"
+  - "model.ngram_embed={ns: [3, 4, 5, 6, 7, 8], buckets: 12289}"
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {cste: "router trained by the next-chunk loss (chunk STE)", rgate: "bypass gated by router margin",
+           cste_rgate: "both", thin_outer: "thin outer nets (m2/m2, d 64) + wider main, same FLOPs"}
+runs:
+  - {name: cste,       config: configs/runs/tiny_hnet1_2m.yaml, set: [model.dc.chunk_ste=true]}
+  - {name: rgate,      config: configs/runs/tiny_hnet1_2m.yaml, set: [model.dc.residual_gate=margin]}
+  - {name: cste_rgate, config: configs/runs/tiny_hnet1_2m.yaml, set: [model.dc.chunk_ste=true, model.dc.residual_gate=margin]}
