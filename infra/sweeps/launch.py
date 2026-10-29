@@ -139,19 +139,19 @@ def create_cmd(cs, zone: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------------------------- commands
-def load_spec(a):
+def load_spec(a, allow_missing: bool = False):
     from spec import Spec, SpecError
 
     try:
         spec = Spec.load(a.spec)
-        jobs = spec.jobs(allow_missing=getattr(a, "allow_missing", False))
+        jobs = spec.jobs(allow_missing=allow_missing)
     except SpecError as e:
         raise LaunchError(f"spec check failed: {e}")
     return spec, jobs
 
 
 def cmd_create(a) -> int:
-    spec, jobs = load_spec(a)
+    spec, jobs = load_spec(a, a.allow_missing)
     if spec.missing:
         print(f"# WARNING: runs skipped for missing configs: {spec.missing}")
     if a.vms < 1 or a.vms > len(jobs):
@@ -233,7 +233,7 @@ def read_status_files(gcs: str) -> dict:
 
 
 def cmd_status(a) -> int:
-    spec, jobs = load_spec(a)
+    spec, jobs = load_spec(a, allow_missing=True)  # launched jobs never include runs whose configs were missing
     gcs = a.gcs or default_gcs(spec.name, spec.raw.get("gcs"))
     vms = list_vms(spec.name)
     files = read_status_files(gcs)

@@ -351,3 +351,29 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
 - Caveat: at these context lengths NSA still sees 64–97% of the keys dense attention sees, so it is not yet a test of
   sparsity.
 - Open: CUDA parity for the flex and flash fast paths still has to run on a GPU VM before EXP-005.
+
+### WS-J done: trainer flags, resume hardening, sweep spec v2, launcher, report
+- Trainer flags (`hnet/train/cli.py`):
+  - Covers optimizer and Muon LR, schedule, budget, batch, checkpointing, resume, `--model YAML` and
+    `--print-config`.
+  - Precedence: config < flags < `--set`; a flag and a `--set` that conflict are an error.
+- Resume:
+  - Bitwise-identical resume on CPU, including after a SIGTERM or SIGKILL at an arbitrary step (AdamW and Muon),
+    tested in a subprocess.
+  - `resume_strict` refuses to resume if the config changed; `stop_on_nonfinite` writes `diverged.json`.
+  - My metrics truncation-on-resume is kept, made atomic, and tolerates a torn last line.
+- Sweep spec v2 (`scripts/search/spec.py`): grids, params, `--shard i/n`. Fairness "tuned" mode for per-arch LR
+  sweeps. `infra/sweeps/launch.py create|status|teardown`. `scripts/search/report.py` writes report.md,
+  best_params.yaml and figures.
+- Specs ready: EXP-003 (AdamW LR sweep), EXP-004 (Muon), EXP-005 (attention variants). EXP-004/005 take their
+  LRs from EXP-003's `best_params.yaml`.
+- Full suite: 576 passed, 37 skipped.
+
+### EXP-002 VM b: CUDA illegal memory access in mamba_ssm SSD backward
+- All three runs on `hx-exp002b-l4` (paper_s0, paper_s1, end_linear_s0) crashed within about 30 steps:
+  `ssd_combined.py:971 dxBC_given.copy_` → `cudaErrorIllegalAddress`.
+- paper_s0 logged compression 5.3 → 44 bytes/position at step 20 just before the crash, which looks like corrupted
+  numerics rather than router behaviour.
+- VM c's runs (paper_r42, paper_nosmooth, same micro_batch 16) are healthy at step 170+. WS-H's 177-step run with
+  the same kernels used micro_batch 64.
+- Repro: `scripts/debug/repro_ssd_crash.sh` runs five cases one at a time with `CUDA_LAUNCH_BLOCKING=1`.

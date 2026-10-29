@@ -93,8 +93,12 @@ Byte and token runs see the same text per step up to the ~1% gap between 256×17
 | `ckpt_every` | 1000 | rolling checkpoints every N steps, keep `ckpt_keep` |
 | `ckpt_every_tokens` | null | permanent checkpoints whenever tok-eq crosses a multiple of N |
 | `ckpt_steps` | [] | permanent checkpoints at these steps |
+| `ckpt_tokens` | [] | permanent checkpoints at the first step reaching each of these tok-eq values |
+| `ckpt_keep` | 2 | rolling checkpoints kept (>= 1) |
 | `save_final` | true | permanent checkpoint at the end |
-| `resume` | `auto` | `auto` = latest `<out_dir>/ckpt/step_*`; a path; or null |
+| `resume` | `auto` | `auto` = latest `<out_dir>/ckpt/step_*`; a checkpoint dir or a run dir (its latest); or null. An explicit path without a checkpoint is an error |
+| `resume_strict` | true | refuse to resume when model/data/optimizer/LR/schedule/budget/seed/precision differ from the checkpoint's config |
+| `stop_on_nonfinite` | 3 | stop after N consecutive non-finite logged losses, write `diverged.json`, no checkpoint (0 = never) |
 | `device` | auto | `cuda` if available |
 | `check_signals_every` | 10 | DDP: steps between cross-rank stop checks (SIGTERM/SIGINT/max_hours) |
 | `dist_timeout_min` | 60 | process-group timeout (covers rank-0 downstream eval) |
@@ -102,7 +106,9 @@ Byte and token runs see the same text per step up to the ~1% gap between 256×17
 
 Checkpoint `ckpt/step_XXXXXXX/` holds `model.pt`, `optim.pt`, `rank{r}.pt` (RNG, loader state, counters),
 `meta.json` and `KEEP` for permanent ones. They are written to `.tmp_*` and renamed into place. Resume is exact:
-the same per-step losses as an uninterrupted run (tested on CPU).
+the same per-step losses as an uninterrupted run, also after SIGTERM/SIGKILL at an arbitrary step (tested on CPU
+with AdamW and Muon, `tests/test_train_resume_kill.py`). Command-line flags for these keys (`--lr`, `--seed`,
+`--resume`, `--print-config`, ...): `python -m hnet.train.train --help`; workflow: docs/EXPERIMENTS_HOWTO.md.
 
 ## `eval`
 
