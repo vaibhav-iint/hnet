@@ -118,6 +118,20 @@ runs:
   - data.batch_bytes=544768
   - train.train_bytes=494649344
   - 'model.dc.decision_kwargs={explore: 0.5, explore_frac: 0.3}'
+- name: g1_wild_01
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g1-wild-01.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g1_wild_02
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g1-wild-02.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
 report:
   baseline: bpe
   labels:
@@ -138,3 +152,6 @@ report:
       L04 run above
     g1_router_01: Self-surprise tokenizer teacher (prior-free; a decaying curriculum, labelled as such)
     g1_router_02: Exploring rank decisions (prior-free; an annealed exploration schedule, not a curriculum toward any target)
+    g1_wild_01: In-context match model (the PPM / LZ77 / PAQ "match model", built into the byte LM)
+    g1_wild_02: 'Prefix output dictionary: give the byte model the output half of BPE''s vocabulary, which it lacks entirely,
+      at 1% of BPE'
