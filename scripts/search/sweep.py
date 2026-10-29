@@ -102,11 +102,18 @@ def gcloud(args):
     return subprocess.run(["gcloud", *args], capture_output=True, text=True, check=False)
 
 
-def gcs_sync(local: str, remote: str):
-    """Mirror a directory to GCS; a failed upload is an error (results must not silently stay local)."""
-    r = gcloud(["storage", "rsync", "-r", local, remote])
-    if r.returncode != 0:
-        raise RuntimeError(f"gcloud storage rsync {local} -> {remote} failed:\n{r.stderr[-2000:]}")
+def gcs_sync(local: str, remote: str, attempts: int = 4, backoff: float = 15.0):
+    """Mirror a directory to GCS; a failed upload is an error (results must not silently stay local). Transient GCS
+    errors (e.g. HTTP 503) are retried with exponential backoff; the last failure raises."""
+    for i in range(attempts):
+        r = gcloud(["storage", "rsync", "-r", local, remote])
+        if r.returncode == 0:
+            return
+        if i + 1 < attempts:
+            print(f"[sweep] WARN gcloud storage rsync {local} failed (attempt {i + 1}/{attempts}), retrying:\n"
+                  f"{r.stderr[-500:]}", flush=True)
+            time.sleep(backoff * 2**i)
+    raise RuntimeError(f"gcloud storage rsync {local} -> {remote} failed after {attempts} attempts:\n{r.stderr[-2000:]}")
 
 
 def gcs_list_dirs(prefix: str) -> set:
