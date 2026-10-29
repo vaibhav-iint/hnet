@@ -27,6 +27,9 @@ def _env(tmp_path, monkeypatch):
     yield
 
 
+_REAL_RUN = subprocess.run
+
+
 class FakeGcloud:
     """Replaces subprocess.run for gcloud calls; `handler(args) -> (code, stdout, stderr)`."""
 
@@ -34,6 +37,8 @@ class FakeGcloud:
         self.handler, self.calls, self.envs = handler, [], []
 
     def __call__(self, args, **kw):
+        if args[0] == "git":  # local repo queries run for real
+            return _REAL_RUN(args, **kw)
         assert args[0] == "gcloud", args
         self.calls.append(args)
         self.envs.append(kw.get("env"))
@@ -137,8 +142,9 @@ def test_zone_fallback_stops_on_hard_error_and_cleans_leftover(tmp_path, monkeyp
         raise AssertionError(a)
 
     monkeypatch.setattr(subprocess, "run", FakeGcloud(h))
-    r = gce.create_with_fallback(_spec(tmp_path), ["z1", "z2"], log=lambda *x: None)
-    assert not r.ok and len(r.tried) == 1 and state["deleted"] == ["hnet-t"]
+    with pytest.raises(gce.GcloudError, match="permission denied"):
+        gce.create_with_fallback(_spec(tmp_path), ["z1", "z2"], log=lambda *x: None)
+    assert state["deleted"] == ["hnet-t"]
 
 
 def test_zone_fallback_never_touches_existing(tmp_path, monkeypatch):
@@ -148,8 +154,22 @@ def test_zone_fallback_never_touches_existing(tmp_path, monkeypatch):
         raise AssertionError(f"unexpected call {a}")
 
     monkeypatch.setattr(subprocess, "run", FakeGcloud(h))
-    r = gce.create_with_fallback(_spec(tmp_path), ["z1", "z2"], log=lambda *x: None)
-    assert not r.ok and len(r.tried) == 1
+    with pytest.raises(gce.GcloudError, match="already exists"):
+        gce.create_with_fallback(_spec(tmp_path), ["z1", "z2"], log=lambda *x: None)
+
+
+def test_zone_fallback_all_zones_exhausted(tmp_path, monkeypatch):
+    def h(a):
+        if a[3] == "create":
+            return 1, "", STOCKOUT
+        if a[3] == "describe":
+            return 1, "", NOTFOUND
+        raise AssertionError(a)
+
+    monkeypatch.setattr(subprocess, "run", FakeGcloud(h))
+    with pytest.raises(gce.NoCapacity) as ei:
+        gce.create_with_fallback(_spec(tmp_path), ["z1", "z2"], log=lambda *x: None)
+    assert [z for z, _ in ei.value.tried] == ["z1", "z2"]
 
 
 def test_retryable_classification():
@@ -164,8 +184,8 @@ def test_retryable_classification():
 def test_parse_serial_response_forms():
     d = gce.parse_serial_response(json.dumps({"contents": "abc\n", "start": "10", "next": "14"}), "", 10)
     assert d == {"contents": "abc\n", "start": 10, "next": 14}
-    d = gce.parse_serial_response("hello\n", "\nSpecify --start=106 in the next get-serial-port-output invocation", 100)
-    assert d["next"] == 106 and d["contents"] == "hello\n" and d["start"] == 100
+    with pytest.raises(ValueError):  # we always ask for JSON; anything else is an error, not a fallback
+        gce.parse_serial_response("hello\n", "", 100)
 
 
 class FakeSerial:

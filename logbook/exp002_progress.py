@@ -3,7 +3,7 @@
     python logbook/exp002_progress.py [--no-pull]
 
 Writes logbook/figures/exp002_progress.png with three rows:
-  1. training bpb vs bytes seen (EMA-smoothed, mean over seeds)
+  1. training bpb vs bytes seen (centred 5-point rolling mean, mean over seeds)
   2. validation bpb vs bytes seen (same val text for every run)
   3. realized compression per stage (bytes per stage-s position) for the H-Nets
 Left column: boundary routers (paper LH-Net router vs end-of-chunk guesses). Right column: ablations of the paper router.
@@ -55,12 +55,14 @@ def load_runs():
     return runs
 
 
-def ema(y, alpha=0.05):
-    out, m = [], None
-    for v in y:
-        m = v if m is None else (1 - alpha) * m + alpha * v
-        out.append(m)
-    return np.array(out)
+def smooth_curve(y, k=5):
+    """Centred rolling mean over k logged points (no lag; edges use the available neighbours)."""
+    y = np.asarray(y, dtype=float)
+    out = np.empty_like(y)
+    for i in range(len(y)):
+        lo, hi = max(0, i - k // 2), min(len(y), i + k // 2 + 1)
+        out[i] = y[lo:hi].mean()
+    return out
 
 
 def mean_curve(seeds, key, source, smooth=False):
@@ -71,7 +73,7 @@ def mean_curve(seeds, key, source, smooth=False):
         if recs:
             x = np.array([r["bytes_seen"] for r in recs], dtype=float)
             y = np.array([r[key] for r in recs], dtype=float)
-            curves.append((x, ema(y) if smooth else y))
+            curves.append((x, smooth_curve(y) if smooth else y))
     if not curves:
         return None, None
     n = min(len(c[0]) for c in curves)
@@ -88,7 +90,8 @@ def plot(runs):
             ax = axes[row, col]
             x, y = mean_curve(runs.get("bpe", []), key, source, smooth)
             if x is not None:
-                ax.plot(x / 1e6, y, color=BASELINE_COLOR, lw=2, label=LABELS["bpe"])
+                ax.plot(x / 1e6, y, color=BASELINE_COLOR, lw=2, label=LABELS["bpe"],
+                        marker="o" if source == "eval" else None, ms=3)
             for i, v in enumerate(variants):
                 x, y = mean_curve(runs.get(v, []), key, source, smooth)
                 if x is not None:

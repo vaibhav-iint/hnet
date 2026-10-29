@@ -229,26 +229,23 @@ def cmd_launch(a) -> int:
            "meta": {"data": a.data, "linger_min": a.linger_min, "job": job, "startup_path": str(spath)}}
     with st.locked():
         st.add(rec)
-    res = gce.create_with_fallback(spec, zones, log=_p)
+    try:
+        res = gce.create_with_fallback(spec, zones, log=_p)
+    except BaseException as e:  # close the ledger entry, then let the error surface
+        with st.locked():
+            r = st.get(name)
+            r["segments"][-1]["end"] = r["segments"][-1]["start"]
+            r["ended_at"] = r["created_at"] = time.time()
+            r["status"] = "CREATE_FAILED"
+            r["meta"]["error"] = str(e)[-1000:]
+        raise
     with st.locked():
         r = st.get(name)
-        if not res.ok:
-            r["segments"][-1]["end"] = r["segments"][-1]["start"]
-            r["ended_at"] = time.time()
-            r["created_at"] = r["ended_at"]
-            r["status"] = "CREATE_FAILED"
-            r["meta"]["tried"] = res.tried
-        else:
-            t = time.time()
-            r["zone"] = res.zone
-            r["status"] = (res.instance or {}).get("status", "RUNNING")
-            r["segments"][-1].update({"start": t, "deadline": t + a.max_hours * 3600})
-            r["meta"]["tried"] = res.tried
-    if not res.ok:
-        _p("FAILED: no zone could create the VM:")
-        for z, e in res.tried:
-            _p(f"  {z}: {e}")
-        return 4
+        t = time.time()
+        r["zone"] = res.zone
+        r["status"] = (res.instance or {}).get("status", "RUNNING")
+        r["segments"][-1].update({"start": t, "deadline": t + a.max_hours * 3600})
+        r["meta"]["tried"] = res.tried
     _p(f"created {name} in {res.zone}. Follow with:\n  python -m infra.gcp watch {name}\n"
        f"  python -m infra.gcp sync-metrics {name}")
     return 0

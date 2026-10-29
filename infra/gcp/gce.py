@@ -135,33 +135,37 @@ class CreateResult:
     instance: dict | None = None
 
 
+class NoCapacity(RuntimeError):
+    """Every zone answered with a capacity/quota/availability error."""
+
+    def __init__(self, tried: list):
+        self.tried = tried
+        super().__init__("no zone could create the VM:\n" + "\n".join(f"  {z}: {e}" for z, e in tried))
+
+
 def create_with_fallback(spec: CreateSpec, zones: list[str], log=print) -> CreateResult:
-    """Try zones in order; move on only for capacity/quota/availability errors."""
+    """Try zones in order, moving on only for capacity/quota/availability errors. Any other error is
+    raised as is; NoCapacity when every zone refused."""
     tried = []
     for z in zones:
         log(f"[create] {spec.name} in {z} ({spec.machine_type}{', spot' if spec.spot else ''})")
         try:
             out = run(create_args(spec, z), timeout=600)
-            inst = out[0] if isinstance(out, list) and out else out
-            return CreateResult(True, z, tried, inst)
         except GcloudError as e:
-            short = _short(e.stderr)
-            tried.append((z, short))
             if "already exists" in e.stderr.lower():
-                log(f"[create] {spec.name} already exists in {z}; refusing to touch it")
-                return CreateResult(False, None, tried)
-            # a failed insert can leave a half-created instance behind: make sure nothing remains
-            leftover = describe(spec.name, z)
-            if leftover is not None:
-                if leftover.get("status") in ("RUNNING", "STAGING", "PROVISIONING") and not is_retryable(e.stderr):
-                    return CreateResult(True, z, tried, leftover)
-                log(f"[create] removing leftover {spec.name} in {z} ({leftover.get('status')})")
+                raise  # an existing VM of that name is never touched
+            # a failed insert can leave a half-created instance of our new name behind: remove it
+            if describe(spec.name, z) is not None:
+                log(f"[create] removing the half-created {spec.name} in {z}")
                 delete(spec.name, z)
             if not is_retryable(e.stderr):
-                log(f"[create] {z}: non-retryable error: {short}")
-                return CreateResult(False, None, tried)
-            log(f"[create] {z}: {short} -> next zone")
-    return CreateResult(False, None, tried)
+                raise
+            tried.append((z, _short(e.stderr)))
+            log(f"[create] {z}: {tried[-1][1]} -> next zone")
+            continue
+        inst = out[0] if isinstance(out, list) and out else out
+        return CreateResult(True, z, tried, inst)
+    raise NoCapacity(tried)
 
 
 def _short(stderr: str) -> str:
