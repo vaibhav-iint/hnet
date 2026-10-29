@@ -1,0 +1,24 @@
+# EXP-014: rank-based boundary decisions (hnet/model/routing/decide.py). EXP-003 showed the stage-1 router becomes
+# a limit cycle at lr >= 3e-3 (select-all <-> select-none) because the threshold-0.5 rule flips every position on a
+# uniform shift of the router's bias. Quantile decisions select exactly the top 1/N positions by p, are immune to
+# such shifts, pin compression, and make the ratio loss inert. Arms (2-stage, end-of-chunk MLP router, same budget
+# as EXP-002/006/012/013): quantile at lr 1.5e-3 (vs EXP-012 `select`), quantile at lr 6e-3 (vs EXP-013 `lr6`), and
+# quantile + attention-pool chunk vectors at 1.5e-3 (vs EXP-012 `pool_attn`).
+name: exp014_quantile_decision
+out_root: runs/search/exp014_quantile_decision
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp014_quantile_decision
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - model.dc.decision=quantile
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {quant: "quantile decisions, lr 1.5e-3", quant_lr6: "quantile decisions, lr 6e-3",
+           quant_pool: "quantile decisions + attention-pool chunk vectors, lr 1.5e-3"}
+runs:
+  - {name: quant,      config: configs/runs/tiny_hnet2_2m.yaml}
+  - {name: quant_lr6,  config: configs/runs/tiny_hnet2_2m.yaml, set: [train.lr=6.0e-3]}
+  - {name: quant_pool, config: configs/runs/tiny_hnet2_2m.yaml,
+     set: [model.dc.chunker=pool, "model.dc.chunker_kwargs={mode: attn}"]}

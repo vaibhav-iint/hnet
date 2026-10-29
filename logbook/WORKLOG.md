@@ -575,3 +575,18 @@ Probes from the innermost main network's input x (the chunk vector) to the bytes
   flip a whole batch to "no boundaries". This is the mechanism behind H-Net's LR ceiling.
 - Next: EXP-013 tests whether stabilizing the router (strong ratio loss, entropy penalty) lets the H-Net use BPE's
   LR, and whether the main network is under-trained (inverted multipliers [1, 1, 4]).
+
+### The stage-1 router is a limit cycle at high LR (`logbook/figures/exp003_collapses.png`)
+- At lr 6e-3 the stage-1 router oscillates for the whole run between compression 1 (every position selected) and
+  ~500 (none), every few steps; at 3e-3 in bursts; at 1.5e-3 it holds near 3. Stage 0 is stable at every LR.
+- Training bpb barely reacts, because the decoder relies on the residual path: nothing damps the router.
+- Mechanism: the ratio loss constrains only the *mean* of p; the stage-1 p's are clustered near 0.5 (the
+  "undecided router" of the diagnostics), so a uniform shift of the router's bias flips every position at once. The
+  ratio loss then pushes back and Adam's momentum overshoots.
+- The EXP-008 `combo` OOMs (both seeds) are the same failure: the router-entropy penalty drove the stage-1 router to
+  select everything, the main network saw ~32k positions instead of ~3.6k, and attention ran out of memory. The
+  entropy penalty amplifies the all-flip mode; verdict: harmful.
+- Fix to test: **rank-based (quantile) boundary decisions**. In training, select the top 1/N positions by p (batch
+  quantile) and keep a running threshold for eval (BatchNorm-style); p is recentred so the threshold maps to 0.5
+  for the STE and the EMA dechunker. Compression is pinned exactly, the decision is immune to uniform shifts, and
+  the ratio loss becomes an exact constant (inert), so α disappears.

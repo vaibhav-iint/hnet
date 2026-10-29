@@ -84,6 +84,10 @@ class HNet(nn.Module):
             self.routing_module = registry.build(
                 "router", dc["router"], d, target_ratio=dc["target_ratio"], **(dc["router_kwargs"] or {})
             )
+            from .routing.decide import DECISIONS, QuantileDecider
+
+            assert dc["decision"] in DECISIONS, dc["decision"]
+            self.decider = QuantileDecider(dc["target_ratio"]) if dc["decision"] == "quantile" else None
             self.chunk_layer = registry.build("chunker", dc["chunker"], d, **(dc["chunker_kwargs"] or {}))
             need = getattr(self.chunk_layer, "requires_semantics", None)
             have = self.routing_module.boundary_semantics
@@ -120,6 +124,8 @@ class HNet(nn.Module):
         with _no_autocast(h.device):
             residual = self.residual_proj(h.float())
         r = self.routing_module(h, ctx, input_ids=input_ids, boundaries=boundaries[0] if boundaries else None)
+        if self.decider is not None:
+            r = self.decider(r, ctx)
         x, ctx_inner = self.chunk_layer(h, r.boundary_mask, ctx)
         inner_ids = input_ids.index_select(0, ctx_inner.outer_index) if input_ids is not None else None
         inner_boundaries = boundaries[1:] if boundaries else None

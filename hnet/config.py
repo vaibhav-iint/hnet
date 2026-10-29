@@ -65,6 +65,7 @@ class DCConfig:
     ratio_loss_alpha: float = 0.03
     router: Any = "cosine_lookahead"  # paper / LH-Net router; see hnet/model/routing
     router_kwargs: Any = field(default_factory=dict)
+    decision: Any = "threshold"  # "threshold" (p > 0.5, paper) or "quantile" (top 1/N by rank; see routing/decide.py)
     chunker: Any = "select"  # keep vectors at boundaries (paper default); "pool" = learned summary over the chunk
     chunker_kwargs: Any = field(default_factory=dict)
     dechunker: Any = "ema"  # EMA smoothing (paper default); "repeat" = no smoothing
@@ -96,8 +97,8 @@ class DCConfig:
 
     def for_stage(self, s: int, n_stages: int) -> dict:
         out = {}
-        for name in ("router", "router_kwargs", "chunker", "chunker_kwargs", "dechunker", "ste", "aux_loss",
-                     "residual_dropout"):
+        for name in ("router", "router_kwargs", "decision", "chunker", "chunker_kwargs", "dechunker", "ste",
+                     "aux_loss", "residual_dropout"):
             v = getattr(self, name)
             if isinstance(v, list):
                 assert len(v) == n_stages, f"dc.{name}: expected {n_stages} values"
