@@ -1,0 +1,23 @@
+# EXP-009: is routing the bottleneck? 1-stage tiny H-Net (tiny_hnet1_2m: m4 / T8 / m4, 6 bytes per chunk) with
+# hand-made boundaries at identical FLOPs (FineWeb-Edu word starts average 6.0 bytes, the model's target ratio):
+#   space_start: SpaceByte rule, a chunk starts at each word start (decoder reads the current word's chunk)
+#   space_end:   a chunk ends at each word's closing space (decoder reads the most recent completed word)
+#   fixed6:      every 6 bytes (same compression, no semantics)
+# Compare with EXP-006 (same data/budget/eval): bpe and hnet1 (learned cosine-lookahead router), 3 seeds each.
+# If word chunks close most of the gap to BPE, the learned router is the bottleneck; if not, look elsewhere.
+name: exp009_oracle_chunks
+out_root: runs/search/exp009_oracle_chunks
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp009_oracle_chunks
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {space_start: "word-start chunks (oracle)", space_end: "word-end chunks (oracle)",
+           fixed6: "fixed 6-byte chunks"}
+runs:
+  - {name: space_start, config: configs/runs/tiny_hnet1_2m.yaml, set: [model.dc.router=space_like]}
+  - {name: space_end,   config: configs/runs/tiny_hnet1_2m.yaml,
+     set: [model.dc.router=space_like, "model.dc.router_kwargs={semantics: end}"]}
+  - {name: fixed6,      config: configs/runs/tiny_hnet1_2m.yaml, set: [model.dc.router=fixed_pool]}
