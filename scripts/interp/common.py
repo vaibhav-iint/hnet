@@ -164,6 +164,34 @@ def enumerate_runs() -> pd.DataFrame:
         rows.append({"run_id": rid, "exp_id": x.exp_id, "arm": x.arm, "seed": x.seed, "dir": str(p),
                      "status": x.status, "val_bpb_db": x.val_bpb_final, "zero_main_db": x.zero_main_bpb_final,
                      "adopted_db": x.adopted, "tokenizer_db": x.tokenizer_kind, **f})
+    # live mirrors: runs that finished or appeared after the runs.csv snapshot (EXP-025/026/027, ladder)
+    have = {(x["exp_id"], x["arm"], int(x["seed"]) if not pd.isna(x["seed"]) else 0) for x in rows}
+    have_dirs = {x["dir"] for x in rows}
+    live_map = {"exp025_muon": "EXP-025", "exp026_mamba_free": "EXP-026", "exp027_adoption_mechanism": "EXP-027",
+                "ladder_lr_1e16": "LADDER-LR-1e16", "lrext_1e16": "LADDER-LREXT-1e16"}
+    if LIVE.exists():
+        for sub in sorted(LIVE.iterdir()):
+            exp = live_map.get(sub.name)
+            if exp is None and sub.name.startswith("ladder_1e1"):
+                b, rung = sub.name.split("_")[1:3]
+                exp = f"LADDER-{b}-{rung}"
+            if exp is None:
+                continue
+            for rd in sorted(sub.glob("*_s[0-9]")):
+                if not (rd / "metrics.jsonl").exists() or str(rd) in have_dirs:
+                    continue
+                arm, seed = rd.name.rsplit("_s", 1)
+                if (exp, arm, int(seed)) in have:
+                    continue
+                cfg = _find_config(rd, exp, arm, int(seed))
+                f = run_features(cfg, arm, exp)
+                if cfg is None and exp.startswith("LADDER"):
+                    f.update(kind="bpe" if arm.startswith("bpe") else "hnet", optimizer="muon",
+                             muon_lr=float(arm.split("mlr")[1]) if "mlr" in arm else 0.02,
+                             n_stages=None if arm.startswith("bpe") else 1, prior_w=1.0 if arm.startswith("hnet_ws") else 0.0)
+                rows.append({"run_id": f"{exp}/{arm}_s{seed}", "exp_id": exp, "arm": arm, "seed": float(seed),
+                             "dir": str(rd), "status": "live", "val_bpb_db": None, "zero_main_db": None,
+                             "adopted_db": None, "tokenizer_db": None, **f})
     return pd.DataFrame(rows)
 
 
