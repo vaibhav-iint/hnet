@@ -33,3 +33,7 @@ checks:
   fairness: pass
   grad_audit: logbook/evolve/candidates/g1-mem-01/grad_audit.txt
   smoke: pass
+  smoke_log: logbook/evolve/candidates/g1-mem-01/smoke.txt
+  bit_identity: logbook/evolve/candidates/g1-mem-01/bit_identity.txt
+  numbers: {params: 20022761, params_bpe: 20023040, gflops_per_byte: 0.02048, gflops_per_byte_hnet: 0.02037,
+            flops_vs_hnet: +0.55%, smoke_trie_ablation_bpb: +0.32}
