@@ -421,3 +421,17 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
   - Tests: identical block layout and dense mask to torch's `create_block_mask`, and exact under a tiny chunk budget.
 - VMs b and e (in setup) were reset onto 1bdcc27. VMs d and f keep running on 9e9f8c4. The other three runs on d
   survived end_mlp_s1's failure; end_mlp_s1 needs a rerun.
+
+### EXP-002 at 10/18; EXP-003 launched (commit df6ad43)
+- EXP-002: 10 runs are done. Every finished H-Net ablation ends at val ≈ 1.82–1.83 bpb vs BPE 1.635: H-Net trails
+  by ~0.19 bpb at the ~2M scale, and the ablations barely differ.
+- The bytes-per-position panels are now log scale.
+- Sweep uploads retry transient GCS errors (an HTTP 503 had failed VM f's final sync). Restarting f uploaded the
+  missing final checkpoints.
+- VM b (paper, end_linear) was preempted five times in us-central1-a and is now **on-demand** in us-central1-c
+  (about $1.3 extra). Its runs restarted from scratch: no checkpoint had been reached.
+- EXP-003 (AdamW LR sweep: bpe, paper, end_mlp and end_cosine_shift × LR {5e-4, 1e-3, 1.5e-3, 3e-3, 6e-3} × 3
+  seeds = 60 runs) was launched with `infra/sweeps/launch.py` on 5 spot L4s (12 jobs each, 3 in parallel). Worst case
+  $9.26; fairness gate (tuned) reports no problems.
+- Babysitter (`launch/babysit.sh`) covers EXP-002 VM d and the EXP-003 VMs. It restarts a preempted VM in place, or
+  recreates it in another zone from the exact `launch.py` create command.
