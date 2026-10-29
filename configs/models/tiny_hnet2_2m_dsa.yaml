@@ -23,4 +23,4 @@ matching:
   seq_len_tokens: 448
   bytes_per_token: 4.6
   reference: "tiny_bpe_2m"
-  ablation_of: "tiny_hnet2_2m"
+  variant_of: "tiny_hnet2_2m"  # differs only in the attention mixer (tests/test_mixers_deepseek.py)

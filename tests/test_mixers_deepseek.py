@@ -561,13 +561,13 @@ def test_variant_configs_exist():
 @pytest.mark.parametrize("path", VARIANT_CONFIGS, ids=lambda p: os.path.basename(p)[:-5])
 def test_variant_configs_matched_and_minimal(path):
     y = load_yaml(path)
-    base_name = y["matching"]["ablation_of"]
+    base_name = y["matching"]["variant_of"]
     base = load_yaml(os.path.join(ROOT, "configs", "models", base_name + ".yaml"))
     variant = os.path.basename(path)[:-5].rsplit("_", 1)[-1]
     # identical to the base except the attention-mixer fields
     strip = lambda d: {k: v for k, v in d.items() if k not in MIXER_KEYS}  # noqa: E731
     assert strip(y["model"]) == strip(base["model"])
-    skip = ("ablation_of", "reference")
+    skip = ("variant_of", "reference")
     assert {k: v for k, v in y["matching"].items() if k not in skip} == {
         k: v for k, v in base["matching"].items() if k not in skip}
     cfg, fpb = _flops_of(path)
