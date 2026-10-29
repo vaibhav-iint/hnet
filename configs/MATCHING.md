@@ -99,6 +99,41 @@ DC / mixer fields, plus the main network where re-matched:
   T12 (+0.1%), tiny_hnet2_10m_ratios42 T11 (+1.6%), tiny_hnet2_2m_ratios42 T7 with main `d_intermediate` 896
   instead of 768 (+1.3%; depth alone gives -3.0% / +2.7%).
 
+## Attention variants
+
+DeepSeek attention mixers (`hnet/model/mixers/deepseek.py`, write-up in `docs/ATTENTION_DEEPSEEK.md`; WS-I1). Each
+config is its base with **only the attention mixer swapped**: dense = `mixer` / `mixer_kwargs` (plus top-level
+`num_kv_heads` for NSA, whose only consumer is the mixer); H-Net = main-network `t` code via per-stage
+`mixer_codes` / `mixer_cfg` (stage-0/1 SWA attention unchanged). FLOPs were matched with each variant's own knobs
+(MLA ranks / head dims, NSA KV heads and compression-MLP width, DSA indexer width); data, optimizer and schedule
+come from the unchanged run files, and `scripts/search/fairness.py` on a spec with all eight runs reports no
+problems. Mixer columns: one mixer layer at the stage's sequence length (dense 448 tokens, H-Net main 2048/9
+positions), forward FLOPs per position from the mixer's `flops_per_position`, params from the meta-device build.
+
+| config | mixer | params (M) | non-emb (M) | train GFLOPs/byte | vs tiny_bpe_2m | vs base | mixer params (vs attn) | mixer fwd FLOPs/pos (vs attn) |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| tiny_bpe_2m | attn | 15.01 | 2.133 | 0.01195 | +0.00% | +0.00% | 65.5k | 248.7k |
+| tiny_bpe_2m_mla | mla | 15.01 | 2.134 | 0.01195 | +0.00% | +0.00% | 65.7k (+0%) | 248.7k (+0.00%) |
+| tiny_bpe_2m_nsa | nsa | 15.26 | 2.387 | 0.01195 | +0.05% | +0.05% | 91.0k (+39%) | 249.6k (+0.34%) |
+| tiny_bpe_2m_dsa | dsa | 15.14 | 2.263 | 0.01194 | -0.04% | -0.04% | 78.6k (+20%) | 248.0k (-0.28%) |
+| tiny_hnet2_2m | attn | 7.91 | 7.857 | 0.01194 | -0.05% | +0.00% | 262.1k | 644.1k |
+| tiny_hnet2_2m_mla | mla | 7.92 | 7.866 | 0.01195 | -0.00% | +0.04% | 263.5k (+1%) | 646.3k (+0.35%) |
+| tiny_hnet2_2m_nsa | nsa | 8.11 | 8.063 | 0.01194 | -0.05% | -0.01% | 291.6k (+11%) | 643.7k (-0.05%) |
+| tiny_hnet2_2m_dsa | dsa | 8.05 | 8.003 | 0.01195 | +0.00% | +0.05% | 283.0k (+8%) | 646.4k (+0.37%) |
+
+Knobs (dense d=128, 4 heads of 32; H-Net main d=256, 8 heads of 32):
+* `_mla`: qk = 16 nope + 16 decoupled-RoPE (the base's qk head dim; H-Net base also ropes 16 of 32), v 32,
+  `q_lora_rank` d/2 (64 / 128, costs the same as a full-rank query), `kv_lora_rank` 96 / 200 (the matching knob).
+* `_nsa`: compression l=8 stride 4, selection l'=8 x n=8 (1 initial + 2 local + 5 ranked = 64 keys), window 32,
+  independent K/V per branch (paper), GQA with 2 KV heads (G = 2 / 4; selection is shared per group, as in the
+  paper), compression-MLP hidden 12 / 96 (the matching knob). At these lengths the three branches together still
+  attend to 64% (dense) / 97% (H-Net main) of the keys of dense causal attention (keys per query 143 vs 224.5 and
+  111 vs 114.5), so the extra K/V projections are paid for mostly by fewer KV heads; sparsity only saves compute at
+  longer contexts.
+* `_dsa`: the `_mla` attention (same ranks; H-Net kv 200) + lightning indexer 4 heads x 32 / 24 (the matching knob),
+  top-64 keys. The indexer costs ~(2 d_I + 3) H_I per causal key; top-64 saves ~(1 - 64/ctx) of the attention
+  quadratic term. Indexer trained by its KL loss (V3.2 Eq. 4), injected into backward (`index_loss: inject`).
+
 ## Calibration: which convention reproduces which published number
 
 Tested in `tests/test_flops.py`.

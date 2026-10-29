@@ -6,6 +6,10 @@
 # tiny_bpe_2m within +-2%); `attn` uses the plain tiny_bpe_2m / tiny_hnet2_2m. `model:` swaps the run file's model
 # include, so data/optimizer/eval come from the same run files as EXP-002/003. While a variant's file does not
 # exist, every command lists it as missing; `--allow-missing` checks/runs the others.
+# File names follow WS-I2's docs/ATTENTION_KIMI.md: gated_attn = the head-wise sigmoid gate in both families
+# (tiny_bpe_2m_gated_headwise, tiny_hnet2_2m_gated; the element-wise H-Net gate is +2.5% FLOPs, outside +-2%).
+# There is no dense kda_hybrid yet (DenseConfig has one mixer for all layers, see docs/ATTENTION_KIMI.md), so
+# bpe_kda_hybrid stays listed as missing until that exists.
 # Params (fill after EXP-003, then commit; the VMs read the spec from git):
 #   lr.bpe / lr.hnet  best AdamW LR of BPE and of the chosen H-Net in EXP-003 (report.py best_params.yaml);
 #   hnet_router       router registry name of the best H-Net in EXP-002/003 (paper = cosine_lookahead, end_mlp,
@@ -46,7 +50,7 @@ runs:
      set: ["train.lr=${lr.bpe}"]}
   - {name: bpe_moba, config: configs/runs/tiny_bpe_2m.yaml, model: configs/models/tiny_bpe_2m_moba.yaml,
      set: ["train.lr=${lr.bpe}"]}
-  - {name: bpe_gated_attn, config: configs/runs/tiny_bpe_2m.yaml, model: configs/models/tiny_bpe_2m_gated_attn.yaml,
+  - {name: bpe_gated_attn, config: configs/runs/tiny_bpe_2m.yaml, model: configs/models/tiny_bpe_2m_gated_headwise.yaml,
      set: ["train.lr=${lr.bpe}"]}
   - {name: hnet_attn, config: configs/runs/tiny_hnet2_2m.yaml, model: configs/models/tiny_hnet2_2m.yaml,
      set: ["model.dc.router=${hnet_router}", "train.lr=${lr.hnet}"]}
@@ -62,5 +66,5 @@ runs:
      set: ["model.dc.router=${hnet_router}", "train.lr=${lr.hnet}"]}
   - {name: hnet_moba, config: configs/runs/tiny_hnet2_2m.yaml, model: configs/models/tiny_hnet2_2m_moba.yaml,
      set: ["model.dc.router=${hnet_router}", "train.lr=${lr.hnet}"]}
-  - {name: hnet_gated_attn, config: configs/runs/tiny_hnet2_2m.yaml, model: configs/models/tiny_hnet2_2m_gated_attn.yaml,
+  - {name: hnet_gated_attn, config: configs/runs/tiny_hnet2_2m.yaml, model: configs/models/tiny_hnet2_2m_gated.yaml,
      set: ["model.dc.router=${hnet_router}", "train.lr=${lr.hnet}"]}

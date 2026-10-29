@@ -1,0 +1,26 @@
+# tiny_bpe_2m_dsa: tiny_bpe_2m with the attention mixer swapped for DSA (V3.2-Exp) on the tiny_bpe_2m_mla MLA, top-64 keys, indexer 4 heads x 32.
+# FLOPs/byte matched to tiny_bpe_2m (+-1%) by the variant's own knobs; see configs/MATCHING.md
+# ("Attention variants") and docs/ATTENTION_DEEPSEEK.md. WS-I1.
+model:
+  type: "dense"
+  variant: "llama"
+  vocab_size: 50304
+  d_model: 128
+  n_layers: 10
+  d_intermediate: 384
+  num_heads: 4
+  num_kv_heads: null
+  rope_theta: 10000.0
+  nope_every: 0
+  tie_embeddings: false
+  norm_eps: 1.0e-05
+  initializer_range: 0.02
+  mixer: "dsa"
+  mixer_kwargs: {"base": "mla", "kv_lora_rank": 96, "q_lora_rank": 64, "qk_nope_head_dim": 16, "qk_rope_head_dim": 16, "v_head_dim": 32, "index_topk": 64, "index_n_heads": 4, "index_head_dim": 32, "index_loss": "inject", "index_loss_coef": 1.0}
+# Not part of the model; read by scripts/flops_report.py only.
+matching:
+  seq_len_bytes: 2048
+  seq_len_tokens: 448
+  bytes_per_token: 4.6
+  reference: "tiny_bpe_2m"
+  ablation_of: "tiny_bpe_2m"

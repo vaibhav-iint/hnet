@@ -6,16 +6,18 @@ set -euo pipefail
 MD=http://metadata.google.internal/computeMetadata/v1/instance/attributes
 attr() { curl -sf -H "Metadata-Flavor: Google" "$MD/$1"; }
 COMMIT=$(attr hnet-commit); SPEC=$(attr hnet-spec); GCS=$(attr hnet-gcs); PARALLEL=$(attr hnet-parallel || echo 3)
-# Optional: comma-separated run names (no seed suffix) so several VMs can split one sweep without touching each
-# other's run directories (restore and mirror are restricted to those runs).
-ONLY=$(attr hnet-only || echo "")
+# Optional, to split one sweep across VMs (restore and mirror are restricted to this VM's jobs):
+#   hnet-shard  i/n: jobs i, i+n, ... of the spec's job order (scripts/search/spec.py; infra/sweeps/launch.py sets it)
+#   hnet-only   comma-separated run names (architectures, no seed suffix)
+#   hnet-allow-missing  1: skip runs whose config files do not exist (otherwise the sweep refuses to start)
+ONLY=$(attr hnet-only || echo ""); SHARD=$(attr hnet-shard || echo ""); ALLOW_MISSING=$(attr hnet-allow-missing || echo "")
 LOG=/var/log/hnet_sweep.log
 exec > >(tee -a "$LOG" | sed -u 's/^/HNET /' > /dev/console) 2>&1
-upload_log() { gcloud storage cp "$LOG" "$GCS/_logs/$(hostname)-$(date -u +%Y%m%dT%H%M%S).log" || true; }
+upload_log() { gcloud storage cp "$LOG" "$GCS/_logs/$(hostname)-$(date -u +%Y%m%dT%H%M%S).log" || echo "WARN log upload failed"; }
 finish() { rc=$?; echo "HNET_DONE rc=$rc"; upload_log; sleep 30; shutdown -h now; }
 trap finish EXIT
 
-echo "boot $(date -u) commit=$COMMIT spec=$SPEC gcs=$GCS"
+echo "boot $(date -u) commit=$COMMIT spec=$SPEC gcs=$GCS shard=${SHARD:-all} only=${ONLY:-all}"
 [ -d /opt/hnet/.git ] || git clone -q https://github.com/vaibhav-iint/hnet.git /opt/hnet
 cd /opt/hnet && git fetch -q origin && git checkout -q "$COMMIT"
 export PYTHONPATH=/opt/hnet
@@ -32,12 +34,11 @@ python3 -m pytest -q -p no:cacheprovider -m "not slow" tests/test_ssd.py tests/t
 mkdir -p data/finewebedu10B
 gcloud storage rsync -r gs://neat-dispatch-501718-a5-hnet/data/finewebedu10B data/finewebedu10B
 python3 scripts/data/prepare.py --dataset finewebedu10B --n-train 1
-OUT=$(python3 -c "import yaml,sys; print(yaml.safe_load(open(sys.argv[1]))['out_root'])" "$SPEC")
-mkdir -p "$OUT"
-SCOPE=(); ONLY_ARGS=()
-if [ -n "$ONLY" ]; then SCOPE=(--exclude "^(?!(${ONLY//,/|})_s[0-9]+/).*"); ONLY_ARGS=(--only "$ONLY"); fi
-# Resume across VMs / spot preemptions: restore finished and partial runs (incl. checkpoints) from GCS.
-if gcloud storage ls "$GCS/" >/dev/null 2>&1; then gcloud storage rsync -r "${SCOPE[@]}" "$GCS" "$OUT"; fi
-( while true; do sleep 120; gcloud storage rsync -r "${SCOPE[@]}" "$OUT" "$GCS" >/dev/null 2>&1 || echo "WARN live mirror failed"; done ) &
-python3 scripts/search/sweep.py "$SPEC" --parallel "$PARALLEL" --gcs "$GCS" "${ONLY_ARGS[@]}"
+ARGS=(--parallel "$PARALLEL" --gcs "$GCS" --restore --mirror-every 120)
+[ -n "$SHARD" ] && ARGS+=(--shard "$SHARD")
+[ -n "$ONLY" ] && ARGS+=(--only "$ONLY")
+[ "$ALLOW_MISSING" = "1" ] && ARGS+=(--allow-missing)
+# sweep.py restores this selection's runs from GCS (finished runs and checkpoints, after a preemption or on another
+# VM; run dirs already on this disk are kept), mirrors them every 120 s, and uploads each run when it ends.
+python3 scripts/search/sweep.py "$SPEC" "${ARGS[@]}"
 echo "sweep finished OK"

@@ -97,7 +97,8 @@ def run_diag(out_dir: str, texts) -> dict:
 
 
 # ---------------------------------------------------------------------------------------------------- GCS
-def gcloud(args, check=True):
+def gcloud(args):
+    """``gcloud <args>`` (on the VM: its service account); callers check the return code."""
     return subprocess.run(["gcloud", *args], capture_output=True, text=True, check=False)
 
 
@@ -119,10 +120,11 @@ def gcs_list_dirs(prefix: str) -> set:
 
 
 def restore(jobs, gcs: str):
-    """Download this selection's run dirs (incl. checkpoints and done markers) from GCS before starting."""
+    """Download this selection's run dirs (incl. checkpoints and done markers) from GCS before starting. Run dirs
+    already on local disk are kept as they are (they are at least as new as the mirror: a restarted VM)."""
     remote = gcs_list_dirs(gcs)
     for j in jobs:
-        if j.name in remote:
+        if j.name in remote and not Path(j.out).exists():
             Path(j.out).mkdir(parents=True, exist_ok=True)
             r = gcloud(["storage", "rsync", "-r", f"{gcs.rstrip('/')}/{j.name}", j.out])
             if r.returncode != 0:

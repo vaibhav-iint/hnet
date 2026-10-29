@@ -1,0 +1,26 @@
+# tiny_bpe_2m_nsa: tiny_bpe_2m with the attention mixer swapped for NSA (2502.11089), GQA 2 kv heads (selection shared per group), l=8 d=4 l'=8 n=8 w=32, phi hidden 12.
+# FLOPs/byte matched to tiny_bpe_2m (+-1%) by the variant's own knobs; see configs/MATCHING.md
+# ("Attention variants") and docs/ATTENTION_DEEPSEEK.md. WS-I1.
+model:
+  type: "dense"
+  variant: "llama"
+  vocab_size: 50304
+  d_model: 128
+  n_layers: 10
+  d_intermediate: 384
+  num_heads: 4
+  num_kv_heads: 2
+  rope_theta: 10000.0
+  nope_every: 0
+  tie_embeddings: false
+  norm_eps: 1.0e-05
+  initializer_range: 0.02
+  mixer: "nsa"
+  mixer_kwargs: {"compress_hidden": 12, "compress_block": 8, "compress_stride": 4, "select_block": 8, "select_n": 8, "n_init_blocks": 1, "n_local_blocks": 2, "sliding_window": 32, "separate_kv": true}
+# Not part of the model; read by scripts/flops_report.py only.
+matching:
+  seq_len_bytes: 2048
+  seq_len_tokens: 448
+  bytes_per_token: 4.6
+  reference: "tiny_bpe_2m"
+  ablation_of: "tiny_bpe_2m"

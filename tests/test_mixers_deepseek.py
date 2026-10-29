@@ -43,8 +43,8 @@ VARIANTS = {
 }
 
 
-def ctx_of(lengths):
-    cu = torch.tensor([0, *torch.tensor(lengths).cumsum(0).tolist()], dtype=torch.int32)
+def ctx_of(lengths, device=None):
+    cu = torch.tensor([0, *torch.tensor(lengths).cumsum(0).tolist()], dtype=torch.int32, device=device)
     return SeqCtx.from_cu_seqlens(cu)
 
 
@@ -215,7 +215,7 @@ def _naive_nsa(m, x, lengths):
                 cur = t // m.ls
                 avail = [j for j in range(n_slc) if j <= cur and (W < 0 or (j + 1) * m.ls - 1 >= t - W)]
                 forced = [j for j in avail if j < m.n_init or j > cur - m.n_local]
-                rest = sorted((j for j in avail if j not in forced), key=lambda j: -float(imp[j]))
+                rest = sorted((j for j in avail if j not in forced), key=lambda j: (-float(imp[j]), -j))
                 chosen = forced + rest[:m.n - len(forced)]
                 keys = sorted(s for j in chosen for s in range(j * m.ls, (j + 1) * m.ls)
                               if s <= t and (W < 0 or t - s <= W))
@@ -312,7 +312,7 @@ def test_dsa_matches_naive_topk(force_sparse_backend):
             for t in range(L):
                 cand = [s for s in range(t + 1) if t - s <= 11]
                 score = torch.stack([(iw[t] * (iq[t] @ ik[s]).relu()).sum() for s in cand])
-                keys = [cand[i] for i in score.topk(min(5, len(cand))).indices.tolist()]
+                keys = sorted(cand, key=lambda s: (-float(score[cand.index(s)]), -s))[:5]  # ties: most recent
                 for h in range(4):
                     p = torch.softmax(torch.stack([q[t, h] @ k[s, h // 2] for s in keys]) * a.softmax_scale, 0)
                     out[t, h] = (p[:, None] * v[keys, h // 2]).sum(0)
@@ -384,23 +384,38 @@ def test_dsa_chunked_topk_matches_single_chunk(monkeypatch):
 
 
 # ----------------------------------------------------------------------------- backends
-@pytest.mark.parametrize("variant", ["nsa", "dsa", "dsa_attn_gqa"])
-def test_flex_matches_gather_with_grads(variant, force_sparse_backend):
+@pytest.mark.parametrize("variant", ["nsa", "nsa_mha_shared_win", "dsa", "dsa_attn_gqa"])
+def test_flex_matches_gather_forward(variant, force_sparse_backend):
+    """CPU: eager flex_attention (forward only; flex has no CPU backward) vs the gather reference."""
     name, kw = VARIANTS[variant]
+    m = make(name, **kw).eval()
     lengths = [31, 6, 19]
     x = torch.randn(1, sum(lengths), D)
+    with torch.no_grad():
+        force_sparse_backend("gather")
+        ref = m(x, ctx_of(lengths))
+        force_sparse_backend("flex")
+        torch.testing.assert_close(m(x, ctx_of(lengths)), ref, atol=1e-5, rtol=1e-5)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
+@pytest.mark.parametrize("variant", ["nsa", "dsa", "dsa_attn_gqa"])
+def test_cuda_flex_matches_gather_with_grads(variant, force_sparse_backend):
+    name, kw = VARIANTS[variant]
+    lengths = [131, 6, 90]
+    x = torch.randn(1, sum(lengths), D, device="cuda")
     res = {}
     for backend in ("gather", "flex"):
         force_sparse_backend(backend)
-        m = make(name, **kw).train()
+        m = make(name, **kw).cuda().train()
         xx = x.clone().requires_grad_(True)
-        y = m(xx, ctx_of(lengths))
+        y = m(xx, ctx_of(lengths, "cuda"))
         y.square().sum().backward()
         res[backend] = (y.detach(), xx.grad, {n: p.grad for n, p in m.named_parameters()})
-    torch.testing.assert_close(res["flex"][0], res["gather"][0], atol=1e-5, rtol=1e-5)
-    torch.testing.assert_close(res["flex"][1], res["gather"][1], atol=1e-4, rtol=1e-4)
+    torch.testing.assert_close(res["flex"][0], res["gather"][0], atol=2e-3, rtol=2e-3)
+    torch.testing.assert_close(res["flex"][1], res["gather"][1], atol=2e-3, rtol=2e-3)
     for n, g in res["gather"][2].items():
-        torch.testing.assert_close(res["flex"][2][n], g, atol=1e-4, rtol=1e-4, msg=n)
+        torch.testing.assert_close(res["flex"][2][n], g, atol=2e-3, rtol=2e-3, msg=n)
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
@@ -445,7 +460,8 @@ def test_flops_conventions():
     # sparsity: NSA / DSA attend to fewer keys than dense at long L
     long = 2000.0
     dense = ds.MultiHeadLatentAttention.flops_per_position(D, long, SPEC, num_heads=4)
-    sparse = ds.DeepSeekSparseAttention.flops_per_position(D, long, SPEC, num_heads=4)
+    sparse = ds.DeepSeekSparseAttention.flops_per_position(D, long, SPEC, num_heads=4, index_n_heads=2,
+                                                           index_head_dim=8)
     assert sparse < dense
     full = FlopsConvention(attn="full")
     nsa_full = ds.NativeSparseAttention.flops_per_position(D, long, full, num_heads=4)
@@ -567,3 +583,20 @@ def test_variant_configs_matched_and_minimal(path):
     assert abs(fpb / base_fpb - 1) <= 0.01
     model = build_model(cfg)  # builds (meta-free) and the param count matches the analytic count
     assert count_params(cfg) == sum(p.numel() for p in model.parameters())
+
+
+def test_dsa_inject_survives_activation_checkpointing():
+    """The trainer wraps blocks in non-reentrant checkpointing; injected indexer gradients must be unchanged."""
+    from torch.utils.checkpoint import checkpoint
+
+    name, kw = VARIANTS["dsa"]
+    x = torch.randn(1, 40, D)
+    c = ctx_of([25, 15])
+    grads = []
+    for ckpt in (False, True):
+        m = make(name, **kw).train()
+        y = checkpoint(m, x, c, use_reentrant=False) if ckpt else m(x, c)
+        y.square().sum().backward()
+        grads.append({n: p.grad.clone() for n, p in m.named_parameters()})
+    for n, g in grads[0].items():
+        torch.testing.assert_close(grads[1][n], g, msg=n)

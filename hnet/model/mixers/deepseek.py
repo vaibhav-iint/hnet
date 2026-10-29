@@ -45,9 +45,9 @@ the rope channels (so the parameter count does not depend on depth) but do not r
   separately for keys and values and shared by the KV heads;
 * selection, Eqs. (8)-(12): p^cmp_t = softmax(q_t K^cmp_t) (the compression branch's own probabilities), mapped to
   selection blocks of ``select_block`` (l') by spatial overlap (Eq. 9), summed over the G heads of a GQA group
-  (Eq. 10), top-``select_n`` blocks per group (Eq. 11) with the first ``n_init_blocks`` and the ``n_local_blocks``
-  most recent blocks (the current, partially filled one included) always selected; tokens of the chosen blocks are
-  attended causally (s <= t), Eq. (12);
+  (Eq. 10), top-``select_n`` blocks per group (Eq. 11; ties go to the more recent block) with the first
+  ``n_init_blocks`` and the ``n_local_blocks`` most recent blocks (the current, partially filled one included)
+  always selected; tokens of the chosen blocks are attended causally (s <= t), Eq. (12);
 * sliding window: keys s in [t - sliding_window, t];
 * gates g^c_t = sigmoid(W_g h_t) per head and branch; by default independent K/V projections per branch
   (``separate_kv``) as in the paper.
@@ -64,7 +64,8 @@ d | l'). A global ``window_size >= 0`` (the shared attention key) additionally l
 reference code deepseek-ai/DeepSeek-V3.2-Exp ``inference/model.py`` class ``Indexer``)::
 
     I_t,s = sum_j w^I_t,j ReLU(q^I_t,j . k^I_s)          (Eq. 1; H^I small heads, w^I scaled by (H^I d^I)^-1/2)
-    u_t   = Attn(h_t, {c_s : I_t,s in Top-k(I_t,:)})      (Eq. 2; causal, same segment, shared by all heads)
+    u_t   = Attn(h_t, {c_s : I_t,s in Top-k(I_t,:)})      (Eq. 2; causal, same segment, shared by all heads;
+                                                            ties go to the more recent key)
     L^I   = sum_t KL(p_t,S_t || softmax(I_t,S_t))          (Eq. 4; p_t = L1-normalized sum over heads of the main
                                                             attention probabilities, S_t the selected set)
 
@@ -85,6 +86,9 @@ accumulation or multiplied by an fp16 loss scale (bf16 needs none); with Adam th
 share of the global grad norm (set ``index_loss_coef = 1 / grad_accum`` to match exactly). With
 ``index_loss="attr"`` nothing is injected and the caller must add ``mixer_aux_loss(model)`` (sum of every mixer's
 ``aux_loss``) to the loss it back-propagates, scaled like ``out.aux_loss``.
+
+Precision: logits, index scores and softmaxes are kept in fp32 (``.float()`` after each einsum, which bf16
+autocast would otherwise downcast); probabilities @ values follow the autocast dtype.
 
 Backends. ``mla`` uses ``attn.attention`` (flash / flex / SDPA, chosen automatically). ``nsa``'s window branch uses
 it too; its compression branch is pure PyTorch on a padded per-segment layout (it needs the probabilities); its
@@ -166,6 +170,14 @@ def _masked_softmax(scores: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
     return p / p.sum(-1, keepdim=True).clamp_min(torch.finfo(p.dtype).tiny)
 
 
+def _topk_recent(score: torch.Tensor, k: int):
+    """Top-k over the last dim; ties go to the *later* index (most recent key / block), so the choice does not
+    depend on how documents are packed (ReLU index scores tie at exactly 0). Returns (values, indices)."""
+    n = score.shape[-1]
+    vals, order = torch.sort(score.flip(-1), dim=-1, descending=True, stable=True)
+    return vals[..., :k], (n - 1) - order[..., :k]
+
+
 def _dense_attention(q, k, v, ctx: SeqCtx, window: int, scale: float) -> torch.Tensor:
     """``attn.attention`` with automatic backend; flash-attn needs equal qk / v head dims, so pad the smaller."""
     backend = _attn.select_backend(q)
@@ -184,7 +196,7 @@ def _gather_attend(q, k, v, idx, valid, scale: float):
     Hk, S = k.shape[1], idx.shape[-1]
     heads = torch.arange(Hk, device=q.device)[None, :, None]
     kg, vg = k[idx, heads], v[idx, heads]  # [T, Hk, S, d]
-    s = torch.einsum("tagd,tasd->tags", q.view(T, Hk, H // Hk, dq).float(), kg.float()) * scale
+    s = torch.einsum("tagd,tasd->tags", q.view(T, Hk, H // Hk, dq).float(), kg.float()).float() * scale
     p = _masked_softmax(s, valid[:, :, None, :])
     o = torch.einsum("tags,tasd->tagd", p, vg.float())
     return o.reshape(T, H, -1).to(v.dtype), p.reshape(T, H, S)
@@ -463,7 +475,8 @@ class NativeSparseAttention(nn.Module):
         ok = start + self.l - 1 <= t  # [Lmax, n_cmp]: complete at or before t (Eq. 7)
         if self.window_size >= 0:
             ok = ok & (start >= t - self.window_size)
-        s = torch.einsum("blagd,bnad->bagln", qp.view(B, Lmax, Hk, G, hd).float(), kc.float()) * self.softmax_scale
+        s = torch.einsum("blagd,bnad->bagln", qp.view(B, Lmax, Hk, G, hd).float(), kc.float()).float()
+        s = s * self.softmax_scale
         p = _masked_softmax(s, ok)  # [B, Hk, G, Lmax, n_cmp], Eq. (8)
         o = torch.einsum("bagln,bnad->blagd", p, vc.float()).reshape(B, Lmax, H, hd)
         return o[seg, pos].to(v.dtype), p.detach().sum(2)
@@ -485,8 +498,8 @@ class NativeSparseAttention(nn.Module):
             avail = avail & ((j + 1) * self.ls - 1 >= t - self.window_size)
         forced = avail & ((j < self.n_init) | (j > cur - self.n_local))
         score = score.masked_fill(~avail, float("-inf")).masked_fill(forced, float("inf"))
-        top = score.topk(min(self.n, n_slc), dim=-1)
-        return top.indices, top.values > float("-inf")
+        vals, blocks = _topk_recent(score, min(self.n, n_slc))
+        return blocks, vals > float("-inf")
 
     def _selected(self, q, k, v, blocks, bvalid, ctx: SeqCtx, backend: str):
         seg, pos, starts, B, Lmax = _layout(ctx)
@@ -617,8 +630,8 @@ class LightningIndexer(nn.Module):
     @staticmethod
     def score(q, k, w):
         """q [..,Hi,di], k [..,S,di] (aligned leading dims), w [..,Hi] -> I [..,S] (fp32)."""
-        s = torch.einsum("...hd,...sd->...hs", q.float(), k.float()).relu()
-        return torch.einsum("...hs,...h->...s", s, w)
+        s = torch.einsum("...hd,...sd->...hs", q.float(), k.float()).float().relu()
+        return torch.einsum("...hs,...h->...s", s, w.float()).float()
 
 
 def _attn_project(mod: CausalAttention, x2: torch.Tensor, ctx: SeqCtx):
@@ -711,17 +724,17 @@ class DeepSeekSparseAttention(nn.Module):
         for a in range(0, T, C):
             b = min(T, a + C)
             lo = max(0, a - span_max + 1)
-            s = torch.einsum("chd,sd->chs", iq[a:b].float(), ik[lo:b].float()).relu_()
-            s = torch.einsum("chs,ch->cs", s, iw[a:b])  # Eq. 1
+            s = torch.einsum("chd,sd->chs", iq[a:b].float(), ik[lo:b].float()).float().relu_()
+            s = torch.einsum("chs,ch->cs", s, iw[a:b]).float()  # Eq. 1
             qp = torch.arange(a, b, device=iq.device)[:, None]
             kp = torch.arange(lo, b, device=iq.device)[None, :]
             ok = (seg[a:b, None] == seg[None, lo:b]) & (kp <= qp)
             if W >= 0:
                 ok = ok & (qp - kp <= W)
-            top = s.masked_fill(~ok, float("-inf")).topk(min(K, b - lo), dim=-1)
-            kk = top.indices.shape[-1]
-            idx[a:b, :kk] = top.indices + lo
-            valid[a:b, :kk] = top.values > float("-inf")
+            vals, top = _topk_recent(s.masked_fill(~ok, float("-inf")), min(K, b - lo))
+            kk = top.shape[-1]
+            idx[a:b, :kk] = top + lo
+            valid[a:b, :kk] = vals > float("-inf")
         return torch.where(valid, idx, torch.zeros_like(idx)), valid
 
     def forward(self, x: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:

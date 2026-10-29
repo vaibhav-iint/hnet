@@ -1,0 +1,26 @@
+# tiny_hnet2_2m_nsa: tiny_hnet2_2m with the attention mixer swapped for NSA (2502.11089) main network, GQA 2 kv heads, l=8 d=4 l'=8 n=8 w=32, phi hidden 96.
+# FLOPs/byte matched to tiny_hnet2_2m (+-1%) by the variant's own knobs; see configs/MATCHING.md
+# ("Attention variants") and docs/ATTENTION_DEEPSEEK.md. WS-I1.
+model:
+  type: "hnet"
+  arch_layout: ["m4", ["T1m4", ["T7"], "m4T1"], "m4"]
+  d_model: [96, 128, 256]
+  d_intermediate: [0, 384, 768]
+  vocab_size: 256
+  tie_embeddings: false
+  ssm: {"d_state": 32, "d_conv": 4, "expand": 2, "headdim": 32, "ngroups": 1, "chunk_size": 256}
+  attn: {"num_heads": [3, 4, 8], "num_kv_heads": null, "rotary_emb_dim": [16, 16, 16], "rope_theta": 10000.0, "window_size": [1023, 1023, -1], "nope_every": 0}
+  dc: {"target_ratios": [3.0, 3.0], "ratio_loss_alpha": 0.03, "router": "cosine_lookahead", "router_kwargs": {}, "chunker": "select", "dechunker": "ema", "ste": true, "aux_loss": "ratio", "aux_loss_scope": "local"}
+  norm_eps: 1.0e-05
+  initializer_range: 0.02
+  lr_multiplier: "auto"
+  lr_multiplier_n_gpt: 4.6
+  mixer_codes: [{"m": "mamba2", "t": "attn"}, {"m": "mamba2", "t": "attn"}, {"m": "mamba2", "t": "nsa"}]
+  mixer_cfg: {"nsa": [{}, {}, {"num_kv_heads": 2, "compress_hidden": 96, "compress_block": 8, "compress_stride": 4, "select_block": 8, "select_n": 8, "n_init_blocks": 1, "n_local_blocks": 2, "sliding_window": 32, "separate_kv": true}]}
+# Not part of the model; read by scripts/flops_report.py only.
+matching:
+  seq_len_bytes: 2048
+  seq_len_tokens: 448
+  bytes_per_token: 4.6
+  reference: "tiny_bpe_2m"
+  ablation_of: "tiny_hnet2_2m"
