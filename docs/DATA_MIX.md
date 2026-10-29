@@ -103,12 +103,13 @@ decode to exactly its bytes.
 ## Commands
 
 ```bash
-# local end-to-end test build (~50 MB of train text; streams ~0.3 GB from HF, ~1 min + tokenization)
+# local end-to-end test build (~50 MB of train text; ~1 min here: streams ~0.3 GB from HF, 4-core tokenization)
 python scripts/data/build_mix.py --preset small
 python scripts/data/build_mix.py --preset small --report          # bytes/token table from the manifest
 
 # full build (25 GB of train text) on the GPU box, straight from HF (no credentials; HF_TOKEN optional):
-python scripts/data/build_mix.py --preset full --fetch-mode download --fetch-workers 12 --workers 8 --delete-pools
+python scripts/data/build_mix.py --preset full --fetch-workers 14 --workers 8 --delete-pools
+#   --fetch-mode auto (default): fineweb-edu and code download whole parquet files (deleted after use), the rest streams
 #   override the size with --train-bytes 50e9 etc.; re-run the same command to resume after any interruption
 
 # retrain the in-corpus tokenizer (default sample: first 1 GB of the train stream) and build with it
@@ -124,10 +125,14 @@ The committed tokenizer was trained with
 (the first 500 MB of the seed-0 train stream; the full build's train stream starts with the same documents, and
 no val-assigned document is in it).
 
-Full-build resources (estimates from the local runs): HF reads ~25 GB (fineweb-edu ~12 GB of parquet, code ~8 GB:
-the rarest in-mix language, Rust, needs ~270 code row groups); pools ~32 GB; output ~25 GB byte shards + ~11 GB
-token shards (+ val sets); fetching is network-bound (10 MB/s per streamed source here; download mode is faster),
-tokenization ~4–6 MB/s per core with `--workers`.
+Full-build resources (extrapolated from the local runs): HF reads ~20-25 GB (fineweb-edu ~6 parquet files of
+2.1 GB; code ~8 GB: the rarest in-mix language, Rust, needs ~270 of github-code-clean's 10k-file row groups; the
+rest is small); pools ~27 GB (each language is stored only up to its quota); output ~25 GB byte shards + ~12 GB
+token shards (+ ~0.2 GB val sets), so ~65 GB peak disk, ~38 GB after `--delete-pools`. Fetching is network-bound
+(streaming: ~10 MB/s per source here; downloads: a 360 MB code file in a few seconds). Tokenization is the slow
+part: HF `tokenizers` encodes ~1.3 MB/s per process on this (heavily shared) 4-core container and its batch
+threading scales poorly, so use processes: `--workers` ~ number of cores (each shard is one job); budget
+~1-2 h for 25 GB on a 16-32 core machine. Memory: < 2 GB per worker.
 
 Determinism and resumption: a build is a function of (spec, seed, preset sizes, tokenizer). Fetch progress is saved
 after every unit (row groups), finished shards are kept if their document plan and tokenizer are unchanged, so
@@ -162,7 +167,56 @@ data: {include: ../data/mix_v1.yaml, seq_len: <matched>, batch_tokens: ...}
 
 ## Bytes per token (small build, `mix_v1_small`, 32k in-corpus BPE)
 
-MEASURED_TABLE
+Overall train: **4.15 bytes/token** (50.0 MB, 12,062,255 tokens, 9,339 docs; stream incl. BOS/EOS vs EOT: 4.144); combined val set: 4.17. Blog (128k in-corpus BPE): 4.57.
+
+| source | train bytes/token | train byte share (target) | token share | val bytes/token | blog 128k |
+|---|---|---|---|---|---|
+| **[en]** | **4.50** | 70.16% | 64.64% | 4.49 | |
+| **[code]** | **3.61** | 19.73% | 22.65% | 3.55 | |
+| **[math]** | **3.50** | 5.00% | 5.93% | 3.69 | |
+| **[ml]** | **3.12** | 5.10% | 6.78% | 3.25 | |
+| en.fineweb_edu | 4.50 | 70.16% (70.00%) | 64.64% | 4.56 | 4.95 |
+| code.c | 3.23 | 3.39% (3.33%) | 4.35% | 3.26 | 3.78 |
+| code.cpp | 3.62 | 2.55% (2.53%) | 2.91% | 3.89 | 3.38 |
+| code.javascript | 3.88 | 2.37% (2.36%) | 2.53% | 3.73 | 3.88 |
+| code.python | 3.79 | 2.26% (2.32%) | 2.48% | 3.83 | 3.89 |
+| code.java | 4.02 | 2.19% (2.30%) | 2.26% | 4.38 | 4.38 |
+| code.php | 3.44 | 2.03% (2.03%) | 2.44% | 3.88 | 3.71 |
+| code.csharp | 3.88 | 1.95% (1.94%) | 2.09% | 4.04 | 4.79 |
+| code.markdown | 3.63 | 1.30% (1.30%) | 1.48% | 2.92 | 3.68 |
+| code.typescript | 3.95 | 0.64% (0.59%) | 0.67% | 3.83 | 4.13 |
+| code.sql | 2.95 | 0.18% (0.41%) | 0.26% | 3.09 | 2.88 |
+| code.go | 2.97 | 0.29% (0.31%) | 0.41% | 3.39 | 3.39 |
+| code.ruby | 3.35 | 0.27% (0.27%) | 0.34% | 3.07 | 3.61 |
+| code.shell | 3.00 | 0.16% (0.16%) | 0.22% | 2.94 | 3.08 |
+| code.rust | 2.76 | 0.14% (0.15%) | 0.22% | 3.45 | 3.86 |
+| math.finemath | 3.45 | 3.07% (3.07%) | 3.68% | 3.71 | 3.69 |
+| math.infiwebmath | 3.58 | 1.93% (1.93%) | 2.24% | 3.56 | 3.86 |
+| ml.rus_Cyrl | 3.88 | 0.63% (0.62%) | 0.67% | 3.72 | 5.43 |
+| ml.cmn_Hani | 2.37 | 0.62% (0.62%) | 1.09% | 2.24 | 3.75 |
+| ml.deu_Latn | 2.94 | 0.63% (0.62%) | 0.89% | 2.98 | 3.92 |
+| ml.fra_Latn | 3.19 | 0.63% (0.62%) | 0.81% | 3.05 | 4.04 |
+| ml.spa_Latn | 3.11 | 0.62% (0.62%) | 0.83% | 3.35 | 4.15 |
+| ml.ita_Latn | 3.17 | 0.63% (0.62%) | 0.82% | 3.17 | 4.0 |
+| ml.por_Latn | 3.11 | 0.63% (0.62%) | 0.84% | 3.14 | 4.09 |
+| ml.arb_Arab | 3.62 | 0.71% (0.62%) | 0.82% | 3.48 | 4.45 |
+| **[heldout]** (val only) | | | | **3.14** | |
+| heldout.haskell | | | | 3.76 | |
+| heldout.fortran | | | | 2.80 | |
+| heldout.lua | | | | 3.44 | |
+| heldout.julia | | | | 2.84 | |
+| heldout.perl | | | | 3.14 | |
+| heldout.scala | | | | 3.32 | |
+| heldout.assembly | | | | 2.57 | |
+| heldout.visual_basic | | | | 4.11 | |
+| heldout.powershell | | | | 3.29 | |
+| heldout.tex | | | | 2.82 | |
+
+Measured on the local small build (50 MB of train text; val sets of 64 KB per leaf), so per-leaf numbers of the
+small leaves (Rust, Shell, SQL: < 0.2 MB) are noisy, and SQL is under its share there (one long document is the
+unit; at full size every share is within a fraction of a percent). GPT-2's 50k tokenizer on the same train text:
+3.62 overall (en 4.60, code 2.32, math 3.36, ml 2.20): the in-corpus 32k BPE spends 13% fewer tokens overall,
+slightly more on English, far fewer on code and non-English text.
 
 The blog's 128k in-corpus tokenizer gets 4.57 overall (fineweb-edu 4.95, code 2.88–4.79, math 3.69–3.86,
 multilingual 3.75–5.43); a 32k vocabulary compresses less.

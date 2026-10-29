@@ -820,6 +820,7 @@ def assemble(spec: MixSpec, cfg: BuildConfig, tokenizer_path, root=None, workers
     if workers > 1 and len(jobs) > 1:
         from multiprocessing import get_context
 
+        threads = threads or max(1, (os.cpu_count() or 1) // workers)  # tokenizer (rayon) threads per worker
         with get_context("spawn").Pool(workers, initializer=_worker_init, initargs=(threads,)) as pool:
             for st in pool.imap_unordered(_shard_job, jobs):
                 results[st["stem"]] = st
