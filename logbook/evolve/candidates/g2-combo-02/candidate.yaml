@@ -1,0 +1,14 @@
+id: g2-combo-02
+parents: [g1-mem-02, g1-arch-02, hnet_ws]
+track: crossover
+hypothesis: >-
+  The two seed-1 winners of generation 1 act on different ends of the hierarchy and should add: g1-mem-02 makes the
+  chunk-level memory consistent regardless of the tokenizer basin (keys = strings ending at the boundary; 1.779 vs
+  1.825 prior-free, in the suffix basin), and g1-arch-02 lets each byte read its own offset-specific view of the chunk
+  vector (1.798 vs 1.827 warm start). Parent: hnet_ws. Launch only if both survive seed 2.
+prediction: {fitness: "<= min(g1-mem-02, g1-arch-02) - 0.01", mechanism: "suffix gates open > 0.5; slot maps diverge from identity"}
+branch: evolve/g2
+model: configs/evolve/models/g2-combo-02.yaml
+set: []
+checks: {tests: "components tested in g1", fairness: "params 20,023,015 <= BPE 20,023,040; FLOPs/byte +1.08%", grad_audit: "components audited in g1", smoke: "4 CPU steps, loss falls, compression on target"}
+author: orchestrator
