@@ -848,3 +848,19 @@ word identity; (3) give the chunks a vocabulary and a token-level objective; (4)
 (5) remove the adoption lottery with a 10% warm start. What is still open: the two-level hierarchy (the vocabulary at
 a (6,3) second level), scale (10M → 125M, more data), downstream tasks, and whether the warm start can be replaced by
 something that does not name whitespace (a surprise-based or consistency-based start).
+
+### A100-40GB throughput (GCP spot, compiled blocks, 50 steps, `scripts/bench`)
+| model | MFU | bytes/s | note |
+|---|---|---|---|
+| BPE L04 / L06 / L08 / L12 | 11% / 22% / 34% / 41% | 1.87M / 1.21M / 1.07M / 0.52M | L08 whole-model compile 40.5%, eager 20%; Muon = AdamW speed |
+| H-Net L04 / L08 (mb 8) / L12 | 6.5% / 17% / 24% | 0.61M / 0.36M / 0.20M | ~3x slower per byte than BPE at equal FLOPs/byte |
+| packing 3 L04 runs per GPU | | BPE 3x0.55M, H-Net 3x0.22M | no gain over one run per GPU |
+
+Prime: no H100 offers, H200 pods need SSH (unavailable in this container), GPU sandboxes need an account grant;
+ladder moved to GCP A100 spot (user decision). Ladder cost at these speeds: 79 A100-h (~$114 spot); the warm-start
+H-Net arm is dropped at 1e18 to fit +$100 (~$73 + preemption overhead).
+
+### mix_v1 full build
+25.0 GB train (4.96M docs, 98 shards) + 41 val sets, 2906 s on an 8-core CPU VM; 4.126 bytes/token overall with the
+32k in-corpus BPE (en 4.53, code 3.46, math 3.50, multilingual 3.15). The ladder configs use 4.145 (measured on the
+small build); the 0.5% mismatch in the H-Net's target compression is kept for consistency across the ladder.
