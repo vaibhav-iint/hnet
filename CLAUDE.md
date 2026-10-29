@@ -22,9 +22,12 @@ next-chunk CE, grad norm) and, for LR sweeps, val bpb vs LR per architecture. Al
 
 (`$S2` = this session's scratchpad.) The HTML embeds the PNGs, is published as an artifact and sent as a file; the
 markdown TL;DR + tables go in the chat message. Mechanism panels, not only loss curves: the loss curve says *whether*
-a run is behind, the panels say *why* (a bypass rms 20× the hierarchy's is a dead hierarchy, whatever the bpb).
+a run is behind, the panels say *why*. Read the tokenizer basin from `bnd_on_ws/s0` (share of boundaries on whitespace:
+~0.9 word basin vs ~0 suffix basin, decided by step ~300) and the hierarchy's value from a *mean*-ablation probe,
+not from rms ratios: the bypass/hierarchy rms ratio tracks the optimizer's LR, not adoption (logbook/interp/REPORT.md),
+and zero-ablation overstates the hierarchy 1.4-26x because it also removes a constant offset.
 Alerts are computed, not eyeballed (`alerts()` in `logbook/training_report.py`: compression off target, score std → 0,
-tau saturated, margin undecided, grad-norm spike, bypass dominating, seed spread > 0.03 = bifurcation).
+tau saturated, margin undecided, grad-norm spike, seed spread > 0.03 = bifurcation).
 
 ## Finding training-dynamics bugs: the meta (read before touching the model or launching a sweep)
 
@@ -34,7 +37,8 @@ of them was derivable from the code or from a five-minute CPU run. The list of m
 | What was wrong | How we found it | When we could have found it |
 |---|---|---|
 | Stage-1 cosine router never leaves p ≈ 0.5 (cos ≈ 0 on random states; ratio loss has zero gradient once F is on target) | post-hoc deep dive after the EXP-002 sweep | by hand, from the loss formula, day 0 |
-| Decoder switches to the zero-init residual bypass by step 20–130; main network's gradient collapses | per-stage grad norms, added after the fact; `dechunk_rms`/`residual_rms` only at EXP-008 | first 200 steps of a tiny run with those two numbers logged |
+| (Corrected by the interp audit) the hierarchy carries ≤0.005 bits for the first ~100 steps while the bypass is informative from step ~35: there was never a 'switch'; the large early zero-ablation effects were a constant offset | zero-main probe, read as information | a mean-ablation probe on a step-100 checkpoint |
+| Seed lottery attributed to noise / data order; data order is identical across seeds (`shuffle_buffer: 0`), so the basin is chosen by the initialization | final bpb spread over seeds | ranking seeds across arms that share a parameter layout (same seed always loses) |
 | Detached quantile threshold left the logit *scale* unanchored → sigmoid saturates → stage dead (EXP-014) | tau hit 1.000 in the metrics of a paid sweep | asking "what anchors the scale?" when writing the decider |
 | Consistency penalty satisfied by shrinking all logits to a constant (EXP-020) | `score_std` fell to 0.15 in the metrics of a paid sweep | asking "what is the cheapest way to zero this penalty?" |
 | Median/MAD scale estimator collapses when 5/6 of scores coincide (EXP-021) | divergence, grad norm 1e6 | unit test on a bimodal / near-constant score vector |

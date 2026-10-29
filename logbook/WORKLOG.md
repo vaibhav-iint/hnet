@@ -1106,3 +1106,36 @@ decay 0.5 on `residual_proj` only, which bounds its size at ~1/wd; probe: platea
 test whether anchoring the bypass is a fix or only a symptom.
 Also: my hand-written note in the generated docs/LADDER.md broke `test_committed_files_match_the_generator`, which the
 VM test gate would have caught at launch. Moved to docs/ANALYSIS_LADDER.md; CLAUDE.md now says not to edit generated files.
+
+### Interpretability audit (logbook/interp/REPORT.md; 281 runs' metrics, 20 checkpoints' activations): corrections
+Ten findings, the ones that change the record:
+1. **The seed lottery is the initialization.** Data order is identical across seeds (`shuffle_buffer: 0`); arms with the
+   same parameter layout get the same starting router per seed. In all 5 prior-free arms of the n-gram layout seeds
+   finish in the same order (s2 best, s0 worst; p = 1/1296); no intervention except the whitespace prior ever changed
+   which seed loses (decider, temperature, residual warmup, chunk STE, margin gate).
+2. **The two basins are "cut at the space" and "guess the space".** Word seeds put a boundary on every whitespace byte;
+   suffix seeds never do: 55-64% of their cuts are on the last letter of a word (the router predicts "next byte is not
+   a letter", AUC 0.75-0.80; under end semantics it cannot see that byte). "Morphological tokenizer" was wrong.
+3. **The zero-main probe overstates the hierarchy 1.4-26×** (it also removes a constant offset the decoder relies on).
+   Mean-ablation: EXP-006 hnet1 "0.63 bpb" is 0.025 bits of information; EXP-002/008 "0.69" is 0.18-0.27.
+4. **The bypass/hierarchy rms ratio is not an adoption signal**: under Muon it tracks the LR (log-log r = 0.96, n = 28).
+   The best tiny H-Net (EXP-025 prior_muon 0.025, 1.630) runs at ratio 7.6 with a hierarchy worth 0.38 bpb. The CLAUDE.md
+   rule and the report's alert built on it are retired; the basin is now logged directly (`bnd_on_ws/s0`).
+5. **There was never a switch away from the hierarchy**: it carries ≤0.005 bits for the first ~100 steps while the
+   bypass is informative from step ~35. Gating or delaying the bypass cannot create adoption (consistent with EXP-027).
+6. **The ladder's prior-free H-Nets (L03/L04) are in the losing basin** (≤8% of cuts on whitespace, hierarchy worth
+   0.03-0.04 bits); the warm-start ones work (0.24-0.27 bits), but the 4.15 bytes/chunk target forces ~30% of their
+   cuts off whitespace because spaces occur every ~6 bytes.
+7. **The losing seed is readable at step ~210 from `dechunk_rms`** (within-arm |r| ≥ 0.5; AUC 0.88 at step 250).
+8. **Tiny "BPE parity" is against BPE at an untuned LR** (BPE 1.564 at 6e-3 vs 1.634 at 1.5e-3; H-Nets flat in LR);
+   tuned gap ≥ 0.066. At parity the H-Net wins on 2-4-byte tokens and loses on long whole words.
+9. Where the hierarchy helps it helps on sentence structure: punctuation 1.6-2.1 bits/byte, newlines 1.1-1.2, digits ~1;
+   the next word's first letter ~0.5, falling to ~0.1 by the fifth letter.
+10. Other corrections: the adoption deep dive's margin timing (it rises over steps 60-100, collapses at 150-300); EXP-020
+   "neutral" hides an undecided router; EXP-027's gate was undone by the optimizer (the pre-gate bypass grew to 4.6-6.8);
+   the chunk table gives word identity only without n-gram tables; the race is decided the same way at L03/L04.
+Recommendations adopted: log the basin and use mean-ablation; land the router in the word basin directly (g1-router-01's
+self-surprise teacher is exactly the suggested next-byte-entropy prior); LR-tune before claiming parity; bound
+`residual_proj` under Muon (g1-opt-02). Evolve consequence: with deterministic data order, prior-free candidates'
+seed outcomes are partly a function of their parameter layout's init; generation 1 compares candidates with controls at
+the same seeds and now logs `bnd_on_ws/s0` so each run's basin is visible.

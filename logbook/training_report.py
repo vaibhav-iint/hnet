@@ -42,7 +42,7 @@ def _refs(sweep):
     return REFERENCES if sweep.startswith("exp") else {}
 MECH = [("p_margin/s0", "router margin |p-0.5|"), ("p_mid/s0", "undecided fraction (p in 0.4-0.6)"),
         ("score_std/s0", "raw score std (scale drift)"), ("rms", "hierarchy (solid) vs bypass (dashed) rms"),
-        ("chunk_vocab_ce/s0", "next-chunk CE"), ("grad_norm", "grad norm")]
+        ("bnd_on_ws/s0", "boundaries on whitespace (basin)"), ("grad_norm", "grad norm")]
 
 
 def _jsonl(path):
@@ -96,9 +96,9 @@ def alerts(run):
             out.append(f"{k}=1")
         if k.startswith("p_margin/") and isinstance(v, (int, float)) and v < 0.08:
             out.append(f"{k}={v:.2f} (undecided)")
-    d, res = last.get("dechunk_rms/s0"), last.get("residual_rms/s0")
-    if isinstance(d, (int, float)) and isinstance(res, (int, float)) and d > 0 and res > 5 * d:
-        out.append(f"bypass ≥{5 * (int(res / d) // 5)}× hierarchy rms")  # binned so seeds share one alert
+    w = last.get("bnd_on_ws/s0")
+    if isinstance(w, (int, float)) and m[-1]["step"] >= 300 and w < 0.3:
+        out.append(f"suffix basin (bnd_on_ws {w:.2f})")  # word basin ~0.9; decided by step ~300
     gn = [r.get("grad_norm") for r in m if isinstance(r.get("grad_norm"), (int, float))]
     if len(gn) >= 4 and gn[-1] > 50 * statistics.median(gn[:-1]) and gn[-1] > 10:
         out.append(f"grad_norm×{gn[-1] / statistics.median(gn[:-1]):.0f}")

@@ -281,6 +281,13 @@ class HNetForCausalLM(nn.Module):
             stats[f"aux/s{s}"] = loss.detach()
             stats.update({f"{k}/s{s}": v for k, v in st.items()})
             stats[f"compression/s{s}"] = r.boundary_mask.numel() / n_sel
+            if s == 0:  # which basin the tokenizer is in (logbook/interp/REPORT.md): cuts on whitespace bytes
+                with torch.no_grad():
+                    m0 = r.boundary_mask.reshape(-1)
+                    ws = (ids == 0x20) | (ids == 0x0A) | (ids == 0x09)
+                    on_ws = (m0 & ws).sum().float()
+                    stats["bnd_on_ws/s0"] = on_ws / m0.sum().clamp(min=1)
+                    stats["ws_cut/s0"] = on_ws / ws.sum().clamp(min=1)
             with torch.no_grad():
                 p = r.p.detach()
                 stats[f"p_mid/s{s}"] = ((p > 0.4) & (p < 0.6)).float().mean()  # undecided boundary decisions
