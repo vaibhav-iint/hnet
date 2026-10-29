@@ -561,3 +561,17 @@ Probes from the innermost main network's input x (the chunk vector) to the bytes
 3. **Routing is not the main gap**: oracle word chunks are only 0.04 better than the learned router and still 0.17
    behind BPE. What remains is what the main network receives (chunk identity: EXP-012) and how early it gets
    trained (EXP-008/011).
+
+### Where the n-gram gain lands; LR sweep; mid-training router collapses
+- **n-gram embeddings help the byte stage, not the hierarchy** (`diagnose.py` on EXP-006 hnet1 vs hnet1_ng, same
+  96 docs): bpb 1.790 → 1.676, but the main network's contribution falls from 0.63 to 0.38 bpb; the gains are in
+  punctuation (gap 0.56 → 0.16) and word-internal bytes. The tables are a BPE-like local-statistics crutch.
+- **EXP-003 (partial, 34/60 done): BPE's best LR is 6e-3 at the grid edge (1.564 ± 0.012); every H-Net peaks at
+  1.5e-3 (1.78–1.80) and degrades above.** At tuned settings the gap is 0.235 bpb, not 0.17. Note the paper's LR
+  multipliers put stage 0 at 3.5× base (5.3e-3 at base 1.5e-3) and the main network at 0.72× base (1.1e-3).
+- **Mid-training router collapses at LR ≥ 3e-3**: stage-1 compression spikes to 18–631 bytes/position for tens of
+  steps (end_mlp lr 6e-3 s0 at step 550; end_cosine_shift lr 3e-3 s1 at step 340), then the ratio loss pulls it back
+  at a cost of ~0.05 bpb. The stage-1 router sits at p ≈ 0.5 (no signal keeps it decided), so a large update can
+  flip a whole batch to "no boundaries". This is the mechanism behind H-Net's LR ceiling.
+- Next: EXP-013 tests whether stabilizing the router (strong ratio loss, entropy penalty) lets the H-Net use BPE's
+  LR, and whether the main network is under-trained (inverted multipliers [1, 1, 4]).

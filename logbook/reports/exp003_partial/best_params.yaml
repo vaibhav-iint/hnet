@@ -1,0 +1,5 @@
+best_lr:
+  bpe: 0.006
+  paper: 0.0015
+  end_mlp: 0.0015
+  end_cosine_shift: 0.0015

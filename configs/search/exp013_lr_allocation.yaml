@@ -1,0 +1,25 @@
+# EXP-013: can the H-Net use BPE's learning rate? EXP-003: BPE's best LR is 6e-3 (grid edge), H-Nets peak at 1.5e-3
+# and collapse mid-training (stage-1 router flips to "no boundaries") at >= 3e-3. The paper's LR multipliers put
+# stage 0 at 3.5x base and the main network at 0.72x. Arms at base LR 6e-3 (2-stage, end-of-chunk MLP router, same
+# budget as EXP-002/006): default multipliers; strong ratio loss; router-entropy penalty; no multipliers; main-heavy
+# multipliers [1, 1, 4]. Compare with EXP-003 end_mlp at lr 6e-3 (default) and 1.5e-3 (best).
+name: exp013_lr_allocation
+out_root: runs/search/exp013_lr_allocation
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp013_lr_allocation
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - train.lr=6.0e-3
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {lr6: "lr 6e-3, paper multipliers", lr6_alpha1: "lr 6e-3 + strong ratio loss (alpha 1)",
+           lr6_rent: "lr 6e-3 + router entropy 0.05", lr6_nomult: "lr 6e-3, no multipliers",
+           lr6_mainheavy: "lr 6e-3, multipliers [1, 1, 4]"}
+runs:
+  - {name: lr6,           config: configs/runs/tiny_hnet2_2m.yaml}
+  - {name: lr6_alpha1,    config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.ratio_loss_alpha=1.0]}
+  - {name: lr6_rent,      config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.router_entropy_weight=0.05]}
+  - {name: lr6_nomult,    config: configs/runs/tiny_hnet2_2m.yaml, set: [model.lr_multiplier=null]}
+  - {name: lr6_mainheavy, config: configs/runs/tiny_hnet2_2m.yaml, set: ["model.lr_multiplier=[1, 1, 4]"]}
