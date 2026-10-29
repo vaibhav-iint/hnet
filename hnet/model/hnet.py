@@ -133,8 +133,10 @@ class HNet(nn.Module):
         input_ids: Optional[torch.Tensor] = None,
         boundaries: Optional[List[torch.Tensor]] = None,
         binfo=None,
+        dec_add: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, List[RouterOutput]]:
-        """h [T, D_in] -> ([T, D_in], router outputs of this and all inner stages, outer first)."""
+        """h [T, D_in] -> ([T, D_in], router outputs of this and all inner stages, outer first). ``dec_add``: optional
+        [T, D] tensor added to this stage's decoder input (the match model's decoder-side candidates)."""
         D_in = h.shape[-1]
         if self.pad_dimension is not None:
             h = torch.cat((h, self.pad_dimension.to(h.dtype).expand(h.shape[0], -1)), dim=-1)
@@ -194,6 +196,8 @@ class HNet(nn.Module):
             residual = residual * keep[ctx.seq_idx.reshape(-1).long()].unsqueeze(-1)
         r.residual_in = residual.detach()  # read by HNetForCausalLM for the router gain objective (stage 0)
         h = (out + residual).to(h.dtype)
+        if dec_add is not None:
+            h = h + dec_add.to(h.dtype)
         h = self.decoder(h, ctx)
         return h[:, :D_in], [r, *inner_preds]
 
