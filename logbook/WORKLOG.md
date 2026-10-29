@@ -539,3 +539,25 @@ Probes from the innermost main network's input x (the chunk vector) to the bytes
   (mean or attention pooling of encoder states within the chunk, plus the boundary state), so the main network's
   input carries the chunk's identity. This is BLT's byte→patch cross-attention in H-Net clothing, and it is natural
   only with "end" semantics (the chunk must be complete when its vector is formed).
+
+### First results of the fix sweeps (val bpb, mean ± sd over seeds; BPE = 1.634 ± 0.002, 3 seeds)
+| experiment | arm | n | val bpb | main-network contribution (zero-main cost) |
+|---|---|---|---|---|
+| EXP-006 | 2-stage paper router | 1 | 1.795 | |
+| EXP-006 | 2-stage paper router + n-gram embeddings | 3 | **1.714 ± 0.016** | |
+| EXP-006 | 1-stage learned router | 3 | 1.845 ± 0.002 | |
+| EXP-006 | 1-stage + n-gram embeddings | 1 | **1.705** | |
+| EXP-006 | 2-stage end-of-chunk MLP + n-gram | 1 | 1.696 | |
+| EXP-009 | 1-stage, fixed 6-byte chunks | 3 | 1.859 ± 0.007 | +0.25 |
+| EXP-009 | 1-stage, oracle word-START chunks | 3 | 1.827 ± 0.006 | +0.45 |
+| EXP-009 | 1-stage, oracle word-END chunks | 3 | 1.806 ± 0.026 | **+0.56** |
+| EXP-008 | 2-stage base (zero-main probe) | 1 | 1.795 | +0.036 (innermost), +0.687 (all below stage 0) |
+
+1. **Parameter matching is real**: FLOP-free n-gram tables (matching BPE's 15M total params) remove ~40% of the gap
+   (0.21 → 0.07 for 1-stage). Cartesia's ladder matches the outer networks to BPE's embedding + head in params AND
+   FLOPs; this is what that buys at tiny scale.
+2. **Chunk semantics change how much the hierarchy is used**: oracle word-end chunks make the main network worth
+   0.56 bpb vs 0.25 with fixed chunks; "end" beats "start" by 0.11 of main-network contribution (the lag).
+3. **Routing is not the main gap**: oracle word chunks are only 0.04 better than the learned router and still 0.17
+   behind BPE. What remains is what the main network receives (chunk identity: EXP-012) and how early it gets
+   trained (EXP-008/011).
