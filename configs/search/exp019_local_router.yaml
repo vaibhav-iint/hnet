@@ -1,0 +1,28 @@
+# EXP-019: a router that is a tokenizer. chunk_stats (logbook) shows the paper's contextual routers do not produce
+# types: at stage 1 half of the chunks are strings seen once and a recurring word is segmented the same way only
+# 23-53% of the time, so no table or loss can give the main network word identity. `local_mlp` scores a boundary
+# from the last k = 8 bytes only (context-free, like BPE), so the same string is always cut the same way; rank
+# decisions pin compression. Arms: the router alone (`local`), with the stage-0 chunk vocabulary (`local_vocab`), and
+# with the vocabulary + next-chunk objective (`local_vocab_pred`). Compare with EXP-017 (end_mlp router, same arms)
+# on bpb and on chunk_stats consistency. 2-stage (3,3), lr 1.5e-3, EXP-002 budget.
+name: exp019_local_router
+out_root: runs/search/exp019_local_router
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp019_local_router
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=local_mlp
+  - "model.dc.router_kwargs={k: 8, d_hidden: 64}"
+  - model.dc.decision=quantile
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {local: "context-free router (last 8 bytes), rank decisions",
+           local_vocab: "+ hashed chunk vocabulary",
+           local_vocab_pred: "+ vocabulary + next-chunk prediction (w 0.5)"}
+runs:
+  - {name: local,            config: configs/runs/tiny_hnet2_2m.yaml}
+  - {name: local_vocab,      config: configs/runs/tiny_hnet2_2m.yaml,
+     set: ["model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16}, null]"]}
+  - {name: local_vocab_pred, config: configs/runs/tiny_hnet2_2m.yaml,
+     set: ["model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}, null]"]}
