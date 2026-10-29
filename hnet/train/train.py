@@ -226,7 +226,8 @@ class Trainer:
         self.flops = FlopsEstimator(self.mcfg, self.raw, self.seq_len, self.kind)
         self.peak = peak_flops() if self.cuda else None
         self.logger = MetricsLogger(self.out_dir, self.is_main and not dry_run, self.lc.get("wandb"),
-                                    self.lc.get("run_name"), cfg, resume=self.resumed_from is not None)
+                                    self.lc.get("run_name"), cfg,
+                                    resume_step=self.step if self.resumed_from is not None else None)
         self._stop_reason: Optional[str] = None
         self._zero = torch.zeros((), device=self.device)
         self._set_progress = getattr(self.raw, "set_progress", None)  # unwrapped model (not DDP)

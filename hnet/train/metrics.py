@@ -175,6 +175,15 @@ class FlopsEstimator:
         return sum(6.0 * n / bpp[min(s, len(bpp) - 1)] for s, n in self._stage_params.items())
 
 
+def _truncate_after(path: str, step: int):
+    with open(path) as f:
+        recs = [json.loads(line) for line in f if line.strip()]
+    with open(path, "w") as f:
+        for r in recs:
+            if r["step"] <= step:
+                f.write(json.dumps(r) + "\n")
+
+
 class MetricsLogger:
     """Rank-0 sink: stdout, ``metrics.jsonl`` / ``eval.jsonl``, optional wandb."""
 
@@ -182,15 +191,19 @@ class MetricsLogger:
                   "step_time", "mem_gb"]
 
     def __init__(self, out_dir: str, enabled: bool, wandb_project: Optional[str] = None, run_name=None,
-                 config: Optional[dict] = None, resume: bool = False):
+                 config: Optional[dict] = None, resume_step: Optional[int] = None):
         self.enabled = enabled
         self.wandb = None
         if not enabled:
             return
         os.makedirs(out_dir, exist_ok=True)
-        mode = "a" if resume else "w"
-        self.f = open(os.path.join(out_dir, "metrics.jsonl"), mode)
-        self.fe = open(os.path.join(out_dir, "eval.jsonl"), mode)
+        paths = [os.path.join(out_dir, n) for n in ("metrics.jsonl", "eval.jsonl")]
+        if resume_step is not None:  # drop records logged after the checkpoint so resumed steps are not duplicated
+            for p in paths:
+                if os.path.exists(p):
+                    _truncate_after(p, resume_step)
+        mode = "w" if resume_step is None else "a"
+        self.f, self.fe = (open(p, mode) for p in paths)
         if wandb_project and os.environ.get("WANDB_API_KEY"):  # opted in: a failing wandb is an error
             import wandb
 

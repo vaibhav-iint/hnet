@@ -2,6 +2,7 @@
 
 import json
 import os
+import shutil
 
 import torch
 
@@ -65,3 +66,17 @@ def test_signal_stops_with_checkpoint(tmp_path):
     tr.train()
     assert tr.step == 7
     assert ckpt.latest_checkpoint(str(tmp_path)).endswith("step_0000007")
+
+
+def test_resume_after_crash_drops_records_past_checkpoint(tmp_path):
+    """A run killed after its last checkpoint has logged steps the resumed run will redo; they must not duplicate."""
+    Trainer(cfg(tmp_path, stop_at_step=10, ckpt_every=4)).train()  # checkpoints 4, 8 (+ final 10)
+    for d in os.listdir(os.path.join(tmp_path, "ckpt")):
+        if not d.endswith("0000008"):
+            shutil.rmtree(os.path.join(tmp_path, "ckpt", d))
+    tr = Trainer(cfg(tmp_path))  # simulates preemption at step 10 with the newest checkpoint at step 8
+    assert tr.step == 8
+    tr.train()
+    with open(os.path.join(tmp_path, "metrics.jsonl")) as f:
+        steps = [json.loads(line)["step"] for line in f]
+    assert steps == list(range(1, 16))
