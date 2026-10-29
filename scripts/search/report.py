@@ -122,6 +122,10 @@ def f_ci(ci: dict, d: int = 3) -> str:
 
 
 def f_delta(ci: dict, d: int = 3) -> str:
+    if ci["n"] and ci["mean"] == float("-inf"):
+        return "baseline diverged"
+    if ci["n"] and ci["mean"] == float("inf"):
+        return "diverged"
     if ci["n"] == 0 or not math.isfinite(ci["mean"]):
         return "—"
     if not math.isfinite(ci["lo"]):
@@ -259,6 +263,8 @@ def seed_curve(runs, key: str, source: str, smooth: bool = False, scale=None):
     """(x bytes, mean, min, max) over seeds on the steps every seed has logged; None if nothing logged."""
     per = []
     for r in runs:
+        if r.diverged:  # its curve stops early; it would cut every seed's curve to its length
+            continue
         recs = [q for q in (r.evals if source == "eval" else r.metrics) if key in q and q[key] is not None]
         if not recs:
             continue
@@ -298,8 +304,13 @@ def _bpp(stage: int):
     return f
 
 
-def _clip_bpb(ax):
-    ax.set_ylim(top=min(ax.get_ylim()[1], 3.5))
+def _clip_bpb(axes):
+    """Autoscale to everything drawn, then cap the top (early-training bpb is ~8) at 3.5."""
+    for ax in np.ravel(axes):
+        ax.relim()
+        ax.autoscale_view()
+    for ax in np.ravel(axes):
+        ax.set_ylim(top=min(ax.get_ylim()[1], 3.5))
 
 
 def fig_curves(sweep, path, key, source, smooth, ylabel, by_setting: bool, best, title):
@@ -322,7 +333,6 @@ def fig_curves(sweep, path, key, source, smooth, ylabel, by_setting: bool, best,
                     continue
                 _draw(ax, seed_curve(sweep.select(arch, pt), key, source, smooth), colors[arch],
                       label_of(spec, arch), marker="o" if source == "eval" else None)
-            _clip_bpb(ax)
             head = gtitle if p is None else (f"{gtitle} · {point_label(p, aliases)}" if len(groups) > 1
                                              else point_label(p, aliases))
             ax.set_title(head, fontsize=10)
@@ -331,6 +341,7 @@ def fig_curves(sweep, path, key, source, smooth, ylabel, by_setting: bool, best,
             if gi == len(groups) - 1:
                 ax.set_xlabel("Training bytes seen (M)")
         axes[gi, 0].legend(loc="upper right", fontsize=8)
+    _clip_bpb(axes)
     fig.suptitle(title, x=0.01, ha="left", fontsize=12, fontweight="bold")
     fig.tight_layout(rect=(0, 0, 1, 0.97))
     fig.savefig(path)
@@ -347,7 +358,9 @@ def fig_overview(sweep, path, best, title):
     spec, base = sweep.spec, baseline_of(sweep.spec)
     colors = _colors(sweep, base)
     groups = panel_groups(sweep, base)
-    fig, axes = plt.subplots(3, len(groups), figsize=(5.8 * len(groups), 11), sharex=True, squeeze=False)
+    fig, axes = plt.subplots(3, len(groups), figsize=(max(9.0, 5.8 * len(groups)), 11), sharex=True, squeeze=False)
+    keys = list(dict.fromkeys(k for r in sweep.runs for k in r.job.point))
+    aliases = spec.aliases(keys) if keys else {}
     for col, (gtitle, members) in enumerate(groups.items()):
         for row, (key, source, smooth, ylabel) in enumerate([
                 ("bpb", "train", True, "Training bits per byte"), ("val/bpb", "eval", False, "Validation bits per byte")]):
@@ -355,10 +368,10 @@ def fig_overview(sweep, path, best, title):
             for arch in [base] + members:
                 if arch in sweep.archs():
                     pt = best.get(arch, {}).get("point", sweep.points(arch)[0])
-                    _draw(ax, seed_curve(sweep.select(arch, pt), key, source, smooth), colors[arch],
-                          label_of(spec, arch), marker="o" if source == "eval" else None)
+                    lab = label_of(spec, arch) + (f" ({point_label(pt, aliases)})" if keys else "")
+                    _draw(ax, seed_curve(sweep.select(arch, pt), key, source, smooth), colors[arch], lab,
+                          marker="o" if source == "eval" else None)
             ax.set_ylabel(ylabel)
-            _clip_bpb(ax)
             if row == 0:
                 ax.set_title(gtitle)
         ax = axes[2, col]
@@ -371,6 +384,7 @@ def fig_overview(sweep, path, best, title):
         ax.set_ylabel("Bytes per position (solid s0, dashed s1)")
         ax.set_xlabel("Training bytes seen (M)")
         axes[0, col].legend(loc="upper right", fontsize=8)
+    _clip_bpb(axes[:2])
     counts = sweep.counts()
     fig.suptitle(f"{title} · {sum(counts.get(k, 0) for k in ('running', 'done', 'diverged'))} runs logging, "
                  f"{counts.get('done', 0) + counts.get('diverged', 0)} finished", x=0.01, ha="left", fontsize=12,

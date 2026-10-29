@@ -337,3 +337,17 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
 - Attention Residuals (arXiv 2603.15031; the blog's "1.25×") is implemented as `Isotropic(attn_res=S)` but not yet
   wired into configs or flops.py; I'll do that wiring.
 - Open: CUDA parity for fla and flex is not run yet; no dense hybrid layout; KDA has no decoding cache.
+
+### WS-I1 done: DeepSeek MLA, NSA, DSA
+- New mixers in `hnet/model/mixers/deepseek.py`:
+  - `mla`: low-rank KV latent with a decoupled RoPE key.
+  - `nsa`: compressed, selected and sliding-window branches with sigmoid gates.
+  - `dsa`: lightning indexer with top-k selection, built on MLA.
+- Six configs (tiny BPE and H-Net); FLOPs per byte within ±0.05% of `tiny_bpe_2m`, and the fairness gate reports
+  "Problems: none".
+- Tests: 59 DeepSeek mixer tests (plus 9 CUDA-only); full suite 535 passed, 37 skipped.
+- The DSA indexer KL loss is injected into backward through an identity autograd function, since the trainer only
+  adds `out.aux_loss`. Its gradient is not divided by `grad_accum`.
+- Caveat: at these context lengths NSA still sees 64–97% of the keys dense attention sees, so it is not yet a test of
+  sparsity.
+- Open: CUDA parity for the flex and flash fast paths still has to run on a GPU VM before EXP-005.

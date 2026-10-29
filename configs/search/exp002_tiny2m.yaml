@@ -19,3 +19,11 @@ runs:
   - {name: paper_nosmooth,   config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.dechunker=repeat]}
   - {name: paper_nolrmult,   config: configs/runs/tiny_hnet2_2m.yaml, set: [model.lr_multiplier=null]}
   - {name: paper_alpha01,    config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.ratio_loss_alpha=0.1]}
+report:   # scripts/search/report.py (logbook/exp002_progress.py and exp002_summary.py are thin wrappers)
+  baseline: bpe
+  groups:
+    "Boundary routers": [paper, end_linear, end_mlp, end_cosine_shift]
+    "Ablations of the paper router": [paper, paper_r42, paper_nosmooth, paper_nolrmult, paper_alpha01]
+  labels: {bpe: BPE baseline, paper: paper router (LH-Net), end_linear: "end-of-chunk, linear",
+           end_mlp: "end-of-chunk, MLP", end_cosine_shift: "end-of-chunk, cosine", paper_r42: "targets (4,2)",
+           paper_nosmooth: no smoothing, paper_nolrmult: no LR multipliers, paper_alpha01: "ratio loss α=0.1"}
