@@ -1,38 +1,146 @@
 {
  "EXP-018 h1_vocab_pred s0 (word)": {
   "bpb": {
-   "full": 1.4859,
-   "vocab_zero": 1.9667,
-   "vocab_mean": 1.9873,
-   "hier_mean": 1.8854
+   "full": 1.6439,
+   "vocab_zero": 2.0889,
+   "vocab_mean": 2.108,
+   "hier_mean": 2.035
   },
   "by_class_gain_vocab_mean": {
-   "space": 0.203,
-   "newline": 0.475,
-   "punct": 0.911,
-   "digit": 1.108,
-   "word_start": 0.577,
-   "word_mid": 0.514,
+   "space": 0.227,
+   "newline": 0.479,
+   "punct": 0.74,
+   "digit": 1.092,
+   "word_start": 0.567,
+   "word_mid": 0.44,
    "word_end": 0.613,
-   "utf8": 0.345
+   "utf8": 0.264
   }
  },
  "EXP-018 h1_vocab_pred s1 (suffix)": {
   "bpb": {
-   "full": 1.6437,
-   "vocab_zero": 1.6522,
-   "vocab_mean": 1.6518,
-   "hier_mean": 1.694
+   "full": 1.8,
+   "vocab_zero": 1.8079,
+   "vocab_mean": 1.8077,
+   "hier_mean": 1.8577
   },
   "by_class_gain_vocab_mean": {
-   "space": 0.005,
-   "newline": 0.012,
-   "punct": 0.008,
-   "digit": 0.007,
-   "word_start": 0.008,
+   "space": 0.006,
+   "newline": -0.008,
+   "punct": 0.019,
+   "digit": 0.014,
+   "word_start": 0.007,
+   "word_mid": 0.008,
+   "word_end": 0.009,
+   "utf8": 0.008
+  }
+ },
+ "EXP-023 vp s0 @1000 (word)": {
+  "bpb": {
+   "full": 1.861,
+   "vocab_zero": 2.022,
+   "vocab_mean": 2.0265,
+   "hier_mean": 2.1113
+  },
+  "by_class_gain_vocab_mean": {
+   "space": 0.027,
+   "newline": 0.093,
+   "punct": 0.02,
+   "digit": 0.511,
+   "word_start": 0.248,
+   "word_mid": 0.159,
+   "word_end": 0.264,
+   "utf8": -0.077
+  }
+ },
+ "EXP-023 vp s1 final (suffix)": {
+  "bpb": {
+   "full": 1.7829,
+   "vocab_zero": 1.7923,
+   "vocab_mean": 1.7921,
+   "hier_mean": 1.861
+  },
+  "by_class_gain_vocab_mean": {
+   "space": 0.01,
+   "newline": 0.011,
+   "punct": -0.042,
+   "digit": 0.01,
+   "word_start": 0.012,
    "word_mid": 0.009,
-   "word_end": 0.01,
-   "utf8": -0.01
+   "word_end": 0.015,
+   "utf8": -0.022
+  }
+ },
+ "EXP-023 vp_ng s2 (word)": {
+  "bpb": {
+   "full": 1.5829,
+   "vocab_zero": 1.5964,
+   "vocab_mean": 1.5965,
+   "hier_mean": 1.8383
+  },
+  "by_class_gain_vocab_mean": {
+   "space": 0.008,
+   "newline": 0.002,
+   "punct": -0.031,
+   "digit": 0.071,
+   "word_start": 0.022,
+   "word_mid": 0.015,
+   "word_end": 0.012,
+   "utf8": 0.028
+  }
+ },
+ "EXP-024 prior s0 (word)": {
+  "bpb": {
+   "full": 1.5548,
+   "vocab_zero": 1.5886,
+   "vocab_mean": 1.5899,
+   "hier_mean": 1.9104
+  },
+  "by_class_gain_vocab_mean": {
+   "space": 0.015,
+   "newline": -0.005,
+   "punct": -0.011,
+   "digit": 0.16,
+   "word_start": 0.058,
+   "word_mid": 0.037,
+   "word_end": 0.03,
+   "utf8": -0.002
+  }
+ },
+ "ladder L03 hnet (prior-free)": {
+  "bpb": {
+   "full": 1.7127,
+   "vocab_zero": 1.716,
+   "vocab_mean": 1.7166,
+   "hier_mean": 1.7537
+  },
+  "by_class_gain_vocab_mean": {
+   "space": -0.002,
+   "newline": 0.086,
+   "punct": -0.039,
+   "digit": -0.065,
+   "word_start": 0.006,
+   "word_mid": 0.003,
+   "word_end": 0.015,
+   "utf8": 0.055
+  }
+ },
+ "ladder L03 hnet_ws (warm start)": {
+  "bpb": {
+   "full": 1.6389,
+   "vocab_zero": 1.6986,
+   "vocab_mean": 1.711,
+   "hier_mean": 1.9062
+  },
+  "by_class_gain_vocab_mean": {
+   "space": 0.027,
+   "newline": -0.023,
+   "punct": 0.061,
+   "digit": 0.418,
+   "word_start": 0.104,
+   "word_mid": 0.075,
+   "word_end": 0.07,
+   "utf8": 0.002
   }
  }
 }
