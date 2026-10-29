@@ -660,3 +660,24 @@ as tokens: hashed chunk-content embeddings (parameter-matched to BPE, zero FLOPs
 sampled-softmax next-chunk objective trains it. This also makes the segmentation matter to the loss (a chunk's
 identity is its token), so the learned tokenizer finally has something to be good at. Router-dynamics work stops
 here; the remaining budget (~$120 of the $200 cap) goes to this line.
+
+### Harvest of the finished sweeps (`logbook/sweep_summary.py --all`, honest-compute view)
+| arm (3 seeds unless noted) | val bpb | main-network contribution (below stage 0) | realized compute |
+|---|---|---|---|
+| BPE (EXP-006) | 1.634 ± 0.002 | | |
+| paper + n-gram tables (EXP-006 `paper_ng`) | 1.714 ± 0.016 | | +1.2% |
+| 1-stage + n-gram tables (`hnet1_ng`, 2 seeds) | 1.722 ± 0.023 | | +0.6% |
+| oracle word-end chunks (EXP-009 `space_end`) | 1.806 ± 0.026 | 0.56 | +0.7% |
+| fixed (3,3) pooling + byte aux head (EXP-011 `fixed_aux`) | **1.821 ± 0.002** | 0.37 | +0.2% |
+| fixed (3,3) pooling (EXP-011 `fixed`) | 1.832 ± 0.008 | 0.84 | +0.2% |
+| fixed + residual warmup (`fixed_rwarm`) | 1.844 ± 0.005 | 0.82 | +0.2% |
+| fixed + identity residual (`fixed_rid`) | 1.854 ± 0.035 | 0.10 | +0.2% |
+| fixed + path-drop 0.3 (`fixed_rdrop`, 2 seeds) | 1.889 ± 0.009 | 0.04 | +0.2% |
+| paper router α 0.03 (EXP-008 `base`) | 1.796 ± 0.001 | 0.69 | **+11.1%** |
+
+- At honest compute the best learned-router or fixed-chunk H-Net is ~1.82, i.e. 0.19 bpb behind BPE; every
+  "training signal" intervention (warmup, path-drop, identity residual) is neutral or harmful, the aux head gives
+  0.01. The n-gram tables (parameters, not FLOPs) give 0.11. This is the quantitative version of the zoom-out: the
+  gap is memory for identity, not signal routing. Hence EXP-017.
+- EXP-014 (p-space quantile) rows are the collapsed runs (compression 440–1800, −20% to −58% realized compute),
+  recorded for the post-mortem only.
