@@ -76,6 +76,12 @@ class DCConfig:
     #   destroys it.
     router_consistency_weight: float = 0.0
     router_consistency_n: int = 4
+    # router_prior_weight: tokenizer curriculum. For the first router_prior_frac of training the stage-0 router's logit
+    #   is also trained (BCE, weight decaying linearly to 0) toward "a chunk ends at every whitespace byte", BPE's
+    #   pre-tokenization. Steers the early race toward the word tokenizer that the adopted EXP-018/023 seeds found by
+    #   themselves; after the curriculum the router is free.
+    router_prior_weight: float = 0.0
+    router_prior_frac: float = 0.1
     chunker: Any = "select"  # keep vectors at boundaries (paper default); "pool" = learned summary over the chunk
     chunker_kwargs: Any = field(default_factory=dict)
     dechunker: Any = "ema"  # EMA smoothing (paper default); "repeat" = no smoothing

@@ -1,0 +1,24 @@
+# EXP-024: make adoption of the hierarchy reliable. EXP-018/023: the word-scale vocabulary + next-chunk objective gives
+# -0.11..-0.13 bpb (and, with n-gram tables, 1.66 vs BPE 1.63) in the seeds whose router finds the *word* tokenizer;
+# the seed that falls into a suffix/morpheme tokenizer never hands the model to the hierarchy (deterministic per seed,
+# across two deciders; residual warmup did not help). Two levers on the first steps: `prior` trains the router for the
+# first 10% of steps (weight 1 -> 0) toward "a chunk ends at every whitespace byte" (BPE's pre-tokenization; the
+# router is free afterwards), `temp4` doubles the confidence temperature (a sharper hierarchy signal from step 0).
+# Both on the best configuration (`vp_ng`: vocabulary + prediction + n-gram tables). 1-stage ratio 6, 3 seeds.
+name: exp024_adoption_curriculum
+out_root: runs/search/exp024_adoption_curriculum
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp024_adoption_curriculum
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - model.dc.decision=quantile
+  - "model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}]"
+  - "model.ngram_embed={ns: [3, 4, 5, 6, 7, 8], buckets: 12289}"
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {prior: "vp_ng + whitespace curriculum (10% of steps)", temp4: "vp_ng + confidence temperature 4"}
+runs:
+  - {name: prior, config: configs/runs/tiny_hnet1_2m.yaml, set: [model.dc.router_prior_weight=1.0, model.dc.router_prior_frac=0.1]}
+  - {name: temp4, config: configs/runs/tiny_hnet1_2m.yaml, set: ["model.dc.decision_kwargs={temp: 4.0}"]}

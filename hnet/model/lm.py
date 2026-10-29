@@ -186,6 +186,14 @@ class HNetForCausalLM(nn.Module):
                     out.aux_loss = out.aux_loss + cv.pred_weight * vocab_ce[st.stage_idx]
         stats = {"positions/s0": ids.new_full((), ids.numel(), dtype=torch.float32)}
         stats.update({f"chunk_vocab_ce/s{s}": v.detach() for s, v in vocab_ce.items()})
+        if dc.router_prior_weight > 0 and self.training and bpred and bpred[0].logit is not None:
+            prog = self.backbone.progress
+            scale = max(0.0, 1.0 - prog / max(dc.router_prior_frac, 1e-6))
+            if scale > 0:
+                tgt = ((ids == 0x20) | (ids == 0x0A)).float()
+                prior = F.binary_cross_entropy_with_logits(bpred[0].logit.float(), tgt)
+                out.aux_loss = out.aux_loss + dc.router_prior_weight * scale * prior
+                stats["router_prior/s0"] = prior.detach()
         if dc.router_consistency_weight > 0 and bpred and bpred[0].logit is not None:
             cons = self._router_consistency(bpred[0].logit, ids, ctx)
             out.aux_loss = out.aux_loss + dc.router_consistency_weight * cons
