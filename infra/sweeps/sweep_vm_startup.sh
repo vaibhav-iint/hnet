@@ -24,10 +24,16 @@ export PYTHONPATH=/opt/hnet
 python3 -m pip install -q -r requirements.txt pytest
 python3 -c "import torch; print('torch', torch.__version__, torch.cuda.get_device_name(0))"
 # Fast kernels are required (prebuilt wheels only); then the CUDA parity tests must pass before any training.
+# The check imports the entry points we use, not just the package: a VM preempted mid-install keeps a broken package
+# directory that a bare "import pkg" accepts.
+declare -A KCHECK=([causal_conv1d]="from causal_conv1d import causal_conv1d_fn"
+                   [mamba_ssm]="from mamba_ssm.ops.triton.ssd_combined import mamba_split_conv1d_scan_combined")
 for pkg in causal_conv1d mamba_ssm; do
-  python3 -c "import $pkg" 2>/dev/null && continue
+  python3 -c "${KCHECK[$pkg]}" 2>/dev/null && continue
   url=$(python3 infra/prime/gpu_caps.py wheel $pkg | tail -1)
-  case "$url" in http*) python3 -m pip install -q --no-deps "$url" ;; *) echo "no prebuilt wheel for $pkg: $url"; exit 1 ;; esac
+  case "$url" in http*) python3 -m pip install -q --no-deps --force-reinstall "$url" ;;
+                 *) echo "no prebuilt wheel for $pkg: $url"; exit 1 ;; esac
+  python3 -c "${KCHECK[$pkg]}"
 done
 python3 infra/prime/gpu_caps.py summary
 python3 -m pytest -q -p no:cacheprovider -m "not slow" tests/test_ssd.py tests/test_mamba2.py tests/test_model_components.py tests/test_model_hnet.py
