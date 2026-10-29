@@ -712,3 +712,18 @@ lr 1.5e-3; paper router at lr 6e-3 EXP-013 `lr6_nomult`) against a whitespace to
   score is a function of the last k bytes only (the same string is always cut the same way, like BPE), and a
   **surprise router** (boundary where the model's own next-byte entropy is high, the BLT patching rule) — both as
   scores for the rank decider, so compression stays pinned; measured with `chunk_stats` before looking at bpb.
+
+### Consistency at initialization vs after training: the router objective is anti-tokenizer
+`chunk_stats` on freshly initialized models (96 val docs): the contextual `end_mlp` router starts out **92–95%
+consistent** (a recurring word is cut the same way almost every time: a random Mamba encoder has short memory, so
+its state at a byte is a near-function of the last few bytes), while the trained `end_mlp` is 73% (stage 0) / 30%
+(stage 1). Training *removes* consistency: the CE-through-STE signal rewards boundaries that help prediction in
+context, never agreement across contexts. The context-free `local_mlp` is, counter-intuitively, *less* consistent at
+init (8% at k = 8, 32% at k = 4): an 8-byte window reaches into the previous word, so the same word gets different
+scores after different predecessors; a tokenizer is a function of the *current chunk's* string, not of a fixed
+window. (EXP-019 stays as the cheap test of whether training fixes this; its windowed design is not the answer.)
+
+Direct answer (new, `dc.router_consistency_weight`): a **self-consistency regularizer** on the byte-level router,
+the variance of its logit across all positions in the batch that end in the same `n` = 4 bytes (hashed group means
+via `index_add`, differentiable, negligible cost). The router keeps its context, but is pulled to agree with itself:
+the same string → the same decision, which is what gives the hierarchy types to work with.

@@ -186,6 +186,10 @@ class HNetForCausalLM(nn.Module):
                     out.aux_loss = out.aux_loss + cv.pred_weight * vocab_ce[st.stage_idx]
         stats = {"positions/s0": ids.new_full((), ids.numel(), dtype=torch.float32)}
         stats.update({f"chunk_vocab_ce/s{s}": v.detach() for s, v in vocab_ce.items()})
+        if dc.router_consistency_weight > 0 and bpred and bpred[0].logit is not None:
+            cons = self._router_consistency(bpred[0].logit, ids, ctx)
+            out.aux_loss = out.aux_loss + dc.router_consistency_weight * cons
+            stats["router_consistency/s0"] = cons.detach()
         if self.main_aux_head is not None and labels is not None:
             stats["main_aux_ce"] = main_ce.detach()
         if self.chunk_pred_head is not None and labels is not None:
@@ -221,6 +225,21 @@ class HNetForCausalLM(nn.Module):
         for st in self.backbone.stages():
             if getattr(st, "chunk_vocab", None) is not None:
                 st.chunk_vocab.reset_parameters()
+
+    def _router_consistency(self, logit: torch.Tensor, ids: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
+        """Mean squared deviation of the byte-level router logit from the mean logit of all positions in the batch
+        that end in the same ``router_consistency_n`` bytes (positions too close to a segment start are skipped)."""
+        n = self.config.dc.router_consistency_n
+        h, valid = HashNgramEmbedding.hashes(ids, ctx.position_ids, n, salt=424242 + n)
+        B = 1 << 20
+        idx = torch.remainder(h, B)
+        lg = logit.float()
+        ones = torch.ones_like(lg) * valid
+        tot = torch.zeros(B, device=lg.device, dtype=lg.dtype).index_add_(0, idx, lg * valid)
+        cnt = torch.zeros(B, device=lg.device, dtype=lg.dtype).index_add_(0, idx, ones)
+        mean = tot / cnt.clamp(min=1)
+        dev = (lg - mean[idx]) ** 2 * valid
+        return dev.sum() / ones.sum().clamp(min=1)
 
     def _chunk_pred_loss(self, bpred, ids: torch.Tensor, labels: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
         """Mean CE of predicting, from the innermost main network's output at each innermost position, the k bytes
