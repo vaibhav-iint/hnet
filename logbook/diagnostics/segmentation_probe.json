@@ -1,0 +1,306 @@
+{
+ "entropy": {
+  "chunks": 38166,
+  "mean_len": 5.99,
+  "types": 15647,
+  "type_token_ratio": 0.41,
+  "singleton_frac": 0.3169,
+  "unigram_bits_per_chunk": 12.027,
+  "unigram_bits_per_byte": 2.0079,
+  "top": [
+   [
+    "b'the '",
+    1556
+   ],
+   [
+    "b' '",
+    637
+   ],
+   [
+    "b'of '",
+    564
+   ],
+   [
+    "b'to '",
+    548
+   ],
+   [
+    "b'and '",
+    500
+   ],
+   [
+    "b's '",
+    288
+   ],
+   [
+    "b'is '",
+    281
+   ],
+   [
+    "b'in '",
+    216
+   ],
+   [
+    "b'that '",
+    189
+   ],
+   [
+    "b'are '",
+    183
+   ],
+   [
+    "b', '",
+    173
+   ],
+   [
+    "b'for '",
+    155
+   ],
+   [
+    "b' and '",
+    152
+   ],
+   [
+    "b'with '",
+    150
+   ],
+   [
+    "b' of '",
+    141
+   ]
+  ],
+  "name": "entropy",
+  "boundaries_on_whitespace": 0.6642388346406275,
+  "whitespace_boundaries_hit": 1.0182487594045142,
+  "consistency": 0.6043307086614174,
+  "n_consistency_types": 2032
+ },
+ "entropy_abs": {
+  "chunks": 38160,
+  "mean_len": 5.991,
+  "types": 13338,
+  "type_token_ratio": 0.3495,
+  "singleton_frac": 0.3072,
+  "unigram_bits_per_chunk": 10.069,
+  "unigram_bits_per_byte": 1.6807,
+  "top": [
+   [
+    "b' '",
+    2792
+   ],
+   [
+    "b'a'",
+    1271
+   ],
+   [
+    "b'e'",
+    1242
+   ],
+   [
+    "b'o'",
+    1085
+   ],
+   [
+    "b'i'",
+    844
+   ],
+   [
+    "b'r'",
+    745
+   ],
+   [
+    "b's'",
+    739
+   ],
+   [
+    "b't'",
+    693
+   ],
+   [
+    "b'n'",
+    593
+   ],
+   [
+    "b'l'",
+    530
+   ],
+   [
+    "b'u'",
+    457
+   ],
+   [
+    "b'h'",
+    446
+   ],
+   [
+    "b'c'",
+    417
+   ],
+   [
+    "b'm'",
+    394
+   ],
+   [
+    "b'p'",
+    381
+   ]
+  ],
+  "name": "entropy_abs",
+  "boundaries_on_whitespace": 0.29035270263059604,
+  "whitespace_boundaries_hit": 1.0180886825676325,
+  "consistency": 0.4119094488188976,
+  "n_consistency_types": 2032
+ },
+ "whitespace": {
+  "chunks": 37482,
+  "mean_len": 6.099,
+  "types": 11343,
+  "type_token_ratio": 0.3026,
+  "singleton_frac": 0.2074,
+  "unigram_bits_per_chunk": 10.857,
+  "unigram_bits_per_byte": 1.7801,
+  "top": [
+   [
+    "b'the '",
+    2025
+   ],
+   [
+    "b'of '",
+    1226
+   ],
+   [
+    "b'and '",
+    1084
+   ],
+   [
+    "b'to '",
+    996
+   ],
+   [
+    "b'a '",
+    737
+   ],
+   [
+    "b'in '",
+    630
+   ],
+   [
+    "b'is '",
+    525
+   ],
+   [
+    "b'that '",
+    329
+   ],
+   [
+    "b'for '",
+    288
+   ],
+   [
+    "b'are '",
+    279
+   ],
+   [
+    "b'with '",
+    256
+   ],
+   [
+    "b'The '",
+    246
+   ],
+   [
+    "b'on '",
+    212
+   ],
+   [
+    "b'as '",
+    208
+   ],
+   [
+    "b'or '",
+    198
+   ]
+  ],
+  "name": "whitespace",
+  "boundaries_on_whitespace": 1.0,
+  "whitespace_boundaries_hit": 1.0,
+  "consistency": 1.0,
+  "n_consistency_types": 2032
+ },
+ "mdl": {
+  "chunks": 24090,
+  "mean_len": 9.49,
+  "types": 21389,
+  "type_token_ratio": 0.8879,
+  "singleton_frac": 0.8417,
+  "unigram_bits_per_chunk": 14.203,
+  "unigram_bits_per_byte": 1.4967,
+  "top": [
+   [
+    "b' of the '",
+    94
+   ],
+   [
+    "b' in the '",
+    60
+   ],
+   [
+    "b' to the '",
+    36
+   ],
+   [
+    "b' and the '",
+    32
+   ],
+   [
+    "b'ing the '",
+    30
+   ],
+   [
+    "b' with the '",
+    29
+   ],
+   [
+    "b' on the '",
+    23
+   ],
+   [
+    "b' students '",
+    22
+   ],
+   [
+    "b' for the '",
+    21
+   ],
+   [
+    "b' that the '",
+    21
+   ],
+   [
+    "b'different '",
+    20
+   ],
+   [
+    "b'ation of '",
+    19
+   ],
+   [
+    "b' from the '",
+    19
+   ],
+   [
+    "b' language '",
+    17
+   ],
+   [
+    "b'important '",
+    16
+   ]
+  ],
+  "name": "mdl",
+  "boundaries_on_whitespace": 0.13254362093805028,
+  "whitespace_boundaries_hit": 0.6427085000800384,
+  "consistency": 0.0639763779527559,
+  "n_consistency_types": 2032
+ }
+}

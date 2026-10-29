@@ -944,3 +944,42 @@ which costs the H-Nets ~0.04 relative to their own optimum; noted as a caveat in
 (bpe / hnet / hnet_ws) launched on `hnet-ladder-1e16` (4×A100 spot, 12 runs); 1e17 held until EXP-027's first evals
 decide whether the ladder's H-Net arm should carry the chunk-STE / gated-bypass change. Both LR VMs deleted
 (hnet-ladder-lr $4.12, hnet-ladder-lr2 ~$3.5).
+
+### Falsifiers from the first-principles ideas (no training): the hierarchy's gain *does* separate word from suffix tokenizers
+Independent ideation (subagent, `$S2/ideas_first_principles.md`) proposed, among ten structural variants, a router
+objective based on the hierarchy's measured gain, with a no-training test: on EXP-023 `vp` seed 0 (word tokenizer)
+vs seed 1 (suffix tokenizer), bits saved per byte by the hierarchy (full model minus zero-main), by byte class
+(`hnet.analysis.diagnose`, 64 val docs, `logbook/diagnostics/diag_exp023_vp_s{0,1}[_step500].json`):
+
+| checkpoint | all bytes | chunk start | word start | space | word internal |
+|---|---|---|---|---|---|
+| step 500, word seed 0 | 0.165 | 0.172 | 0.164 | 0.269 | 0.127 |
+| step 500, suffix seed 1 | 0.068 | 0.071 | 0.026 | 0.084 | 0.068 |
+| final, word seed 0 | 0.460 | 0.651 | 0.595 | 0.529 | 0.366 |
+| final, suffix seed 1 | 0.192 | 0.317 | 0.221 | 0.023 | 0.213 |
+
+Already at step 500, in the middle of the bifurcation, the word tokenizer's hierarchy is worth 2.4× more per byte
+and 6× more at word starts than the suffix tokenizer's. The next-chunk CE was identical for the two (4.9 at step 500).
+So a *usefulness* objective for the router exists and is not blind: credit each byte's gain (CE with the hierarchy
+zeroed minus CE with it) to the chunk that covers it, and train the router's decisions on that advantage
+(REINFORCE with a baseline, or the chunk STE weighted by the gain). This is the first candidate router objective
+that prefers the right basin for the right reason. Next: implement `dc.router_gain_weight` (a second decoder pass on
+the residual-only input, cheap at 4 outer layers) and run it prior-free, 3 seeds.
+
+Two offline segmentation probes (`scripts/analysis/segmentation_probe.py`, 128 val docs, ratio 6,
+`logbook/diagnostics/segmentation_probe.json`) as candidate *teachers* replacing the whitespace prior:
+| segmentation | on whitespace | whitespace hit | consistency | types | unigram bits/byte |
+|---|---|---|---|---|---|
+| whitespace | 1.00 | 1.00 | 1.00 | 11343 | 1.78 |
+| 5-gram entropy spikes (Harris/BLT) | 0.66 | 1.02 | 0.60 | 15647 | 2.01 |
+| 5-gram entropy, absolute | 0.29 | 1.02 | 0.41 | 13338 | 1.68 |
+| unigram MDL (K 10, no length prior, 4 EM iters) | 0.13 | 0.64 | 0.06 | 21389 | 1.50 |
+Entropy spikes are a plausible language-agnostic prior (two thirds of cuts on word ends, top chunks are words) but
+weaker than whitespace on English; unigram MDL without a length prior does what the theory predicts (long rare units,
+84% singletons) and is not a tokenizer as configured. Neither replaces the whitespace curriculum on this data; the
+entropy prior is the candidate for code/multilingual rungs where whitespace is the wrong prior.
+
+EXP-027 at step 500 (val / zero-main): `cste` 2.022, 1.947 / 2.054; `cste_rgate` 2.000, 1.962 / 2.140; `rgate`
+1.999, 1.979 / 2.404; reference `vp_ng` 1.994, 1.953, 1.956 / 2.02-2.05. Same loss as the reference so far; the
+margin gate makes the hierarchy load-bearing from the start (0.42 bpb of contribution at step 500 vs 0.03-0.10 for
+the reference), which is the mechanism it was meant to change. Finals at step 1763 decide.
