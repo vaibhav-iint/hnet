@@ -1,0 +1,3 @@
+# BPE rungs: 2048-token windows, 32k vocab (synthetic token ids stay < 256 but the LM head is full size).
+include: _bench.yaml
+data: {seq_len: 2048, micro_batch: 16, batch_windows: 64, eot: 255}

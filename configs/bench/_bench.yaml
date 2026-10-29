@@ -1,0 +1,28 @@
+# Throughput benchmarks (scripts/bench/bench_train.py). Not a ladder config: provisional rung shapes only, for
+# measuring tokens/s, bytes/s and MFU on the real training loop. Synthetic data by default (no shards needed);
+# `--set data.source=hnet` uses the FineWeb-Edu shards (scripts/data/prepare.py) and also exercises the loader.
+data:
+  source: synthetic
+  synthetic_docs: 20000
+  dataset: finewebedu10B
+  n_train_shards: 1
+  cross_window_label: true
+  num_workers: 1
+  prefetch: 8
+  bytes_per_token: 4.3        # tokens_eq of byte models (ladder: ~4.3x compression); token models count tokens
+train:
+  out_dir: runs/bench/default
+  seed: 0
+  steps: 60
+  optimizer: muon             # blog ladder optimizer; `--set train.optimizer=adamw` for the AdamW path
+  muon: {lr: 0.025, lr_embed: 6.0e-3, lr_head: 6.0e-3, lr_other: 6.0e-3, adam_betas: [0.9, 0.95], adam_weight_decay: 0.1}
+  lr: 3.0e-3
+  schedule: {name: wsd, warmup: 0.1, decay: 0.2, decay_shape: inverse_sqrt, min_lr_ratio: 0.0}
+  grad_clip: 1.0
+  precision: bf16
+  compile: blocks
+  ckpt_every: 0
+  save_final: false
+  resume: null
+eval: {val: none, at_end: false, downstream: null}
+log: {every: 10, wandb: null}
