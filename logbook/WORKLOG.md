@@ -447,3 +447,43 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
   S ∈ {0, 1, 3}; the FLOPs overhead is under 5%; the counts match a hand calculation; H-Net forward works with AttnRes
   on in the main network only. Full suite: 603 passed.
 - It can now be added as an EXP-005 variant, e.g. `--set model.attn_res=[0,0,2]` for the main network only.
+
+### Deep dive: what the tiny H-Net learns, and why it trails BPE
+Tools: `hnet/analysis/diagnose.py` (per-byte loss by byte class and chunk position, router confidence, boundary
+alignment, zero-main ablations, a token-aligned comparison with BPE) and `hnet/analysis/probe_texts.py` (HTML view of
+chunks, loss and main-network help on contrasting inputs: `logbook/figures/probe_texts.html`). Per-checkpoint JSON is
+in `logbook/diagnostics/`. Findings on EXP-002 (paper 2-stage (3,3), final checkpoint, 64–128 val docs):
+1. **The deepest network is barely used.**
+   - Zeroing the innermost main network (6.0M of 7.9M params, 38% of FLOPs) costs 0.04 bpb (paper_s0) or 0.06
+     (end_mlp_s1).
+   - Zeroing everything below stage 0 costs 0.69, mostly from the stage-1 encoder and decoder.
+   - Over training the main network's help grows only 0.008 → 0.018 → 0.040 (steps 500, 1000, final).
+2. **The main network's gradient collapses early in every variant.** Its gradient norm drops from 7–23% of stage 0's
+   at step 10 to 1–3% by step 20 and stays there. This includes end-of-chunk routers, which never show the
+   early compression spike (up to 104 bytes/chunk at step 20 for the paper router). The decoders learn to rely on the
+   (zero-init) residual path almost immediately.
+3. **The stage-1 paper router never leaves its initialization.**
+   - 46–70% of p sit in 0.4–0.6, and only 2% are confident.
+   - With identity q/k on near-random states, cos ≈ 0 gives p ≈ 0.5 at init.
+   - The ratio loss gives no push either: ∂L/∂G = N/(N−1)·(N·F − 1) = 0 once F is on target.
+   - The only remaining signals (EMA and STE paths) scale with the main network's usefulness, so routing and the
+     main network are stuck in a self-reinforcing equilibrium.
+   - Stage-1 chunk starts after whitespace: 13% (Cartesia's improved H-Net: 92%).
+4. **The end-of-chunk MLP router does learn word-like chunks**: 72% of stage-1 starts follow whitespace, and 67%
+   of stage-0 decisions are confident. Yet the main network's help only rises from 0.04 to 0.06 bpb, and bpb improves
+   by just 0.01. Better chunks alone don't unlock the hierarchy here.
+5. **Where the gap to BPE is (token-aligned, identical text).** 84% of it is in "space+word" GPT-2 tokens, spent on
+   the letters after the space (1.78 bits/byte) rather than the space itself (0.45 bits): word identity. The main
+   network's help goes to newlines (1.3 bits saved), punctuation (0.4) and digits, but only 0.03 bits at word
+   starts.
+6. **Scale check: neither model copies in context.** Repeated phrases cost ~2.1–2.4 bits/byte on the 4th–6th
+   repetition, for BPE as well (no induction heads at ~50M tokens). The tiny regime is dominated by local
+   statistics, where BPE's 13M lookup and head parameters are worth more than any hierarchy. Tiny runs are for
+   debugging mechanisms, not for judging H-Net vs BPE.
+- Hypotheses for 4–5: a decoder bottleneck (word-level knowledge must be spelled out through a d=96, 4-layer byte
+  decoder and a 256-way head, while BPE has a 6.4M-param word-level head), plus missing capacity at tiny scale.
+- Running:
+  - EXP-008 (residual path-drop / main-path aux head / router entropy / combined, 3 seeds);
+  - EXP-009 (oracle word chunks vs fixed vs learned at matched FLOPs);
+  - EXP-006 (n-gram embeddings);
+  - a dense-checkpoint probe run for steps 1–400.

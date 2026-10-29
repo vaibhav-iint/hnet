@@ -1,0 +1,354 @@
+{
+ "checkpoint": "runs/gcp/exp002_tiny2m/paper_r42_s0/ckpt/step_0001763",
+ "kind": "byte",
+ "docs": 64,
+ "bpb": 1.7867,
+ "decoder_inputs": {
+  "s0": {
+   "residual_rms": 1.5089,
+   "encoder_rms": 1.1325,
+   "dechunk_rms": 0.7468
+  },
+  "s1": {
+   "residual_rms": 1.7394,
+   "encoder_rms": 1.1398,
+   "dechunk_rms": 0.9432
+  }
+ },
+ "router": [
+  {
+   "stage": 0,
+   "positions": 109027,
+   "selected": 30790,
+   "bytes_per_chunk_vs_prev_stage": 3.541,
+   "p_mean": 0.3296,
+   "p_hist": [
+    0.1955,
+    0.2623,
+    0.1888,
+    0.071,
+    0.0638,
+    0.1116,
+    0.0949,
+    0.0121
+   ],
+   "confident(<.05|>.95)": 0.2076,
+   "near_half(.4-.6)": 0.1348
+  },
+  {
+   "stage": 1,
+   "positions": 30790,
+   "selected": 15414,
+   "bytes_per_chunk_vs_prev_stage": 1.998,
+   "p_mean": 0.5055,
+   "p_hist": [
+    0.0,
+    0.0032,
+    0.2093,
+    0.2869,
+    0.2751,
+    0.2094,
+    0.0141,
+    0.0021
+   ],
+   "confident(<.05|>.95)": 0.0021,
+   "near_half(.4-.6)": 0.5621
+  }
+ ],
+ "alignment": [
+  {
+   "stage": 0,
+   "chunk_starts": 30717,
+   "after_whitespace": 0.0918,
+   "word_internal": 0.6907,
+   "mid_utf8": 0.0048
+  },
+  {
+   "stage": 1,
+   "chunk_starts": 15350,
+   "after_whitespace": 0.0867,
+   "word_internal": 0.6642,
+   "mid_utf8": 0.0038
+  }
+ ],
+ "breakdown": {
+  "by_class": {
+   "digit": {
+    "bits": 4.1828,
+    "share_bytes": 0.0096,
+    "share_bits": 0.0226
+   },
+   "newline": {
+    "bits": 2.743,
+    "share_bytes": 0.0054,
+    "share_bits": 0.0084
+   },
+   "punct": {
+    "bits": 4.0698,
+    "share_bytes": 0.0271,
+    "share_bits": 0.0617
+   },
+   "space": {
+    "bits": 0.4863,
+    "share_bytes": 0.1561,
+    "share_bits": 0.0425
+   },
+   "utf8_cont": {
+    "bits": 1.3941,
+    "share_bytes": 0.0051,
+    "share_bits": 0.004
+   },
+   "utf8_lead": {
+    "bits": 5.6098,
+    "share_bytes": 0.0026,
+    "share_bits": 0.0082
+   },
+   "word_internal": {
+    "bits": 1.3852,
+    "share_bytes": 0.6328,
+    "share_bits": 0.4906
+   },
+   "word_start": {
+    "bits": 4.012,
+    "share_bytes": 0.1613,
+    "share_bits": 0.3622
+   }
+  },
+  "by_chunk_pos": [
+   {
+    "chunk_start": {
+     "bits": 1.9215,
+     "share_bytes": 0.282,
+     "share_bits": 0.3033
+    },
+    "pos1": {
+     "bits": 1.4967,
+     "share_bytes": 0.2014,
+     "share_bits": 0.1687
+    },
+    "pos2": {
+     "bits": 2.0773,
+     "share_bytes": 0.1556,
+     "share_bits": 0.1809
+    },
+    "pos3+": {
+     "bits": 1.7181,
+     "share_bytes": 0.3611,
+     "share_bits": 0.3472
+    }
+   },
+   {
+    "chunk_start": {
+     "bits": 1.8294,
+     "share_bytes": 0.1409,
+     "share_bits": 0.1442
+    },
+    "pos1": {
+     "bits": 1.6023,
+     "share_bytes": 0.1192,
+     "share_bits": 0.1069
+    },
+    "pos2": {
+     "bits": 2.1238,
+     "share_bytes": 0.1066,
+     "share_bits": 0.1267
+    },
+    "pos3+": {
+     "bits": 1.7552,
+     "share_bytes": 0.6333,
+     "share_bits": 0.6221
+    }
+   }
+  ]
+ },
+ "zero_main_bpb": {
+  "s0": 2.3894,
+  "s1": 1.8071
+ },
+ "main_help": {
+  "s0": {
+   "ALL": {
+    "bits_saved": 0.6026,
+    "share_of_saving": 1.0,
+    "share_bytes": 1.0
+   },
+   "chunk0:inside": {
+    "bits_saved": 0.5133,
+    "share_of_saving": 0.6115,
+    "share_bytes": 0.718
+   },
+   "chunk0:start": {
+    "bits_saved": 0.8303,
+    "share_of_saving": 0.3885,
+    "share_bytes": 0.282
+   },
+   "class:digit": {
+    "bits_saved": 0.1698,
+    "share_of_saving": 0.0027,
+    "share_bytes": 0.0096
+   },
+   "class:newline": {
+    "bits_saved": 1.0613,
+    "share_of_saving": 0.0096,
+    "share_bytes": 0.0054
+   },
+   "class:punct": {
+    "bits_saved": 2.0487,
+    "share_of_saving": 0.0921,
+    "share_bytes": 0.0271
+   },
+   "class:space": {
+    "bits_saved": 0.6822,
+    "share_of_saving": 0.1767,
+    "share_bytes": 0.1561
+   },
+   "class:utf8_cont": {
+    "bits_saved": 0.2684,
+    "share_of_saving": 0.0023,
+    "share_bytes": 0.0051
+   },
+   "class:utf8_lead": {
+    "bits_saved": 1.4988,
+    "share_of_saving": 0.0065,
+    "share_bytes": 0.0026
+   },
+   "class:word_internal": {
+    "bits_saved": 0.5691,
+    "share_of_saving": 0.5975,
+    "share_bytes": 0.6328
+   },
+   "class:word_start": {
+    "bits_saved": 0.4211,
+    "share_of_saving": 0.1127,
+    "share_bytes": 0.1613
+   }
+  },
+  "s1": {
+   "ALL": {
+    "bits_saved": 0.0204,
+    "share_of_saving": 1.0,
+    "share_bytes": 1.0
+   },
+   "chunk0:inside": {
+    "bits_saved": 0.0215,
+    "share_of_saving": 0.7574,
+    "share_bytes": 0.718
+   },
+   "chunk0:start": {
+    "bits_saved": 0.0175,
+    "share_of_saving": 0.2426,
+    "share_bytes": 0.282
+   },
+   "class:digit": {
+    "bits_saved": 0.0557,
+    "share_of_saving": 0.0263,
+    "share_bytes": 0.0096
+   },
+   "class:newline": {
+    "bits_saved": -0.0767,
+    "share_of_saving": -0.0205,
+    "share_bytes": 0.0054
+   },
+   "class:punct": {
+    "bits_saved": 0.0127,
+    "share_of_saving": 0.0169,
+    "share_bytes": 0.0271
+   },
+   "class:space": {
+    "bits_saved": 0.0085,
+    "share_of_saving": 0.0652,
+    "share_bytes": 0.1561
+   },
+   "class:utf8_cont": {
+    "bits_saved": -0.0067,
+    "share_of_saving": -0.0017,
+    "share_bytes": 0.0051
+   },
+   "class:utf8_lead": {
+    "bits_saved": -0.0453,
+    "share_of_saving": -0.0058,
+    "share_bytes": 0.0026
+   },
+   "class:word_internal": {
+    "bits_saved": 0.0249,
+    "share_of_saving": 0.7716,
+    "share_bytes": 0.6328
+   },
+   "class:word_start": {
+    "bits_saved": 0.0187,
+    "share_of_saving": 0.1479,
+    "share_bytes": 0.1613
+   }
+  }
+ },
+ "bpe_checkpoint": "runs/gcp/exp002_tiny2m/bpe_s0/ckpt/step_0001744",
+ "vs_bpe": {
+  "ALL": {
+   "tokens": 23233,
+   "share_bytes": 1.0,
+   "bpe_bits_per_byte": 1.5862,
+   "hnet_bits_per_byte": 1.7857,
+   "gap_bits_per_byte": 0.1995,
+   "share_of_total_gap": 1.0,
+   "hnet_first_byte_bits": 1.445,
+   "hnet_rest_bits_per_byte": 1.8796,
+   "bpe_bits_per_token": 7.335
+  },
+  "space+word": {
+   "tokens": 16164,
+   "share_bytes": 0.8609,
+   "bpe_bits_per_byte": 1.3923,
+   "hnet_bits_per_byte": 1.5916,
+   "gap_bits_per_byte": 0.1993,
+   "share_of_total_gap": 0.8603,
+   "hnet_first_byte_bits": 0.469,
+   "hnet_rest_bits_per_byte": 1.8292,
+   "bpe_bits_per_token": 7.967
+  },
+  "word_piece": {
+   "tokens": 2684,
+   "share_bytes": 0.0827,
+   "bpe_bits_per_byte": 2.5933,
+   "hnet_bits_per_byte": 2.6807,
+   "gap_bits_per_byte": 0.0874,
+   "share_of_total_gap": 0.0363,
+   "hnet_first_byte_bits": 4.258,
+   "hnet_rest_bits_per_byte": 1.9981,
+   "bpe_bits_per_token": 8.586
+  },
+  "punct/other": {
+   "tokens": 3303,
+   "share_bytes": 0.0383,
+   "bpe_bits_per_byte": 3.1031,
+   "hnet_bits_per_byte": 3.5764,
+   "gap_bits_per_byte": 0.4733,
+   "share_of_total_gap": 0.0908,
+   "hnet_first_byte_bits": 3.613,
+   "hnet_rest_bits_per_byte": 3.4278,
+   "bpe_bits_per_token": 3.864
+  },
+  "number": {
+   "tokens": 486,
+   "share_bytes": 0.0125,
+   "bpe_bits_per_byte": 3.299,
+   "hnet_bits_per_byte": 3.3302,
+   "gap_bits_per_byte": 0.0312,
+   "share_of_total_gap": 0.002,
+   "hnet_first_byte_bits": 2.075,
+   "hnet_rest_bits_per_byte": 4.0402,
+   "bpe_bits_per_token": 9.13
+  },
+  "whitespace/newline": {
+   "tokens": 596,
+   "share_bytes": 0.0055,
+   "bpe_bits_per_byte": 2.3452,
+   "hnet_bits_per_byte": 2.7286,
+   "gap_bits_per_byte": 0.3834,
+   "share_of_total_gap": 0.0107,
+   "hnet_first_byte_bits": 2.729,
+   "hnet_rest_bits_per_byte": 0.0,
+   "bpe_bits_per_token": 2.345
+  }
+ },
+ "bpe_bpb_same_text": 1.5862
+}
