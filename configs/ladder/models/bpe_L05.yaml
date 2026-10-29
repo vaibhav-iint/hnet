@@ -16,5 +16,5 @@ model:
   norm_eps: 1.0e-05
   initializer_range: 0.02
 # Not part of the model (scripts/flops_report.py, tests).
-matching: {seq_len_bytes: 8832, seq_len_tokens: 2048, bytes_per_token: 4.3, reference: null}
-ladder: {rung: L05, variant: bpe, bytes_per_token: 4.3, vocab: 32768}
+matching: {seq_len_bytes: 8512, seq_len_tokens: 2048, bytes_per_token: 4.145, reference: null}
+ladder: {rung: L05, variant: bpe, bytes_per_token: 4.145, vocab: 32768}

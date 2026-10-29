@@ -25,8 +25,8 @@ runs:
 - name: hnet
   config: configs/ladder/runs/ladder_hnet.yaml
   model: configs/ladder/models/hnet_L04.yaml
-  set: [data.micro_batch=8, data.batch_bytes=565248, train.train_bytes=411500544]
+  set: [data.micro_batch=8, data.batch_bytes=544768, train.train_bytes=396591104]
 - name: hnet_ws
   config: configs/ladder/runs/ladder_hnet.yaml
   model: configs/ladder/models/hnet_ws_L04.yaml
-  set: [data.micro_batch=8, data.batch_bytes=565248, train.train_bytes=411500544]
+  set: [data.micro_batch=8, data.batch_bytes=544768, train.train_bytes=396591104]

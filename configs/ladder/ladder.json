@@ -1,6 +1,6 @@
 {
  "options": {
-  "bytes_per_token": 4.3,
+  "bytes_per_token": 4.145,
   "vocab": 32768,
   "dataset": "mix_v1",
   "seq_tokens": 2048,
@@ -45,7 +45,7 @@
    "hnet": 8
   }
  },
- "seq_bytes": 8832,
+ "seq_bytes": 8512,
  "rungs": [
   {
    "name": "L03",
@@ -61,9 +61,9 @@
     "d0": 192,
     "n_enc": 2,
     "n_dec": 2,
-    "d_state": 144,
-    "cv_buckets": 25771,
-    "ng_buckets": 4831
+    "d_state": 160,
+    "cv_buckets": 25733,
+    "ng_buckets": 4817
    },
    "numbers": {
     "bpe": {
@@ -71,25 +71,25 @@
      "backbone": 3245824,
      "emb_head": 16777216,
      "flops_per_token": 84053032.5,
-     "flops_per_byte": 19547216.860465117,
-     "emb_head_flops_per_byte": 11705034.418604651,
-     "head_share": 0.5988082345512044
+     "flops_per_byte": 20278174.306393247,
+     "emb_head_flops_per_byte": 12142737.756332932,
+     "head_share": 0.5988082345512042
     },
     "hnet": {
-     "params": 20015529,
+     "params": 20010025,
      "main": 3245888,
-     "outer": 1173097,
-     "tables": 15461376,
+     "outer": 1198313,
+     "tables": 15430656,
      "byte_emb_head": 98304,
-     "flops_per_byte": 19474061.099513248,
-     "stage0_flops_per_byte": 11622252.697674418,
-     "main_flops_per_byte": 7851808.401838832,
+     "flops_per_byte": 20372110.859011617,
+     "stage0_flops_per_byte": 12227350.90711701,
+     "main_flops_per_byte": 8144759.951894606,
      "byte_head_flops_per_byte": 294912.0,
-     "outer_share": 0.5968068313170135,
-     "byte_head_share": 0.015143836639568276,
-     "flops_vs_bpe": -0.0037425154421767415,
-     "outer_vs_emb_head": -0.0070723176002502885,
-     "params_vs_bpe": -0.00037511786422039783
+     "outer_share": 0.6002004893718823,
+     "byte_head_share": 0.014476261298644244,
+     "flops_vs_bpe": 0.004632396940623673,
+     "outer_vs_emb_head": 0.006968210339546088,
+     "params_vs_bpe": -0.0006500011986192433
     }
    }
   },
@@ -107,9 +107,9 @@
     "d0": 192,
     "n_enc": 2,
     "n_dec": 2,
-    "d_state": 144,
-    "cv_buckets": 25771,
-    "ng_buckets": 4831
+    "d_state": 160,
+    "cv_buckets": 25733,
+    "ng_buckets": 4817
    },
    "numbers": {
     "bpe": {
@@ -117,25 +117,25 @@
      "backbone": 4851968,
      "emb_head": 16777216,
      "flops_per_token": 104770632.0,
-     "flops_per_byte": 24365263.255813956,
-     "emb_head_flops_per_byte": 11705034.418604651,
-     "head_share": 0.48039843837154667
+     "flops_per_byte": 25276388.90229192,
+     "emb_head_flops_per_byte": 12142737.756332932,
+     "head_share": 0.4803984383715467
     },
     "hnet": {
-     "params": 21621673,
+     "params": 21616169,
      "main": 4852032,
-     "outer": 1173097,
-     "tables": 15461376,
+     "outer": 1198313,
+     "tables": 15430656,
      "byte_emb_head": 98304,
-     "flops_per_byte": 24299594.352623038,
-     "stage0_flops_per_byte": 11622252.697674418,
-     "main_flops_per_byte": 12677341.654948618,
+     "flops_per_byte": 25377576.98967029,
+     "stage0_flops_per_byte": 12227350.90711701,
+     "main_flops_per_byte": 13150226.082553284,
      "byte_head_flops_per_byte": 294912.0,
-     "outer_share": 0.47828998826146435,
-     "byte_head_share": 0.01213649889460667,
-     "flops_vs_bpe": -0.002695185457323057,
-     "outer_vs_emb_head": -0.0070723176002502885,
-     "params_vs_bpe": -0.00034726229154091737
+     "outer_share": 0.4818171140646737,
+     "byte_head_share": 0.011620967601439696,
+     "flops_vs_bpe": 0.004003265172470849,
+     "outer_vs_emb_head": 0.006968210339546088,
+     "params_vs_bpe": -0.0006017332877652493
     }
    }
   },
@@ -150,12 +150,12 @@
     "mlp": 1408
    },
    "outer": {
-    "d0": 192,
-    "n_enc": 4,
-    "n_dec": 4,
-    "d_state": 80,
-    "cv_buckets": 38219,
-    "ng_buckets": 7159
+    "d0": 224,
+    "n_enc": 3,
+    "n_dec": 3,
+    "d_state": 96,
+    "cv_buckets": 32621,
+    "ng_buckets": 6113
    },
    "numbers": {
     "bpe": {
@@ -163,25 +163,25 @@
      "backbone": 13029504,
      "emb_head": 25165824,
      "flops_per_token": 193249264.5,
-     "flops_per_byte": 44941689.41860465,
-     "emb_head_flops_per_byte": 17557551.627906978,
-     "head_share": 0.39067404574779124
+     "flops_per_byte": 46622259.22798553,
+     "emb_head_flops_per_byte": 18214106.634499397,
+     "head_share": 0.39067404574779113
     },
     "hnet": {
-     "params": 38185841,
-     "main": 13029696,
-     "outer": 2097713,
-     "tables": 22923264,
-     "byte_emb_head": 98304,
-     "flops_per_byte": 45010473.26608978,
-     "stage0_flops_per_byte": 17599596.69767442,
-     "main_flops_per_byte": 27410876.56841536,
-     "byte_head_flops_per_byte": 294912.0,
-     "outer_share": 0.39101114519792646,
-     "byte_head_share": 0.006552075074984433,
-     "flops_vs_bpe": 0.0015305131688410079,
-     "outer_vs_emb_head": 0.002394700050353915,
-     "params_vs_bpe": -0.0002483811632668642
+     "params": 38185263,
+     "main": 13029664,
+     "outer": 2160655,
+     "tables": 22830080,
+     "byte_emb_head": 114688,
+     "flops_per_byte": 46764388.53143221,
+     "stage0_flops_per_byte": 18330337.599517494,
+     "main_flops_per_byte": 28434050.931914717,
+     "byte_head_flops_per_byte": 344064.0,
+     "outer_share": 0.3919721432302476,
+     "byte_head_share": 0.007357393324382737,
+     "flops_vs_bpe": 0.0030485288744086514,
+     "outer_vs_emb_head": 0.006381370623906646,
+     "params_vs_bpe": -0.00026351390410894737
     }
    }
   },
@@ -197,11 +197,11 @@
    },
    "outer": {
     "d0": 256,
-    "n_enc": 2,
+    "n_enc": 3,
     "n_dec": 2,
-    "d_state": 256,
-    "cv_buckets": 38923,
-    "ng_buckets": 7297
+    "d_state": 176,
+    "cv_buckets": 38501,
+    "ng_buckets": 7229
    },
    "numbers": {
     "bpe": {
@@ -209,25 +209,25 @@
      "backbone": 25958912,
      "emb_head": 33554432,
      "flops_per_token": 313405602.0,
-     "flops_per_byte": 72885023.72093023,
-     "emb_head_flops_per_byte": 23410068.837209303,
+     "flops_per_byte": 75610519.17973463,
+     "emb_head_flops_per_byte": 24285475.512665864,
      "head_share": 0.32119175712755765
     },
     "hnet": {
-     "params": 59504353,
+     "params": 59507289,
      "main": 25959168,
-     "outer": 2211809,
-     "tables": 31136768,
+     "outer": 2535257,
+     "tables": 30816256,
      "byte_emb_head": 131072,
-     "flops_per_byte": 73044431.0492158,
-     "stage0_flops_per_byte": 23530972.325581394,
-     "main_flops_per_byte": 49513458.7236344,
+     "flops_per_byte": 75521762.10190894,
+     "stage0_flops_per_byte": 24159424.827503014,
+     "main_flops_per_byte": 51362337.27440593,
      "byte_head_flops_per_byte": 393216.0,
-     "outer_share": 0.3221460142488717,
-     "byte_head_share": 0.005383244065999492,
-     "flops_vs_bpe": 0.0021871067627818874,
-     "outer_vs_emb_head": 0.005164593458175659,
-     "params_vs_bpe": -0.00015107536219105544
+     "outer_share": 0.3199001738717686,
+     "byte_head_share": 0.005206658174492737,
+     "flops_vs_bpe": -0.0011738720853735618,
+     "outer_vs_emb_head": -0.005190373361110834,
+     "params_vs_bpe": -0.00010174188834022324
     }
    }
   },
@@ -243,11 +243,11 @@
    },
    "outer": {
     "d0": 256,
-    "n_enc": 2,
+    "n_enc": 3,
     "n_dec": 2,
-    "d_state": 256,
-    "cv_buckets": 38923,
-    "ng_buckets": 7297
+    "d_state": 176,
+    "cv_buckets": 38501,
+    "ng_buckets": 7229
    },
    "numbers": {
     "bpe": {
@@ -255,25 +255,25 @@
      "backbone": 32120320,
      "emb_head": 33554432,
      "flops_per_token": 370952668.5,
-     "flops_per_byte": 86268062.44186047,
-     "emb_head_flops_per_byte": 23410068.837209303,
+     "flops_per_byte": 89494009.28829916,
+     "emb_head_flops_per_byte": 24285475.512665864,
      "head_share": 0.2713642589687962
     },
     "hnet": {
-     "params": 65665761,
+     "params": 65668697,
      "main": 32120576,
-     "outer": 2211809,
-     "tables": 31136768,
+     "outer": 2535257,
+     "tables": 30816256,
      "byte_emb_head": 131072,
-     "flops_per_byte": 86441373.93455923,
-     "stage0_flops_per_byte": 23530972.325581394,
-     "main_flops_per_byte": 62910401.60897784,
+     "flops_per_byte": 89418719.34645635,
+     "stage0_flops_per_byte": 24159424.827503014,
+     "main_flops_per_byte": 65259294.51895334,
      "byte_head_flops_per_byte": 393216.0,
-     "outer_share": 0.27221886065109985,
-     "byte_head_share": 0.004548932786488166,
-     "flops_vs_bpe": 0.002008987889528191,
-     "outer_vs_emb_head": 0.005164593458175659,
-     "params_vs_bpe": -0.0001369019254157111
+     "outer_share": 0.27018307804092306,
+     "byte_head_share": 0.004397468481699778,
+     "flops_vs_bpe": -0.0008412847121449518,
+     "outer_vs_emb_head": -0.005190373361110834,
+     "params_vs_bpe": -9.219676992455739e-05
     }
    }
   },
@@ -289,11 +289,11 @@
    },
    "outer": {
     "d0": 320,
-    "n_enc": 3,
+    "n_enc": 2,
     "n_dec": 2,
-    "d_state": 112,
-    "cv_buckets": 38069,
-    "ng_buckets": 7129
+    "d_state": 224,
+    "cv_buckets": 38461,
+    "ng_buckets": 7219
    },
    "numbers": {
     "bpe": {
@@ -301,25 +301,25 @@
      "backbone": 56371840,
      "emb_head": 41943040,
      "flops_per_token": 565374240.0,
-     "flops_per_byte": 131482381.39534885,
-     "emb_head_flops_per_byte": 29262586.046511628,
+     "flops_per_byte": 136399092.88299158,
+     "emb_head_flops_per_byte": 30356844.39083233,
      "head_share": 0.22255899030702211
     },
     "hnet": {
-     "params": 98292311,
+     "params": 98312601,
      "main": 56372160,
-     "outer": 3602071,
-     "tables": 38051840,
+     "outer": 3198681,
+     "tables": 38475520,
      "byte_emb_head": 163840,
-     "flops_per_byte": 131412777.27095728,
-     "stage0_flops_per_byte": 29124530.651162792,
-     "main_flops_per_byte": 102288246.61979449,
+     "flops_per_byte": 136706881.1287656,
+     "stage0_flops_per_byte": 30598332.890229188,
+     "main_flops_per_byte": 106108548.23853642,
      "byte_head_flops_per_byte": 491520.0,
-     "outer_share": 0.2216263232235898,
-     "byte_head_share": 0.0037402755668616994,
-     "flops_vs_bpe": -0.0005293798579923958,
-     "outer_vs_emb_head": -0.004717812538146959,
-     "params_vs_bpe": -0.00022955833338755838
+     "outer_share": 0.22382437985260087,
+     "byte_head_share": 0.003595429841874838,
+     "flops_vs_bpe": 0.0022565270726402353,
+     "outer_vs_emb_head": 0.007954993486404272,
+     "params_vs_bpe": -2.318062128536802e-05
     }
    }
   },
@@ -335,11 +335,11 @@
    },
    "outer": {
     "d0": 320,
-    "n_enc": 3,
+    "n_enc": 2,
     "n_dec": 2,
-    "d_state": 112,
-    "cv_buckets": 38069,
-    "ng_buckets": 7129
+    "d_state": 224,
+    "cv_buckets": 38461,
+    "ng_buckets": 7219
    },
    "numbers": {
     "bpe": {
@@ -347,25 +347,25 @@
      "backbone": 66367360,
      "emb_head": 41943040,
      "flops_per_token": 652257772.5,
-     "flops_per_byte": 151687854.06976745,
-     "emb_head_flops_per_byte": 29262586.046511628,
-     "head_share": 0.19291317835541774
+     "flops_per_byte": 157360138.11821473,
+     "emb_head_flops_per_byte": 30356844.39083233,
+     "head_share": 0.19291317835541777
     },
     "hnet": {
-     "params": 108287831,
+     "params": 108308121,
      "main": 66367680,
-     "outer": 3602071,
-     "tables": 38051840,
+     "outer": 3198681,
+     "tables": 38475520,
      "byte_emb_head": 163840,
-     "flops_per_byte": 151636432.31422392,
-     "stage0_flops_per_byte": 29124530.651162792,
-     "main_flops_per_byte": 122511901.66306111,
+     "flops_per_byte": 157685537.23412022,
+     "stage0_flops_per_byte": 30598332.890229188,
+     "main_flops_per_byte": 127087204.34389102,
      "byte_head_flops_per_byte": 491520.0,
-     "outer_share": 0.1920681607096267,
-     "byte_head_share": 0.0032414373808364394,
-     "flops_vs_bpe": -0.00033899718510010945,
-     "outer_vs_emb_head": -0.004717812538146959,
-     "params_vs_bpe": -0.0002083733418027922
+     "outer_share": 0.1940465398852589,
+     "byte_head_share": 0.003117089928610423,
+     "flops_vs_bpe": 0.0020678624192680406,
+     "outer_vs_emb_head": 0.007954993486404272,
+     "params_vs_bpe": -2.1041377374686476e-05
     }
    }
   },
@@ -380,12 +380,12 @@
     "mlp": 2816
    },
    "outer": {
-    "d0": 352,
-    "n_enc": 2,
-    "n_dec": 2,
-    "d_state": 224,
-    "cv_buckets": 42019,
-    "ng_buckets": 7879
+    "d0": 320,
+    "n_enc": 3,
+    "n_dec": 3,
+    "d_state": 128,
+    "cv_buckets": 45697,
+    "ng_buckets": 8563
    },
    "numbers": {
     "bpe": {
@@ -393,25 +393,25 @@
      "backbone": 104218368,
      "emb_head": 50331648,
      "flops_per_token": 934608834.0,
-     "flops_per_byte": 217350891.62790698,
-     "emb_head_flops_per_byte": 35115103.255813956,
+     "flops_per_byte": 225478608.92641738,
+     "emb_head_flops_per_byte": 36428213.268998794,
      "head_share": 0.16155950864894136
     },
     "hnet": {
-     "params": 154548213,
-     "main": 104218784,
-     "outer": 3803477,
-     "tables": 46221824,
-     "byte_emb_head": 180224,
-     "flops_per_byte": 217702547.8085451,
-     "stage0_flops_per_byte": 35359804.32558139,
-     "main_flops_per_byte": 182342743.48296374,
-     "byte_head_flops_per_byte": 540672.0,
-     "outer_share": 0.1624225562884913,
-     "byte_head_share": 0.0024835354727932952,
-     "flops_vs_bpe": 0.0016179191997065523,
-     "outer_vs_emb_head": 0.006968541940052919,
-     "params_vs_bpe": -1.1666126259135545e-05
+     "params": 154531157,
+     "main": 104218816,
+     "outer": 4359061,
+     "tables": 45687040,
+     "byte_emb_head": 163840,
+     "flops_per_byte": 225231617.90136212,
+     "stage0_flops_per_byte": 36077628.89022919,
+     "main_flops_per_byte": 189153989.01113293,
+     "byte_head_flops_per_byte": 491520.0,
+     "outer_share": 0.16018012580289245,
+     "byte_head_share": 0.0021822868591001117,
+     "flops_vs_bpe": -0.0010954077915916738,
+     "outer_vs_emb_head": -0.009623979528745163,
+     "params_vs_bpe": -0.00012202522191906429
     }
    }
   },
@@ -426,12 +426,12 @@
     "mlp": 2816
    },
    "outer": {
-    "d0": 352,
-    "n_enc": 2,
-    "n_dec": 2,
-    "d_state": 224,
-    "cv_buckets": 42019,
-    "ng_buckets": 7879
+    "d0": 320,
+    "n_enc": 3,
+    "n_dec": 3,
+    "d_state": 128,
+    "cv_buckets": 45697,
+    "ng_buckets": 8563
    },
    "numbers": {
     "bpe": {
@@ -439,25 +439,25 @@
      "backbone": 118965504,
      "emb_head": 50331648,
      "flops_per_token": 1056333856.5,
-     "flops_per_byte": 245659036.39534885,
-     "emb_head_flops_per_byte": 35115103.255813956,
-     "head_share": 0.14294244482544427
+     "flops_per_byte": 254845321.2303981,
+     "emb_head_flops_per_byte": 36428213.268998794,
+     "head_share": 0.14294244482544424
     },
     "hnet": {
-     "params": 169295349,
-     "main": 118965920,
-     "outer": 3803477,
-     "tables": 46221824,
-     "byte_emb_head": 180224,
-     "flops_per_byte": 246033153.14926982,
-     "stage0_flops_per_byte": 35359804.32558139,
-     "main_flops_per_byte": 210673348.82368845,
-     "byte_head_flops_per_byte": 540672.0,
-     "outer_share": 0.1437196730317413,
-     "byte_head_share": 0.002197557496131308,
-     "flops_vs_bpe": 0.001522910613875883,
-     "outer_vs_emb_head": 0.006968541940052919,
-     "params_vs_bpe": -1.0649913354754403e-05
+     "params": 169278293,
+     "main": 118965952,
+     "outer": 4359061,
+     "tables": 45687040,
+     "byte_emb_head": 163840,
+     "flops_per_byte": 254620084.8096228,
+     "stage0_flops_per_byte": 36077628.89022919,
+     "main_flops_per_byte": 218542455.9193936,
+     "byte_head_flops_per_byte": 491520.0,
+     "outer_share": 0.14169199934562945,
+     "byte_head_share": 0.0019304054523723263,
+     "flops_vs_bpe": -0.0008838161897101182,
+     "outer_vs_emb_head": -0.009623979528745163,
+     "params_vs_bpe": -0.0001113958491162359
     }
    }
   },
@@ -472,12 +472,12 @@
     "mlp": 3200
    },
    "outer": {
-    "d0": 448,
+    "d0": 384,
     "n_enc": 2,
     "n_dec": 2,
-    "d_state": 96,
-    "cv_buckets": 37717,
-    "ng_buckets": 7079
+    "d_state": 256,
+    "cv_buckets": 44843,
+    "ng_buckets": 8389
    },
    "numbers": {
     "bpe": {
@@ -485,25 +485,25 @@
      "backbone": 169301888,
      "emb_head": 58720256,
      "flops_per_token": 1419929736.0,
-     "flops_per_byte": 330216217.6744186,
-     "emb_head_flops_per_byte": 40967620.46511628,
+     "flops_per_byte": 342564471.89384806,
+     "emb_head_flops_per_byte": 42499582.14716526,
      "head_share": 0.12406301772104024
     },
     "hnet": {
-     "params": 228021001,
-     "main": 169302336,
-     "outer": 5465801,
-     "tables": 52822784,
-     "byte_emb_head": 229376,
-     "flops_per_byte": 329967623.9643051,
-     "stage0_flops_per_byte": 40565011.39534884,
-     "main_flops_per_byte": 289402612.56895626,
-     "byte_head_flops_per_byte": 688128.0,
-     "outer_share": 0.12293633814127486,
-     "byte_head_share": 0.0020854409645791176,
-     "flops_vs_bpe": -0.0007528210209185593,
-     "outer_vs_emb_head": -0.009827494621276744,
-     "params_vs_bpe": -5.01267105001979e-06
+     "params": 227973969,
+     "main": 169302400,
+     "outer": 4559825,
+     "tables": 53767680,
+     "byte_emb_head": 196608,
+     "flops_per_byte": 343066171.27132696,
+     "stage0_flops_per_byte": 42852107.09529553,
+     "main_flops_per_byte": 300214064.1760314,
+     "byte_head_flops_per_byte": 589824.0,
+     "outer_share": 0.1249091594676769,
+     "byte_head_share": 0.0017192718180700924,
+     "flops_vs_bpe": 0.0014645400169646106,
+     "outer_vs_emb_head": 0.008294786214828376,
+     "params_vs_bpe": -0.00021127334018922195
     }
    }
   }
@@ -515,10 +515,10 @@
     "steps": 908,
     "batch_windows": 64,
     "tokens": 119013376,
-    "bytes": 513245184,
+    "bytes": 494649344,
     "tokens_per_param": 36.666614086284405,
     "flops_bpe": 1.000343516086272e+16,
-    "flops_hnet": 9994968072246920.0,
+    "flops_hnet": 1.0077051272305372e+16,
     "optimum_prior": false
    },
    {
@@ -526,10 +526,10 @@
     "steps": 728,
     "batch_windows": 64,
     "tokens": 95420416,
-    "bytes": 411500544,
+    "bytes": 396591104,
     "tokens_per_param": 19.666332506727166,
     "flops_bpe": 9997257290022912.0,
-    "flops_hnet": 9999296295083708.0,
+    "flops_hnet": 1.0064521275178338e+16,
     "optimum_prior": true
    },
    {
@@ -537,10 +537,10 @@
     "steps": 395,
     "batch_windows": 64,
     "tokens": 51773440,
-    "bytes": 223272960,
+    "bytes": 215183360,
     "tokens_per_param": 3.9735541736661655,
     "flops_bpe": 1.000517920063488e+16,
-    "flops_hnet": 1.0049621597120734e+16,
+    "flops_hnet": 1.0062918252539048e+16,
     "optimum_prior": false
    },
    {
@@ -548,10 +548,10 @@
     "steps": 243,
     "batch_windows": 64,
     "tokens": 31850496,
-    "bytes": 137355264,
+    "bytes": 132378624,
     "tokens_per_param": 1.2269580481647304,
     "flops_bpe": 9982123872878592.0,
-    "flops_hnet": 1.0033037110494832e+16,
+    "flops_hnet": 9997466949106052.0,
     "optimum_prior": false
    }
   ],
@@ -561,10 +561,10 @@
     "steps": 1974,
     "batch_windows": 128,
     "tokens": 517472256,
-    "bytes": 2231599104,
+    "bytes": 2150744064,
     "tokens_per_param": 39.71542247502284,
     "flops_bpe": 1.0000113287115571e+17,
-    "flops_hnet": 1.004453318112219e+17,
+    "flops_hnet": 1.005782310405675e+17,
     "optimum_prior": false
    },
    {
@@ -572,10 +572,10 @@
     "steps": 1217,
     "batch_windows": 128,
     "tokens": 319029248,
-    "bytes": 1375813632,
+    "bytes": 1325965312,
     "tokens_per_param": 12.289777321946312,
     "flops_bpe": 9.99855535250473e+16,
-    "flops_hnet": 1.0049552397919515e+17,
+    "flops_hnet": 1.0013923684824746e+17,
     "optimum_prior": true
    },
    {
@@ -583,10 +583,10 @@
     "steps": 1028,
     "batch_windows": 128,
     "tokens": 269484032,
-    "bytes": 1162149888,
+    "bytes": 1120043008,
     "tokens_per_param": 8.389830238303977,
     "flops_bpe": 9.99658207885394e+16,
-    "flops_hnet": 1.0045783303661413e+17,
+    "flops_hnet": 1.0015281138831277e+17,
     "optimum_prior": false
    },
    {
@@ -594,10 +594,10 @@
     "steps": 675,
     "batch_windows": 128,
     "tokens": 176947200,
-    "bytes": 763084800,
+    "bytes": 735436800,
     "tokens_per_param": 3.1389289404071254,
     "flops_bpe": 1.00041388720128e+17,
-    "flops_hnet": 1.0027909286125298e+17,
+    "flops_hnet": 1.0053927119531978e+17,
     "optimum_prior": false
    },
    {
@@ -605,10 +605,10 @@
     "steps": 585,
     "batch_windows": 128,
     "tokens": 153354240,
-    "bytes": 661340160,
+    "bytes": 637378560,
     "tokens_per_param": 2.3106876633333013,
     "flops_bpe": 1.000264949858304e+17,
-    "flops_hnet": 1.0028326240851802e+17,
+    "flops_hnet": 1.0050538065510994e+17,
     "optimum_prior": false
    }
   ],
@@ -618,10 +618,10 @@
     "steps": 5142,
     "batch_windows": 256,
     "tokens": 2695888896,
-    "bytes": 11626020864,
+    "bytes": 11204788224,
     "tokens_per_param": 83.9309476368853,
     "flops_bpe": 1.000047179950719e+18,
-    "flops_hnet": 1.0049692168760114e+18,
+    "flops_hnet": 1.0019178135383351e+18,
     "optimum_prior": false
    },
    {
@@ -629,10 +629,10 @@
     "steps": 3374,
     "batch_windows": 256,
     "tokens": 1768947712,
-    "bytes": 7628587008,
+    "bytes": 7352188928,
     "tokens_per_param": 31.379988873877455,
     "flops_bpe": 1.0001174682717389e+18,
-    "flops_hnet": 1.0024938053744224e+18,
+    "flops_hnet": 1.0050948178163227e+18,
     "optimum_prior": false
    },
    {
@@ -640,10 +640,10 @@
     "steps": 2924,
     "batch_windows": 256,
     "tokens": 1533018112,
-    "bytes": 6611140608,
+    "bytes": 6371606528,
     "tokens_per_param": 23.098976846449823,
     "flops_bpe": 9.999229789352755e+17,
-    "flops_hnet": 1.0024897753248091e+18,
+    "flops_hnet": 1.0047101984121075e+18,
     "optimum_prior": true
    },
    {
@@ -651,10 +651,10 @@
     "steps": 2041,
     "batch_windows": 256,
     "tokens": 1070071808,
-    "bytes": 4614684672,
+    "bytes": 4447485952,
     "tokens_per_param": 10.267593213511077,
     "flops_bpe": 1.0000985647711519e+18,
-    "flops_hnet": 1.0046286104274404e+18,
+    "flops_hnet": 1.0017144565625398e+18,
     "optimum_prior": false
    },
    {
@@ -662,10 +662,10 @@
     "steps": 1806,
     "batch_windows": 256,
     "tokens": 946864128,
-    "bytes": 4083351552,
+    "bytes": 3935404032,
     "tokens_per_param": 7.959148628496543,
     "flops_bpe": 1.0002046359117496e+18,
-    "flops_hnet": 1.0046398577555246e+18,
+    "flops_hnet": 1.0020329083879715e+18,
     "optimum_prior": false
    }
   ]
