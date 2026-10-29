@@ -127,7 +127,7 @@ def mamba2_flops(d: int, ssm, cv: FlopsConvention) -> float:
 def _attn_dims(d: int, a: dict) -> dict:
     nh = a["num_heads"]
     nkv = a.get("num_kv_heads") or nh
-    hd = d // nh
+    hd = a.get("head_dim") or d // nh  # explicit head_dim: heads * head_dim may differ from d
     return dict(nh=nh, nkv=nkv, hd=hd, q=nh * hd, kv=nkv * hd)
 
 
@@ -397,10 +397,12 @@ def _dense(cfg: DenseConfig, seq_len, cv: FlopsConvention):
         # TODO(interface): modded-nanogpt variant (WS-G) has extra value embeddings etc.; counted as llama here.
         pass
     d, V = cfg.d_model, cfg.vocab_size
-    a = dict(num_heads=cfg.num_heads, num_kv_heads=cfg.num_kv_heads or cfg.num_heads, window_size=-1)
+    a = dict(num_heads=cfg.num_heads, num_kv_heads=cfg.num_kv_heads or cfg.num_heads, window_size=-1,
+             head_dim=cfg.head_dim)
     if cfg.mixer != "attn":  # same kwargs the model passes to the mixer
         a = dict(num_heads=cfg.num_heads, num_kv_heads=cfg.num_kv_heads, rope_theta=cfg.rope_theta,
-                 nope_every=cfg.nope_every, **cfg.extra.get("attn", {}), **cfg.mixer_kwargs)
+                 nope_every=cfg.nope_every, **({"head_dim": cfg.head_dim} if cfg.head_dim is not None else {}),
+                 **cfg.extra.get("attn", {}), **cfg.mixer_kwargs)
     layer_p, layer_f = _block_counts(cfg.mixer, True, d, cfg.d_intermediate, a, seq_len, cv)
     comp_p = {
         "embedding": V * d,

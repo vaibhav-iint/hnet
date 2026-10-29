@@ -53,6 +53,9 @@ class AttnConfig:
     nope_every: Any = 0  # 0 = never; k>0: layers with (layer_idx + 1) % k == 0 have no RoPE (SmolLM3 no_rope_layer)
     qkv_bias: bool = False
     out_bias: bool = False
+    # Per-head width; None -> d_model // num_heads. Set explicitly (e.g. 128) for heads * head_dim != d_model
+    # (Cartesia ladder: heads = depth, head_dim 128, so the attention inner width may exceed d_model).
+    head_dim: Any = None
 
 
 @dataclass
@@ -199,7 +202,10 @@ class HNetConfig:
             out[f.name] = _per_stage(getattr(self.attn, f.name), n, f.name)[s]
         if out["num_kv_heads"] is None:
             out["num_kv_heads"] = out["num_heads"]
-        head_dim = self.d_model[s] // out["num_heads"]
+        explicit = out.pop("head_dim")
+        head_dim = int(explicit) if explicit else self.d_model[s] // out["num_heads"]
+        if explicit:  # only passed on when set, so mixers without the knob are unaffected
+            out["head_dim"] = head_dim
         if out["rotary_emb_dim"] is None:
             out["rotary_emb_dim"] = head_dim
         return out
@@ -277,6 +283,7 @@ class DenseConfig:
     d_intermediate: int = 2048  # paper convention: round_up(8*D/3, 128)
     num_heads: int = 12
     num_kv_heads: Optional[int] = None  # None -> MHA
+    head_dim: Optional[int] = None  # None -> d_model // num_heads; may differ (attention inner width != d_model)
     rope_theta: float = 10000.0
     nope_every: int = 0
     tie_embeddings: bool = False

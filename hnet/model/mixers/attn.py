@@ -196,13 +196,15 @@ class CausalAttention(nn.Module):
         out_bias: bool = False,
         softmax_scale: Optional[float] = None,
         layer_idx: int = 0,
+        head_dim: Optional[int] = None,
     ):
         super().__init__()
-        assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
+        if head_dim is None:
+            assert d_model % num_heads == 0, "d_model must be divisible by num_heads"
         num_kv_heads = num_kv_heads or num_heads
         assert num_heads % num_kv_heads == 0, "num_heads must be a multiple of num_kv_heads"
         self.d_model, self.num_heads, self.num_kv_heads = d_model, num_heads, num_kv_heads
-        self.head_dim = d_model // num_heads
+        self.head_dim = d_model // num_heads if head_dim is None else int(head_dim)  # heads * head_dim may != d_model
         self.layer_idx = layer_idx
         self.window_size = int(window_size)
         self.rope_theta = float(rope_theta)
@@ -213,7 +215,7 @@ class CausalAttention(nn.Module):
         self.rotary_emb_dim = rot
         self.softmax_scale = softmax_scale if softmax_scale is not None else self.head_dim ** -0.5
         self.Wqkv = nn.Linear(d_model, (num_heads + 2 * num_kv_heads) * self.head_dim, bias=qkv_bias)
-        self.out_proj = nn.Linear(d_model, d_model, bias=out_bias)
+        self.out_proj = nn.Linear(num_heads * self.head_dim, d_model, bias=out_bias)
 
     @classmethod
     def config_kwargs(cls, cfg, stage: int) -> dict:

@@ -34,6 +34,8 @@ class LlamaLM(nn.Module):
             rope_theta=cfg.rope_theta,
             nope_every=cfg.nope_every,
         )
+        if cfg.head_dim is not None:  # only when set: mixers without the knob keep their signature
+            attn["head_dim"] = cfg.head_dim
         attn.update(cfg.extra.get("attn", {}))
         mixer_kwargs = {**attn, **cfg.mixer_kwargs}  # attention-style mixers share the head/RoPE settings
         self.embeddings = nn.Embedding(cfg.vocab_size, cfg.d_model)
