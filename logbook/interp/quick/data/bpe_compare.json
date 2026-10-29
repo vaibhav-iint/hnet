@@ -1,0 +1,238 @@
+{
+ "bpe_checkpoint": "runs/gcp/exp006_close_gap_tiny/bpe_s0",
+ "docs": 8,
+ "models": {
+  "EXP-024 prior s0 (word, warm start)": {
+   "hnet_bpb_same_text": 1.7341,
+   "bpe_bpb_same_text": 1.7694,
+   "by_kind": {
+    "ALL": {
+     "tokens": 2882,
+     "share_bytes": 1.0,
+     "bpe_bits_per_byte": 1.7694,
+     "hnet_bits_per_byte": 1.7341,
+     "gap_bits_per_byte": -0.0354,
+     "share_of_total_gap": 1.0,
+     "hnet_first_byte_bits": 1.66,
+     "hnet_rest_bits_per_byte": 1.7565,
+     "bpe_bits_per_token": 7.592
+    },
+    "space+word": {
+     "tokens": 1818,
+     "share_bytes": 0.8239,
+     "bpe_bits_per_byte": 1.4436,
+     "hnet_bits_per_byte": 1.4217,
+     "gap_bits_per_byte": -0.0219,
+     "share_of_total_gap": 0.5105,
+     "hnet_first_byte_bits": 0.436,
+     "hnet_rest_bits_per_byte": 1.6357,
+     "bpe_bits_per_token": 8.09
+    },
+    "word_piece": {
+     "tokens": 426,
+     "share_bytes": 0.1037,
+     "bpe_bits_per_byte": 3.233,
+     "hnet_bits_per_byte": 2.9994,
+     "gap_bits_per_byte": -0.2336,
+     "share_of_total_gap": 0.6851,
+     "hnet_first_byte_bits": 4.236,
+     "hnet_rest_bits_per_byte": 2.3839,
+     "bpe_bits_per_token": 9.729
+    },
+    "punct/other": {
+     "tokens": 471,
+     "share_bytes": 0.0489,
+     "bpe_bits_per_byte": 3.7143,
+     "hnet_bits_per_byte": 3.7425,
+     "gap_bits_per_byte": 0.0281,
+     "share_of_total_gap": -0.0389,
+     "hnet_first_byte_bits": 3.769,
+     "hnet_rest_bits_per_byte": 3.6508,
+     "bpe_bits_per_token": 4.771
+    },
+    "number": {
+     "tokens": 60,
+     "share_bytes": 0.0149,
+     "bpe_bits_per_byte": 2.9739,
+     "hnet_bits_per_byte": 2.7717,
+     "gap_bits_per_byte": -0.2022,
+     "share_of_total_gap": 0.0851,
+     "hnet_first_byte_bits": 1.2,
+     "hnet_rest_bits_per_byte": 3.5322,
+     "bpe_bits_per_token": 9.12
+    },
+    "whitespace/newline": {
+     "tokens": 107,
+     "share_bytes": 0.0087,
+     "bpe_bits_per_byte": 2.194,
+     "hnet_bits_per_byte": 3.1817,
+     "gap_bits_per_byte": 0.9877,
+     "share_of_total_gap": -0.2417,
+     "hnet_first_byte_bits": 3.182,
+     "hnet_rest_bits_per_byte": 0.0,
+     "bpe_bits_per_token": 2.194
+    }
+   },
+   "gap_by_token_len": {
+    "1": {
+     "gap_bits_per_byte": -0.0604,
+     "share_bytes": 0.0422
+    },
+    "2": {
+     "gap_bits_per_byte": -0.7255,
+     "share_bytes": 0.059
+    },
+    "3": {
+     "gap_bits_per_byte": -0.1907,
+     "share_bytes": 0.1063
+    },
+    "4": {
+     "gap_bits_per_byte": -0.122,
+     "share_bytes": 0.1378
+    },
+    "5": {
+     "gap_bits_per_byte": -0.0199,
+     "share_bytes": 0.1302
+    },
+    "6": {
+     "gap_bits_per_byte": 0.1217,
+     "share_bytes": 0.1029
+    },
+    "7": {
+     "gap_bits_per_byte": 0.1081,
+     "share_bytes": 0.1047
+    },
+    "8": {
+     "gap_bits_per_byte": 0.0815,
+     "share_bytes": 0.3169
+    }
+   },
+   "space_word_pos_bits": {
+    "space": 0.4363,
+    "letter1": 3.7318,
+    "letter2": 1.7726,
+    "letter3": 1.4392,
+    "letter4": 0.9326,
+    "letter5": 0.553,
+    "letter6": 0.3024,
+    "letter7+": 0.2311
+   }
+  },
+  "EXP-023 vp_ng s2 (word)": {
+   "hnet_bpb_same_text": 1.7625,
+   "bpe_bpb_same_text": 1.7694,
+   "by_kind": {
+    "ALL": {
+     "tokens": 2882,
+     "share_bytes": 1.0,
+     "bpe_bits_per_byte": 1.7694,
+     "hnet_bits_per_byte": 1.7625,
+     "gap_bits_per_byte": -0.0069,
+     "share_of_total_gap": 1.0,
+     "hnet_first_byte_bits": 1.658,
+     "hnet_rest_bits_per_byte": 1.7942,
+     "bpe_bits_per_token": 7.592
+    },
+    "space+word": {
+     "tokens": 1818,
+     "share_bytes": 0.8239,
+     "bpe_bits_per_byte": 1.4436,
+     "hnet_bits_per_byte": 1.4517,
+     "gap_bits_per_byte": 0.0081,
+     "share_of_total_gap": -0.968,
+     "hnet_first_byte_bits": 0.442,
+     "hnet_rest_bits_per_byte": 1.671,
+     "bpe_bits_per_token": 8.09
+    },
+    "word_piece": {
+     "tokens": 426,
+     "share_bytes": 0.1037,
+     "bpe_bits_per_byte": 3.233,
+     "hnet_bits_per_byte": 2.9804,
+     "gap_bits_per_byte": -0.2526,
+     "share_of_total_gap": 3.7878,
+     "hnet_first_byte_bits": 4.201,
+     "hnet_rest_bits_per_byte": 2.373,
+     "bpe_bits_per_token": 9.729
+    },
+    "punct/other": {
+     "tokens": 471,
+     "share_bytes": 0.0489,
+     "bpe_bits_per_byte": 3.7143,
+     "hnet_bits_per_byte": 3.8122,
+     "gap_bits_per_byte": 0.0978,
+     "share_of_total_gap": -0.6923,
+     "hnet_first_byte_bits": 3.793,
+     "hnet_rest_bits_per_byte": 3.8803,
+     "bpe_bits_per_token": 4.771
+    },
+    "number": {
+     "tokens": 60,
+     "share_bytes": 0.0149,
+     "bpe_bits_per_byte": 2.9739,
+     "hnet_bits_per_byte": 2.9464,
+     "gap_bits_per_byte": -0.0274,
+     "share_of_total_gap": 0.0591,
+     "hnet_first_byte_bits": 1.071,
+     "hnet_rest_bits_per_byte": 3.8537,
+     "bpe_bits_per_token": 9.12
+    },
+    "whitespace/newline": {
+     "tokens": 107,
+     "share_bytes": 0.0087,
+     "bpe_bits_per_byte": 2.194,
+     "hnet_bits_per_byte": 3.1421,
+     "gap_bits_per_byte": 0.9481,
+     "share_of_total_gap": -1.1866,
+     "hnet_first_byte_bits": 3.142,
+     "hnet_rest_bits_per_byte": 0.0,
+     "bpe_bits_per_token": 2.194
+    }
+   },
+   "gap_by_token_len": {
+    "1": {
+     "gap_bits_per_byte": -0.057,
+     "share_bytes": 0.0422
+    },
+    "2": {
+     "gap_bits_per_byte": -0.5959,
+     "share_bytes": 0.059
+    },
+    "3": {
+     "gap_bits_per_byte": -0.1877,
+     "share_bytes": 0.1063
+    },
+    "4": {
+     "gap_bits_per_byte": -0.101,
+     "share_bytes": 0.1378
+    },
+    "5": {
+     "gap_bits_per_byte": -0.0045,
+     "share_bytes": 0.1302
+    },
+    "6": {
+     "gap_bits_per_byte": 0.1692,
+     "share_bytes": 0.1029
+    },
+    "7": {
+     "gap_bits_per_byte": 0.1208,
+     "share_bytes": 0.1047
+    },
+    "8": {
+     "gap_bits_per_byte": 0.1107,
+     "share_bytes": 0.3169
+    }
+   },
+   "space_word_pos_bits": {
+    "space": 0.4418,
+    "letter1": 3.7729,
+    "letter2": 1.8215,
+    "letter3": 1.4695,
+    "letter4": 0.979,
+    "letter5": 0.5833,
+    "letter6": 0.3203,
+    "letter7+": 0.2428
+   }
+  }
+ }
+}
