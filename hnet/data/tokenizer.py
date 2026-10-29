@@ -203,7 +203,10 @@ def dataset_tokenizer(dataset: str, root=None) -> TokenizerInfo:
     from hnet.data import mix
 
     if mix.is_mix(dataset, root):
-        return load_tokenizer(mix.mix_dir(dataset, root) / "tokenizer.json")
+        local = mix.mix_dir(dataset, root) / "tokenizer.json"
+        if local.exists():
+            return load_tokenizer(local)
+        return load_tokenizer(mix.spec_tokenizer_path(dataset))  # not built here: the spec's committed tokenizer
     return GPT2Tokenizer()
 
 

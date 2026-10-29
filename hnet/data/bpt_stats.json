@@ -16,5 +16,27 @@
   "bytes_per_token": 4.453704031674332,
   "stream_bytes_per_token": 4.45018303,
   "doc_bytes_per_token_p50": 4.446026528667586
+ },
+ "mix_v1": {
+  "split": "train",
+  "n_shards": 7,
+  "text_bytes": 50001448,
+  "text_tokens": 12062255,
+  "bytes_per_token": 4.145281955985841,
+  "stream_bytes_per_token": 4.143622292134742,
+  "tokenizer": "configs/tokenizers/mix_v1_bpe32k.json",
+  "tokenizer_sha256": "7936154ba1923dd73709e405c5b08ffea15d458bd2b6e4de9875b39895fba3ee",
+  "note": "in-corpus 32k BPE, measured on the 50 MB mix_v1_small build (a prefix of mix_v1's stream); a built mix's manifest.json takes precedence"
+ },
+ "mix_v1_small": {
+  "split": "train",
+  "n_shards": 7,
+  "text_bytes": 50001448,
+  "text_tokens": 12062255,
+  "bytes_per_token": 4.145281955985841,
+  "stream_bytes_per_token": 4.143622292134742,
+  "tokenizer": "configs/tokenizers/mix_v1_bpe32k.json",
+  "tokenizer_sha256": "7936154ba1923dd73709e405c5b08ffea15d458bd2b6e4de9875b39895fba3ee",
+  "note": "in-corpus 32k BPE, measured on the 50 MB mix_v1_small build (a prefix of mix_v1's stream); a built mix's manifest.json takes precedence"
  }
 }

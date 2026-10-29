@@ -224,6 +224,15 @@ def known_mix_datasets() -> set:
     return out
 
 
+def spec_tokenizer_path(dataset: str) -> Path:
+    """The committed tokenizer of the known spec whose presets build `dataset` (e.g. mix_v1 -> mix_v1_bpe32k)."""
+    for name in KNOWN_SPECS:
+        spec = load_spec(name)
+        if dataset in {p["dataset"] for p in spec.presets.values()} and spec.tokenizer:
+            return REPO_ROOT / spec.tokenizer
+    raise FileNotFoundError(f"no known mix spec builds {dataset!r}")
+
+
 def is_mix(dataset: str, root=None) -> bool:
     m = mix_dir(dataset, root) / "manifest.json"
     if m.exists():

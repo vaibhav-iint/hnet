@@ -282,13 +282,14 @@ _STATS_PATH = Path(__file__).with_name("bpt_stats.json")
 
 
 def load_bpt_stats(dataset: str | None = None, root=None) -> dict:
-    """Bytes/token stats: a data mix's manifest.json (its own BPE, measured on its train shards), else the
-    committed GPT-2 stats (written by scripts/data/measure_bpt.py)."""
+    """Bytes/token stats: a built data mix's manifest.json (its own BPE, measured on its train shards), else the
+    committed stats (GPT-2 datasets: scripts/data/measure_bpt.py; data mixes not built locally, e.g. mix_v1:
+    the value measured on the small build, see docs/DATA_MIX.md)."""
     if dataset is not None:
         from hnet.data import mix
 
-        if mix.is_mix(dataset, root):
-            return mix.load_manifest(dataset, root)["train"]
+        if (mix.mix_dir(dataset, root) / "manifest.json").exists() and mix.is_mix(dataset, root):
+            return mix.load_manifest(dataset, root)["train"]  # the local build's own measurement
     d = json.loads(_STATS_PATH.read_text()) if _STATS_PATH.exists() else {}
     return d if dataset is None else d[dataset]
 
