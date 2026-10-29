@@ -79,3 +79,4 @@ ledger below reaches the cap and reports. Generation 1 runs seeds 1 and 2 for ca
 
 | generation | VM-hours | cost | candidates | best fitness |
 |---|---|---|---|---|
+| 1 (12 candidates + bpe/hnet/hnet_ws controls, seeds 1-2; 30 runs; branch evolve/g1a @ efe1625) | running | est. $17 (cap 4.5 h = $26) | | |
