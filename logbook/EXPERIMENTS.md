@@ -369,9 +369,23 @@ adopted) · arms: `cste` = `dc.chunk_ste` (the chunk vectors entering the main n
 so the next-chunk loss trains the router directly, independent of the decoder's adoption); `rgate` =
 `dc.residual_gate=margin` (the residual bypass into the decoder is scaled by the router's mean margin 2·mean|p−0.5|, so
 it opens only once the tokenizer is decided); `cste_rgate` = both · 3 seeds · 2 L4 spot VMs, worst case $2.22 ·
-status: **running** (launched 18:30 UTC)*
+status: **done for seeds 0-1, seed 2 running** (VM recreated after preemption)*
 
 Hypothesis (work log, "Deep dive: the adoption race"): the bypass opens at steps 60–130 while the router is undecided,
 the decoder switches to it, the router loses its only gradient and drifts into a random basin. Either arm should remove
 the seed lottery without the whitespace prior; the reference is `vp_ng` (1.682 mean, one seed not adopted) and EXP-024
 `prior` (1.635 with the prior). Tests: `tests/test_adoption_options.py`, step-0 audit `hnet/analysis/grad_audit.py`.
+
+| arm | val bpb (s0 / s1 / s2) | zero-main (s0 / s1) | main-network contribution |
+|---|---|---|---|
+| `cste` | 1.778 / 1.868 / – | 1.919 / – | 0.14 |
+| `cste_rgate` | 1.742 / 1.882 / – | 2.039 / – | 0.30 |
+| `rgate` | 1.923 / 1.699 / – | 2.140 / – | 0.22 |
+| EXP-023 `vp_ng` (reference, no intervention) | 1.720 / 1.669 / 1.656 | | 0.09 / 0.41 / 0.42 |
+
+- **Negative.** Neither giving the router the next-chunk gradient (`cste`) nor gating the bypass by the router's
+  margin (`rgate`) removes the seed lottery: every arm has one seed near 1.70-1.78 and one near 1.87-1.92, and the
+  means are 0.13-0.15 bpb *worse* than the untouched reference. The gate does what it was built to do (the hierarchy
+  is load-bearing from step 0: contribution 0.3-0.4 bpb at step 500 vs 0.03-0.10 for the reference) and that does not
+  help: a load-bearing hierarchy with a suffix tokenizer is just a worse model. The race is a symptom; the router's
+  objective is the disease (→ EXP-028, the gain objective).

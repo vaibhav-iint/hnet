@@ -1,0 +1,191 @@
+exp_id,arm,label,base_config,parent_arm,notes
+EXP-002,bpe,BPE baseline,configs/runs/tiny_bpe_2m.yaml,NULL,
+EXP-002,paper,"paper router (LH-Net), cosine_lookahead, (3,3)",configs/runs/tiny_hnet2_2m.yaml,NULL,
+EXP-002,end_linear,"end-of-chunk, linear",configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,
+EXP-002,end_mlp,"end-of-chunk, MLP",configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,
+EXP-002,end_cosine_shift,"end-of-chunk, cosine",configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,
+EXP-002,paper_r42,"targets (4,2)",configs/runs/tiny_hnet2_2m_ratios42.yaml,EXP-002/paper,
+EXP-002,paper_nosmooth,no smoothing,configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,
+EXP-002,paper_nolrmult,no LR multipliers,configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,
+EXP-002,paper_alpha01,ratio loss α=0.1,configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,
+EXP-003,bpe__lr0.0005,"BPE baseline, lr 0.0005",configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,
+EXP-003,bpe__lr0.001,"BPE baseline, lr 0.001",configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,
+EXP-003,bpe__lr0.0015,"BPE baseline, lr 0.0015",configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,
+EXP-003,bpe__lr0.003,"BPE baseline, lr 0.003",configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,
+EXP-003,bpe__lr0.006,"BPE baseline, lr 0.006",configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,
+EXP-003,paper__lr0.0005,"paper router (LH-Net), lr 0.0005",configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,
+EXP-003,paper__lr0.001,"paper router (LH-Net), lr 0.001",configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,
+EXP-003,paper__lr0.0015,"paper router (LH-Net), lr 0.0015",configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,
+EXP-003,paper__lr0.003,"paper router (LH-Net), lr 0.003",configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,
+EXP-003,paper__lr0.006,"paper router (LH-Net), lr 0.006",configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,
+EXP-003,end_mlp__lr0.0005,"end-of-chunk, MLP, lr 0.0005",configs/runs/tiny_hnet2_2m.yaml,EXP-002/end_mlp,
+EXP-003,end_mlp__lr0.001,"end-of-chunk, MLP, lr 0.001",configs/runs/tiny_hnet2_2m.yaml,EXP-002/end_mlp,
+EXP-003,end_mlp__lr0.0015,"end-of-chunk, MLP, lr 0.0015",configs/runs/tiny_hnet2_2m.yaml,EXP-002/end_mlp,
+EXP-003,end_mlp__lr0.003,"end-of-chunk, MLP, lr 0.003",configs/runs/tiny_hnet2_2m.yaml,EXP-002/end_mlp,
+EXP-003,end_mlp__lr0.006,"end-of-chunk, MLP, lr 0.006",configs/runs/tiny_hnet2_2m.yaml,EXP-002/end_mlp,
+EXP-003,end_cosine_shift__lr0.0005,"end-of-chunk, cosine, lr 0.0005",configs/runs/tiny_hnet2_2m.yaml,EXP-002/end_cosine_shift,
+EXP-003,end_cosine_shift__lr0.001,"end-of-chunk, cosine, lr 0.001",configs/runs/tiny_hnet2_2m.yaml,EXP-002/end_cosine_shift,
+EXP-003,end_cosine_shift__lr0.0015,"end-of-chunk, cosine, lr 0.0015",configs/runs/tiny_hnet2_2m.yaml,EXP-002/end_cosine_shift,
+EXP-003,end_cosine_shift__lr0.003,"end-of-chunk, cosine, lr 0.003",configs/runs/tiny_hnet2_2m.yaml,EXP-002/end_cosine_shift,
+EXP-003,end_cosine_shift__lr0.006,"end-of-chunk, cosine, lr 0.006",configs/runs/tiny_hnet2_2m.yaml,EXP-002/end_cosine_shift,
+EXP-004,bpe,"BPE baseline, Muon (grid mlr 0.0125 / 0.025 / 0.05; never launched)",configs/runs/tiny_bpe_2m.yaml,EXP-003/bpe__lr0.006,Adam-part LR = best EXP-003 LR (never filled in)
+EXP-004,paper,"paper router (LH-Net), Muon (grid mlr 0.0125 / 0.025 / 0.05; never launched)",configs/runs/tiny_hnet2_2m.yaml,EXP-003/paper__lr0.0015,Adam-part LR = best EXP-003 LR (never filled in)
+EXP-004,end_mlp,"end-of-chunk, MLP, Muon (grid mlr 0.0125 / 0.025 / 0.05; never launched)",configs/runs/tiny_hnet2_2m.yaml,EXP-003/end_mlp__lr0.0015,Adam-part LR = best EXP-003 LR (never filled in)
+EXP-004,end_cosine_shift,"end-of-chunk, cosine, Muon (grid mlr 0.0125 / 0.025 / 0.05; never launched)",configs/runs/tiny_hnet2_2m.yaml,EXP-003/end_cosine_shift__lr0.0015,Adam-part LR = best EXP-003 LR (never filled in)
+EXP-005,bpe_attn,BPE with attn mixer (never launched),configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,model file configs/models/tiny_bpe_2m.yaml
+EXP-005,bpe_mla,BPE with mla mixer (never launched),configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,model file configs/models/tiny_bpe_2m_mla.yaml
+EXP-005,bpe_nsa,BPE with nsa mixer (never launched),configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,model file configs/models/tiny_bpe_2m_nsa.yaml
+EXP-005,bpe_dsa,BPE with dsa mixer (never launched),configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,model file configs/models/tiny_bpe_2m_dsa.yaml
+EXP-005,bpe_kda,BPE with kda mixer (never launched),configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,model file configs/models/tiny_bpe_2m_kda.yaml
+EXP-005,bpe_kda_hybrid,BPE with kda_hybrid mixer (never launched),configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,model file configs/models/tiny_bpe_2m_kda_hybrid.yaml (does not exist)
+EXP-005,bpe_moba,BPE with moba mixer (never launched),configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,model file configs/models/tiny_bpe_2m_moba.yaml
+EXP-005,bpe_gated_attn,BPE with gated_attn mixer (never launched),configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,model file configs/models/tiny_bpe_2m_gated_headwise.yaml
+EXP-005,hnet_attn,H-Net (best router) with attn mixer (never launched),configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,model file configs/models/tiny_hnet2_2m.yaml
+EXP-005,hnet_mla,H-Net (best router) with mla mixer (never launched),configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,model file configs/models/tiny_hnet2_2m_mla.yaml
+EXP-005,hnet_nsa,H-Net (best router) with nsa mixer (never launched),configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,model file configs/models/tiny_hnet2_2m_nsa.yaml
+EXP-005,hnet_dsa,H-Net (best router) with dsa mixer (never launched),configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,model file configs/models/tiny_hnet2_2m_dsa.yaml
+EXP-005,hnet_kda,H-Net (best router) with kda mixer (never launched),configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,model file configs/models/tiny_hnet2_2m_kda.yaml
+EXP-005,hnet_kda_hybrid,H-Net (best router) with kda_hybrid mixer (never launched),configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,model file configs/models/tiny_hnet2_2m_kda_hybrid.yaml
+EXP-005,hnet_moba,H-Net (best router) with moba mixer (never launched),configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,model file configs/models/tiny_hnet2_2m_moba.yaml
+EXP-005,hnet_gated_attn,H-Net (best router) with gated_attn mixer (never launched),configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,model file configs/models/tiny_hnet2_2m_gated.yaml
+EXP-006,bpe,BPE baseline,configs/runs/tiny_bpe_2m.yaml,EXP-002/bpe,THE reference baseline: 1.634 ± 0.002 (3 seeds)
+EXP-006,paper,"2-stage, paper router",configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,
+EXP-006,paper_ng,2-stage + n-gram emb,configs/runs/tiny_hnet2_2m.yaml,EXP-006/paper,
+EXP-006,end_mlp_ng,2-stage end-of-chunk MLP + n-gram emb,configs/runs/tiny_hnet2_2m.yaml,EXP-002/end_mlp,
+EXP-006,hnet1,"1-stage, paper router (ratio 6)",configs/runs/tiny_hnet1_2m.yaml,NULL,
+EXP-006,hnet1_ng,1-stage + n-gram emb,configs/runs/tiny_hnet1_2m.yaml,EXP-006/hnet1,
+EXP-008,base,paper 2-stage,configs/runs/tiny_hnet2_2m.yaml,EXP-002/paper,3-seed re-run of EXP-002 paper with the zero-main probe
+EXP-008,rdrop,residual path-drop 0.3,configs/runs/tiny_hnet2_2m.yaml,EXP-008/base,
+EXP-008,mainaux,main-path aux head 0.3,configs/runs/tiny_hnet2_2m.yaml,EXP-008/base,stage-0 compression collapsed to 1.25 bytes/position (far over the FLOPs budget)
+EXP-008,rent,router entropy 0.05,configs/runs/tiny_hnet2_2m.yaml,EXP-008/base,
+EXP-008,combo,path-drop + aux head + entropy penalty (paper router); dropped,configs/runs/tiny_hnet2_2m.yaml,EXP-008/base,"Dropped from the spec: routers collapsed to select-all, ran out of memory"
+EXP-008,combo_end,"path-drop + aux head + entropy penalty, end_mlp router; dropped",configs/runs/tiny_hnet2_2m.yaml,EXP-008/combo,"Dropped from the spec: 1.652 at +379% FLOPs (compression 1.15 / 1.54), invalid"
+EXP-009,space_start,word-start chunks (oracle),configs/runs/tiny_hnet1_2m.yaml,EXP-006/hnet1,
+EXP-009,space_end,word-end chunks (oracle),configs/runs/tiny_hnet1_2m.yaml,EXP-006/hnet1,
+EXP-009,fixed6,fixed 6-byte chunks,configs/runs/tiny_hnet1_2m.yaml,EXP-006/hnet1,
+EXP-010,alpha1,strong ratio loss (alpha 1.0),configs/runs/tiny_hnet2_2m.yaml,EXP-008/base,
+EXP-010,resid_id,identity-init residual,configs/runs/tiny_hnet2_2m.yaml,EXP-008/base,
+EXP-010,alpha1_resid_id,alpha 1.0 + identity residual,configs/runs/tiny_hnet2_2m.yaml,EXP-008/base,
+EXP-010,swa,outer Mamba -> sliding-window attention,configs/runs/tiny_hnet2_2m.yaml,EXP-008/base,
+EXP-010,kda,outer Mamba -> Kimi Delta Attention,configs/runs/tiny_hnet2_2m.yaml,EXP-008/base,first launch failed on a causal_conv1d channel-count constraint; no eval records
+EXP-011,fixed,"fixed (3,3) pooling",configs/runs/tiny_hnet2_2m.yaml,EXP-008/base,
+EXP-011,fixed_rwarm,+ residual warmup (first 20%),configs/runs/tiny_hnet2_2m.yaml,EXP-011/fixed,
+EXP-011,fixed_rid,+ identity-init residual,configs/runs/tiny_hnet2_2m.yaml,EXP-011/fixed,
+EXP-011,fixed_rdrop,+ residual path-drop 0.3,configs/runs/tiny_hnet2_2m.yaml,EXP-011/fixed,
+EXP-011,fixed_aux,+ main-path aux head 0.3,configs/runs/tiny_hnet2_2m.yaml,EXP-011/fixed,
+EXP-012,select,"end-of-chunk MLP router, select chunker",configs/runs/tiny_hnet2_2m.yaml,EXP-002/end_mlp,= EXP-002 end_mlp re-run with 3 seeds
+EXP-012,pool_mean,+ mean-pool chunk vectors,configs/runs/tiny_hnet2_2m.yaml,EXP-012/select,
+EXP-012,pool_attn,+ attention-pool chunk vectors,configs/runs/tiny_hnet2_2m.yaml,EXP-012/select,
+EXP-012,pool_attn_rwarm,+ attention pool + residual warmup 20%,configs/runs/tiny_hnet2_2m.yaml,EXP-012/pool_attn,
+EXP-013,lr6,"lr 6e-3, paper multipliers",configs/runs/tiny_hnet2_2m.yaml,EXP-003/end_mlp__lr0.006,
+EXP-013,lr6_alpha1,lr 6e-3 + strong ratio loss (alpha 1),configs/runs/tiny_hnet2_2m.yaml,EXP-013/lr6,
+EXP-013,lr6_rent,lr 6e-3 + router entropy 0.05,configs/runs/tiny_hnet2_2m.yaml,EXP-013/lr6,
+EXP-013,lr6_nomult,"lr 6e-3, no multipliers",configs/runs/tiny_hnet2_2m.yaml,EXP-013/lr6,
+EXP-013,lr6_mainheavy,"lr 6e-3, multipliers [1, 1, 4]",configs/runs/tiny_hnet2_2m.yaml,EXP-013/lr6,
+EXP-014,quant__lr0.0015,"quantile decisions (p-space), lr 0.0015",configs/runs/tiny_hnet2_2m.yaml,EXP-012/select,
+EXP-014,quant_pool__lr0.0015,"quantile decisions + attention-pool chunk vectors, lr 0.0015",configs/runs/tiny_hnet2_2m.yaml,EXP-014/quant__lr0.0015,never started
+EXP-014,quant__lr0.006,"quantile decisions (p-space), lr 0.006",configs/runs/tiny_hnet2_2m.yaml,EXP-012/select,
+EXP-014,quant_pool__lr0.006,"quantile decisions + attention-pool chunk vectors, lr 0.006",configs/runs/tiny_hnet2_2m.yaml,EXP-014/quant__lr0.006,
+EXP-015,q_rdrop,quantile + residual path-drop 0.3,configs/runs/tiny_hnet2_2m.yaml,EXP-014/quant__lr0.0015,
+EXP-015,q_aux,quantile + main-path aux head 0.3,configs/runs/tiny_hnet2_2m.yaml,EXP-014/quant__lr0.0015,
+EXP-015,q_rdrop_aux,quantile + path-drop + aux head,configs/runs/tiny_hnet2_2m.yaml,EXP-014/quant__lr0.0015,
+EXP-015,q_rdrop_aux_pool,quantile + path-drop + aux head + mean-pool chunk vectors,configs/runs/tiny_hnet2_2m.yaml,EXP-014/quant__lr0.0015,
+EXP-016,cp4,"chunk-pred k=4, w=0.5",configs/runs/tiny_hnet2_2m.yaml,EXP-014/quant__lr0.0015,
+EXP-016,cp4_w1,"chunk-pred k=4, w=1.0",configs/runs/tiny_hnet2_2m.yaml,EXP-014/quant__lr0.0015,
+EXP-016,cp4_pool,chunk-pred k=4 + mean-pool chunk vectors,configs/runs/tiny_hnet2_2m.yaml,EXP-014/quant__lr0.0015,
+EXP-016,cp8_pool,chunk-pred k=8 + mean-pool chunk vectors,configs/runs/tiny_hnet2_2m.yaml,EXP-014/quant__lr0.0015,
+EXP-017,quant_fix,"rank decisions (fixed), no vocabulary",configs/runs/tiny_hnet2_2m.yaml,EXP-014/quant__lr0.0015,honest-compute 2-stage baseline 1.799 ± 0.005
+EXP-017,vocab,+ hashed chunk vocabulary (input side),configs/runs/tiny_hnet2_2m.yaml,EXP-017/quant_fix,
+EXP-017,vocab_pred,+ vocabulary + next-chunk prediction (w 0.5),configs/runs/tiny_hnet2_2m.yaml,EXP-017/vocab,
+EXP-017,vocab_pred_w1,+ vocabulary + next-chunk prediction (w 1.0),configs/runs/tiny_hnet2_2m.yaml,EXP-017/vocab,
+EXP-018,h1_quant,"1-stage (ratio 6), rank decisions, no vocabulary",configs/runs/tiny_hnet1_2m.yaml,EXP-006/hnet1,
+EXP-018,h1_vocab_pred,1-stage + vocabulary + next-chunk prediction,configs/runs/tiny_hnet1_2m.yaml,EXP-018/h1_quant,
+EXP-019,local,"context-free router (last 8 bytes), rank decisions",configs/runs/tiny_hnet2_2m.yaml,EXP-017/quant_fix,
+EXP-019,local_vocab,+ hashed chunk vocabulary,configs/runs/tiny_hnet2_2m.yaml,EXP-019/local,
+EXP-019,local_vocab_pred,+ vocabulary + next-chunk prediction (w 0.5),configs/runs/tiny_hnet2_2m.yaml,EXP-019/local,
+EXP-020,cons1,consistency penalty w 1 (scale-free: unexplained variance share),configs/runs/tiny_hnet2_2m.yaml,EXP-017/quant_fix,
+EXP-020,cons10,consistency penalty w 10,configs/runs/tiny_hnet2_2m.yaml,EXP-017/quant_fix,
+EXP-020,cons10_vocab_pred,consistency w 10 + vocabulary + next-chunk prediction,configs/runs/tiny_hnet2_2m.yaml,EXP-017/vocab_pred,
+EXP-021,h1r_quant,"1-stage (ratio 6), robust rank decisions",configs/runs/tiny_hnet1_2m.yaml,EXP-018/h1_quant,identical to h1_quant without a vocabulary
+EXP-021,h1r_vocab_pred,+ chunk vocabulary + next-chunk prediction,configs/runs/tiny_hnet1_2m.yaml,EXP-018/h1_vocab_pred,
+EXP-021,h1r_vocab_pred_ng,+ chunk vocabulary + prediction + byte n-gram tables,configs/runs/tiny_hnet1_2m.yaml,EXP-021/h1r_vocab_pred,
+EXP-022,rwarm,"vocabulary + prediction, residual warmup 0.3",configs/runs/tiny_hnet1_2m.yaml,EXP-021/h1r_vocab_pred,
+EXP-022,temp4,"vocabulary + prediction, confidence temperature 4",configs/runs/tiny_hnet1_2m.yaml,EXP-021/h1r_vocab_pred,
+EXP-022,w1,vocabulary + prediction weight 1.0,configs/runs/tiny_hnet1_2m.yaml,EXP-021/h1r_vocab_pred,
+EXP-023,vp,vocabulary + next-chunk prediction (trimmed decider),configs/runs/tiny_hnet1_2m.yaml,EXP-018/h1_vocab_pred,
+EXP-023,vp_ng,+ byte n-gram tables,configs/runs/tiny_hnet1_2m.yaml,EXP-023/vp,prior-free best configuration; base of EXP-027/028
+EXP-023,vp_rwarm,+ residual warmup 0.3,configs/runs/tiny_hnet1_2m.yaml,EXP-023/vp,
+EXP-024,prior,vp_ng + whitespace curriculum (10% of steps),configs/runs/tiny_hnet1_2m.yaml,EXP-023/vp_ng,best H-Net: matches BPE at equal FLOPs
+EXP-024,temp4,vp_ng + confidence temperature 4,configs/runs/tiny_hnet1_2m.yaml,EXP-023/vp_ng,
+EXP-025,bpe_muon__mlr0.025,"BPE, Muon lr 0.025 (Adam part 6e-3)",configs/runs/tiny_bpe_2m.yaml,EXP-006/bpe,
+EXP-025,prior_muon__mlr0.025,"H-Net (EXP-024 prior), Muon lr 0.025 (Adam part 1.5e-3)",configs/runs/tiny_hnet1_2m.yaml,EXP-024/prior,
+EXP-025,bpe_muon__mlr0.05,"BPE, Muon lr 0.05 (Adam part 6e-3)",configs/runs/tiny_bpe_2m.yaml,EXP-006/bpe,
+EXP-025,prior_muon__mlr0.05,"H-Net (EXP-024 prior), Muon lr 0.05 (Adam part 1.5e-3)",configs/runs/tiny_hnet1_2m.yaml,EXP-024/prior,
+EXP-026,swa,outer Mamba-2 -> sliding-window attention (256),configs/runs/tiny_hnet1_2m.yaml,EXP-024/prior,
+EXP-026,kda,outer Mamba-2 -> Kimi Delta Attention,configs/runs/tiny_hnet1_2m.yaml,EXP-024/prior,failed rc=1 in all 3 seeds (sweep_status); second KDA failure after EXP-010
+EXP-027,cste,router trained by the next-chunk loss (chunk STE),configs/runs/tiny_hnet1_2m.yaml,EXP-023/vp_ng,
+EXP-027,rgate,bypass gated by router margin,configs/runs/tiny_hnet1_2m.yaml,EXP-023/vp_ng,
+EXP-027,cste_rgate,both,configs/runs/tiny_hnet1_2m.yaml,EXP-023/vp_ng,
+EXP-028,gain,router trained by REINFORCE on the hierarchy's gain,configs/runs/tiny_hnet1_2m.yaml,EXP-023/vp_ng,
+EXP-028,gain_rgate,+ bypass gated by router margin,configs/runs/tiny_hnet1_2m.yaml,EXP-027/rgate,
+EXP-028,gain_cste,+ chunk STE,configs/runs/tiny_hnet1_2m.yaml,EXP-027/cste,
+LADDER-LR-1e16,bpe__mlr0.01,"BPE L04, Muon lr 0.01",configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L04.yaml
+LADDER-LR-1e16,bpe__mlr0.02,"BPE L04, Muon lr 0.02",configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L04.yaml
+LADDER-LR-1e16,bpe__mlr0.04,"BPE L04, Muon lr 0.04",configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L04.yaml
+LADDER-LR-1e16,bpe__mlr0.08,"BPE L04, Muon lr 0.08",configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L04.yaml
+LADDER-LR-1e16,hnet__mlr0.01,"H-Net L04 (prior-free), Muon lr 0.01",configs/ladder/runs/ladder_hnet.yaml,LADDER-LR-1e16/bpe__mlr0.01,model configs/ladder/models/hnet_L04.yaml
+LADDER-LR-1e16,hnet__mlr0.02,"H-Net L04 (prior-free), Muon lr 0.02",configs/ladder/runs/ladder_hnet.yaml,LADDER-LR-1e16/bpe__mlr0.02,model configs/ladder/models/hnet_L04.yaml
+LADDER-LR-1e16,hnet__mlr0.04,"H-Net L04 (prior-free), Muon lr 0.04",configs/ladder/runs/ladder_hnet.yaml,LADDER-LR-1e16/bpe__mlr0.04,model configs/ladder/models/hnet_L04.yaml
+LADDER-LR-1e16,hnet__mlr0.08,"H-Net L04 (prior-free), Muon lr 0.08",configs/ladder/runs/ladder_hnet.yaml,LADDER-LR-1e16/bpe__mlr0.08,model configs/ladder/models/hnet_L04.yaml
+LADDER-LR-1e16,hnet_ws__mlr0.01,"H-Net L04 + whitespace warm start, Muon lr 0.01",configs/ladder/runs/ladder_hnet.yaml,LADDER-LR-1e16/bpe__mlr0.01,model configs/ladder/models/hnet_ws_L04.yaml
+LADDER-LR-1e16,hnet_ws__mlr0.02,"H-Net L04 + whitespace warm start, Muon lr 0.02",configs/ladder/runs/ladder_hnet.yaml,LADDER-LR-1e16/bpe__mlr0.02,model configs/ladder/models/hnet_ws_L04.yaml
+LADDER-LR-1e16,hnet_ws__mlr0.04,"H-Net L04 + whitespace warm start, Muon lr 0.04",configs/ladder/runs/ladder_hnet.yaml,LADDER-LR-1e16/bpe__mlr0.04,model configs/ladder/models/hnet_ws_L04.yaml
+LADDER-LR-1e16,hnet_ws__mlr0.08,"H-Net L04 + whitespace warm start, Muon lr 0.08",configs/ladder/runs/ladder_hnet.yaml,LADDER-LR-1e16/bpe__mlr0.08,model configs/ladder/models/hnet_ws_L04.yaml
+LADDER-LREXT-1e16,bpe__mlr0.0025,"BPE L04, Muon lr 0.0025",configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L04.yaml
+LADDER-LREXT-1e16,bpe__mlr0.005,"BPE L04, Muon lr 0.005",configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L04.yaml
+LADDER-LREXT-1e16,hnet__mlr0.0025,"H-Net L04 (prior-free), Muon lr 0.0025",configs/ladder/runs/ladder_hnet.yaml,LADDER-LREXT-1e16/bpe__mlr0.0025,model configs/ladder/models/hnet_L04.yaml
+LADDER-LREXT-1e16,hnet__mlr0.005,"H-Net L04 (prior-free), Muon lr 0.005",configs/ladder/runs/ladder_hnet.yaml,LADDER-LREXT-1e16/bpe__mlr0.005,model configs/ladder/models/hnet_L04.yaml
+LADDER-LREXT-1e16,hnet_ws__mlr0.0025,"H-Net L04 + whitespace warm start, Muon lr 0.0025",configs/ladder/runs/ladder_hnet.yaml,LADDER-LREXT-1e16/bpe__mlr0.0025,model configs/ladder/models/hnet_ws_L04.yaml
+LADDER-LREXT-1e16,hnet_ws__mlr0.005,"H-Net L04 + whitespace warm start, Muon lr 0.005",configs/ladder/runs/ladder_hnet.yaml,LADDER-LREXT-1e16/bpe__mlr0.005,model configs/ladder/models/hnet_ws_L04.yaml
+LADDER-1e16-L03,bpe,BPE L03,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L03.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e16-L03,hnet,H-Net L03 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e16-L03/bpe,model configs/ladder/models/hnet_L03.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e16-L03,hnet_ws,H-Net L03 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e16-L03/bpe,model configs/ladder/models/hnet_ws_L03.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e16-L04,bpe,BPE L04,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L04.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e16-L04,hnet,H-Net L04 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e16-L04/bpe,model configs/ladder/models/hnet_L04.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e16-L04,hnet_ws,H-Net L04 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e16-L04/bpe,model configs/ladder/models/hnet_ws_L04.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e16-L05,bpe,BPE L05,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L05.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e16-L05,hnet,H-Net L05 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e16-L05/bpe,model configs/ladder/models/hnet_L05.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e16-L05,hnet_ws,H-Net L05 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e16-L05/bpe,model configs/ladder/models/hnet_ws_L05.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e16-L06,bpe,BPE L06,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L06.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e16-L06,hnet,H-Net L06 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e16-L06/bpe,model configs/ladder/models/hnet_L06.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e16-L06,hnet_ws,H-Net L06 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e16-L06/bpe,model configs/ladder/models/hnet_ws_L06.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L05,bpe,BPE L05,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L05.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L05,hnet,H-Net L05 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e17-L05/bpe,model configs/ladder/models/hnet_L05.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L05,hnet_ws,H-Net L05 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e17-L05/bpe,model configs/ladder/models/hnet_ws_L05.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L06,bpe,BPE L06,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L06.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L06,hnet,H-Net L06 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e17-L06/bpe,model configs/ladder/models/hnet_L06.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L06,hnet_ws,H-Net L06 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e17-L06/bpe,model configs/ladder/models/hnet_ws_L06.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L07,bpe,BPE L07,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L07.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L07,hnet,H-Net L07 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e17-L07/bpe,model configs/ladder/models/hnet_L07.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L07,hnet_ws,H-Net L07 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e17-L07/bpe,model configs/ladder/models/hnet_ws_L07.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L08,bpe,BPE L08,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L08.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L08,hnet,H-Net L08 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e17-L08/bpe,model configs/ladder/models/hnet_L08.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L08,hnet_ws,H-Net L08 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e17-L08/bpe,model configs/ladder/models/hnet_ws_L08.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L09,bpe,BPE L09,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L09.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L09,hnet,H-Net L09 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e17-L09/bpe,model configs/ladder/models/hnet_L09.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e17-L09,hnet_ws,H-Net L09 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e17-L09/bpe,model configs/ladder/models/hnet_ws_L09.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L07,bpe,BPE L07,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L07.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L07,hnet,H-Net L07 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e18-L07/bpe,model configs/ladder/models/hnet_L07.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L07,hnet_ws,H-Net L07 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e18-L07/bpe,model configs/ladder/models/hnet_ws_L07.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L08,bpe,BPE L08,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L08.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L08,hnet,H-Net L08 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e18-L08/bpe,model configs/ladder/models/hnet_L08.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L08,hnet_ws,H-Net L08 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e18-L08/bpe,model configs/ladder/models/hnet_ws_L08.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L09,bpe,BPE L09,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L09.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L09,hnet,H-Net L09 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e18-L09/bpe,model configs/ladder/models/hnet_L09.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L09,hnet_ws,H-Net L09 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e18-L09/bpe,model configs/ladder/models/hnet_ws_L09.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L10,bpe,BPE L10,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L10.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L10,hnet,H-Net L10 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e18-L10/bpe,model configs/ladder/models/hnet_L10.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L10,hnet_ws,H-Net L10 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e18-L10/bpe,model configs/ladder/models/hnet_ws_L10.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L11,bpe,BPE L11,configs/ladder/runs/ladder_bpe.yaml,NULL,model configs/ladder/models/bpe_L11.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L11,hnet,H-Net L11 (prior-free),configs/ladder/runs/ladder_hnet.yaml,LADDER-1e18-L11/bpe,model configs/ladder/models/hnet_L11.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16
+LADDER-1e18-L11,hnet_ws,H-Net L11 + whitespace warm start,configs/ladder/runs/ladder_hnet.yaml,LADDER-1e18-L11/bpe,model configs/ladder/models/hnet_ws_L11.yaml; Muon LR = best_mlr.bpe = 0.02 from LADDER-LR-1e16

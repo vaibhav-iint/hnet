@@ -983,3 +983,13 @@ EXP-027 at step 500 (val / zero-main): `cste` 2.022, 1.947 / 2.054; `cste_rgate`
 1.999, 1.979 / 2.404; reference `vp_ng` 1.994, 1.953, 1.956 / 2.02-2.05. Same loss as the reference so far; the
 margin gate makes the hierarchy load-bearing from the start (0.42 bpb of contribution at step 500 vs 0.03-0.10 for
 the reference), which is the mechanism it was meant to change. Finals at step 1763 decide.
+
+### EXP-027 reads out negative (seeds 0-1): refereeing the race does not fix the tokenizer
+`cste` 1.778 / 1.868, `cste_rgate` 1.742 / 1.882, `rgate` 1.923 / 1.699 against `vp_ng` 1.720 / 1.669 / 1.656. The
+seed lottery survives all three interventions and the means are worse. The margin gate makes the hierarchy carry
+0.3-0.4 bpb from step 500 (the reference carries 0.03-0.10 at that point), which is exactly the mechanism change it
+was designed for, and the loss is no better: forcing adoption of a bad tokenizer is not progress. Together with the
+gain measurement above this settles the diagnosis: the problem is not *when* the decoder adopts the hierarchy but
+*which* tokenizer the router falls into, and only an objective that scores usefulness (EXP-028) addresses that.
+Operational: `hx-exp025-muon-1of4` (bpe_muon 0.025) shut itself down after a mid-install preemption; deleted and
+recreated in europe-west4-a (runs resume from the bucket checkpoints).

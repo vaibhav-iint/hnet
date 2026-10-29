@@ -1,0 +1,18 @@
+reference_id,exp_id,arm,val_bpb,n_seeds,description
+REF-BPE-TINY,EXP-006,bpe,1.6342,3,"BPE baseline at tiny scale: tiny_bpe_2m, AdamW 1.5e-3, 50M token-eq, finewebedu10B, 3 seeds (1.634 ± 0.002). The reference for every tiny-scale H-Net."
+REF-BPE-TINY-EXP002,EXP-002,bpe,1.6349,2,"Same BPE baseline, EXP-002's 2 seeds (1.635)."
+REF-BPE-TUNED,EXP-003,bpe__lr0.006,1.5642,3,"BPE at its best AdamW LR 6e-3 (grid edge), tuned-fairness reference (1.564 ± 0.012)."
+REF-PAPER-2STAGE,EXP-008,base,1.7958,3,"Paper 2-stage (3,3) H-Net as published (alpha 0.03), 1.796 ± 0.001 at +11% realized compute."
+REF-HNET1,EXP-006,hnet1,1.8454,3,"1-stage ratio-6 H-Net with the paper's learned router, 1.845 ± 0.002."
+REF-FIXED,EXP-011,fixed,1.8321,3,"Router-free fixed (3,3) hourglass at honest compute, 1.832 ± 0.008."
+REF-QUANT-FIX,EXP-017,quant_fix,1.7990,3,"2-stage end_mlp with the fixed rank decider, honest-compute 2-stage baseline (1.799 ± 0.005)."
+REF-H1-QUANT,EXP-018,h1_quant,1.8534,3,"1-stage ratio 6, end_mlp, rank decider, no vocabulary (1.853): baseline of the word-scale line."
+REF-VP-NG,EXP-023,vp_ng,1.6819,3,Prior-free best: 1-stage ratio 6 + chunk vocabulary + next-chunk objective + n-gram tables (1.682 mean; 1.66 when adopted). Base of EXP-027/028.
+REF-PRIOR,EXP-024,prior,1.6349,3,"Best H-Net: vp_ng + 10% whitespace curriculum (1.635 ± 0.001), matches BPE at equal FLOPs. Base of EXP-025/026."
+REF-LADDER-BPE-L04-1e16,LADDER-LR-1e16,bpe__mlr0.02,1.6224,1,"Ladder BPE L04 at 1e16 FLOPs, Muon LR 0.02 (its optimum): 1.622."
+REF-LADDER-HNET-L04-1e16,LADDER-LR-1e16,hnet__mlr0.01,1.8608,1,Ladder H-Net L04 prior-free at its own optimum (Muon 0.01): 1.861.
+REF-LADDER-HNETWS-L04-1e16,LADDER-LR-1e16,hnet_ws__mlr0.01,1.8200,1,Ladder H-Net L04 + whitespace warm start at its optimum (Muon 0.01): 1.820.
+REF-LADDER-BPE-L03-1e16,LADDER-1e16-L03,bpe,1.6952,1,Ladder BPE L03 rung run at 1e16 FLOPs (Muon LR 0.02 transferred from the L04 tuning sweep); the reference for that rung's H-Net arms.
+REF-LADDER-BPE-L04-1e16,LADDER-1e16-L04,bpe,1.6224,1,Ladder BPE L04 rung run at 1e16 FLOPs (Muon LR 0.02 transferred from the L04 tuning sweep); the reference for that rung's H-Net arms. Identical records to LADDER-LR-1e16 bpe__mlr0.02.
+REF-LADDER-BPE-L05-1e16,LADDER-1e16-L05,bpe,1.7557,1,Ladder BPE L05 rung run at 1e16 FLOPs (Muon LR 0.02 transferred from the L04 tuning sweep); the reference for that rung's H-Net arms.
+REF-LADDER-BPE-L06-1e16,LADDER-1e16-L06,bpe,1.8411,1,Ladder BPE L06 rung run at 1e16 FLOPs (Muon LR 0.02 transferred from the L04 tuning sweep); the reference for that rung's H-Net arms.
