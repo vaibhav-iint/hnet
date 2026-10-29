@@ -1,0 +1,26 @@
+# EXP-022: making the hierarchy's adoption reliable. EXP-018: the word-scale chunk vocabulary + next-chunk objective
+# gives -0.13 / -0.11 bpb when the decoder adopts the hierarchy early (steps 200-600) and nothing when the residual
+# path wins the race. Three levers on the race, all on top of the robust rank decider (EXP-021 `h1r_vocab_pred`):
+# `rwarm` ramps the residual path in over the first 30% of training (dc.residual_warmup), `temp4` doubles the
+# confidence temperature (sharper STE/EMA signal from the hierarchy from the start), `w1` doubles the chunk-level
+# objective. 1-stage (ratio 6), end_mlp router, lr 1.5e-3, EXP-002 budget.
+name: exp022_adoption
+out_root: runs/search/exp022_adoption
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp022_adoption
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - model.dc.decision=quantile
+  - "model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}]"
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {rwarm: "vocabulary + prediction, residual warmup 0.3",
+           temp4: "vocabulary + prediction, confidence temperature 4",
+           w1: "vocabulary + prediction weight 1.0"}
+runs:
+  - {name: rwarm, config: configs/runs/tiny_hnet1_2m.yaml, set: [model.dc.residual_warmup=0.3]}
+  - {name: temp4, config: configs/runs/tiny_hnet1_2m.yaml, set: ["model.dc.decision_kwargs={temp: 4.0}"]}
+  - {name: w1,    config: configs/runs/tiny_hnet1_2m.yaml,
+     set: ["model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 1.0, n_neg: 1024}]"]}
