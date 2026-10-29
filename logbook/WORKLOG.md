@@ -590,3 +590,22 @@ Probes from the innermost main network's input x (the chunk vector) to the bytes
   quantile) and keep a running threshold for eval (BatchNorm-style); p is recentred so the threshold maps to 0.5
   for the STE and the EMA dechunker. Compression is pinned exactly, the decision is immune to uniform shifts, and
   the ratio loss becomes an exact constant (inert), so α disappears.
+
+### Realized compute: the paper router runs 10–16% over its FLOPs budget (`logbook/sweep_summary.py`)
+The fairness gate checks the *configured* ratios. Recomputing training FLOPs/byte from each run's realized
+compression (last 10 logged steps):
+
+| arm | realized vs budget | val bpb |
+|---|---|---|
+| 2-stage paper router, α 0.03 (EXP-006 `paper`, EXP-008 `base`, EXP-010 `resid_id`) | +10.5% to +15.6% | 1.78–1.80 |
+| same with strong ratio loss α 1.0 (EXP-010 `alpha1`) | +0.8% | 1.818 |
+| fixed (3,3) pooling, oracle word chunks, n-gram arms | +0.2% to +1.2% | |
+| EXP-008 `combo_end` (router-entropy penalty) | **+379%** (compression 1.15 / 1.54) | 1.652: invalid |
+
+- The CE gradient always favours more positions (more compute); at α = 0.03 the ratio loss cannot hold them (its
+  maximum penalty is N·α ≈ 0.09 nats). The paper router's apparent 0.03-bpb edge over fixed chunks was extra compute.
+  EXP-002's paper-router runs were likewise ~7% over budget (2.8/8.5 bytes per position instead of 3/9).
+- `combo_end` was not a result: the entropy penalty drove both routers to "select almost everything". It does show
+  what the hierarchy can do when it gets positions and training signal, which is the point of the next sweep.
+- Policy from here: H-Net arms use rank (quantile) decisions, which pin compression exactly, or α ≥ 1; every
+  summary reports realized FLOPs vs budget and flags > 2%.

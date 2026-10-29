@@ -1,0 +1,26 @@
+# EXP-015: which training signals make the hierarchy carry the model, at HONEST compute. EXP-008 `combo_end`
+# (path-drop + aux head + entropy penalty, end-of-chunk router) reached 1.652 but at +379% FLOPs (routers collapsed
+# to select-all). Here compression is pinned exactly by rank (quantile) decisions, so every arm is at budget.
+# 2-stage (3,3), end-of-chunk MLP router, quantile decisions, lr 1.5e-3; baselines: EXP-014 `quant` and `quant_pool`.
+name: exp015_hierarchy_factorial
+out_root: runs/search/exp015_hierarchy_factorial
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp015_hierarchy_factorial
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - model.dc.decision=quantile
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {q_rdrop: "quantile + residual path-drop 0.3", q_aux: "quantile + main-path aux head 0.3",
+           q_rdrop_aux: "quantile + path-drop + aux head",
+           q_rdrop_aux_pool: "quantile + path-drop + aux head + attention-pool chunk vectors"}
+runs:
+  - {name: q_rdrop,          config: configs/runs/tiny_hnet2_2m.yaml, set: ["model.dc.residual_dropout=0.3"]}
+  - {name: q_aux,            config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.main_aux_weight=0.3]}
+  - {name: q_rdrop_aux,      config: configs/runs/tiny_hnet2_2m.yaml,
+     set: ["model.dc.residual_dropout=0.3", model.dc.main_aux_weight=0.3]}
+  - {name: q_rdrop_aux_pool, config: configs/runs/tiny_hnet2_2m.yaml,
+     set: ["model.dc.residual_dropout=0.3", model.dc.main_aux_weight=0.3, model.dc.chunker=pool,
+           "model.dc.chunker_kwargs={mode: attn}"]}
