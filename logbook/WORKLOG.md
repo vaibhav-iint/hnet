@@ -406,3 +406,18 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
 - New VM f (us-central1-b) runs paper_nosmooth (s0 resumes from its final checkpoint, then diagnostics) and
   paper_nolrmult (s1).
 - Finished: bpe ×2, paper_r42 ×2, paper_nolrmult_s0.
+
+### More VM hardening; the eager mask ran out of memory → chunked BlockMask (commit 1bdcc27)
+- VM setup now:
+  - verifies the kernel entry points and force-reinstalls a wheel left broken by a preemption mid-install;
+  - clears the Triton and inductor caches on every boot (a reset left truncated autotune JSON → JSONDecodeError in 4–6
+    GPU tests on VMs b and e).
+- Preemption babysitter (scratchpad `launch/babysit_exp002.sh`): restarts a VM whose latest stop was a preemption, or
+  recreates it in another zone if the start fails for lack of capacity.
+- The eager `create_block_mask` (from the illegal-memory-access fix) materializes int64 [H, T, T] intermediates and
+  ran out of memory with 4 runs per L4 (end_mlp_s1 at T ≈ 12k, a 1.17 GiB allocation).
+  - `packed_block_mask` now evaluates `mask_mod` in row chunks by broadcasting, reduces to partial/full block maps,
+    and calls `BlockMask.from_kv_blocks`. Index clamping is kept.
+  - Tests: identical block layout and dense mask to torch's `create_block_mask`, and exact under a tiny chunk budget.
+- VMs b and e (in setup) were reset onto 1bdcc27. VMs d and f keep running on 9e9f8c4. The other three runs on d
+  survived end_mlp_s1's failure; end_mlp_s1 needs a rerun.
