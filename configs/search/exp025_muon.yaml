@@ -1,0 +1,36 @@
+# EXP-025: Muon (the blog's ladder optimizer) vs AdamW, on the BPE baseline and on the best H-Net (EXP-024 `prior`:
+# 1-stage ratio 6, end_mlp router, trimmed rank decisions, chunk vocabulary + next-chunk objective, byte n-gram
+# tables, 10% whitespace curriculum). Muon updates hidden 2-D matrices (hnet/optim/muon.py); Adam updates embeddings,
+# heads, norms, router, Mamba scalars at each architecture's best AdamW LR (BPE 6e-3 from EXP-003, H-Net 1.5e-3).
+# Muon LR grid 0.025 / 0.05 (tuned fairness: LR is per-arch, FLOPs/bytes held). AdamW references: EXP-006 `bpe`
+# 1.634 ± 0.002, EXP-024 `prior` 1.635 ± 0.001.
+name: exp025_muon
+out_root: runs/search/exp025_muon
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp025_muon
+seeds: [0, 1, 2]
+params:
+  best_lr: {bpe: 6.0e-3, hnet: 1.5e-3}
+params_note: "Adam-part LR = each architecture's best AdamW LR (EXP-003 for BPE; EXP-018..024 for the H-Net)"
+fairness: {mode: tuned, per_arch: [train.muon.lr_embed, train.muon.lr_head, train.muon.lr_other]}
+set:
+  - train.compile=false
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+  - train.optimizer=muon
+  - "train.muon.adam_betas=[0.9, 0.95]"
+  - train.muon.adam_weight_decay=0.1
+grid:
+  train.muon.lr: [0.025, 0.05]
+grid_alias: {train.muon.lr: mlr}
+report:
+  labels: {bpe_muon: "BPE, Muon", prior_muon: "H-Net (EXP-024 prior), Muon"}
+runs:
+  - name: bpe_muon
+    config: configs/runs/tiny_bpe_2m.yaml
+    set: ["train.muon.lr_embed=${best_lr.bpe}", "train.muon.lr_head=${best_lr.bpe}", "train.muon.lr_other=${best_lr.bpe}"]
+  - name: prior_muon
+    config: configs/runs/tiny_hnet1_2m.yaml
+    set: ["train.muon.lr_embed=${best_lr.hnet}", "train.muon.lr_head=${best_lr.hnet}", "train.muon.lr_other=${best_lr.hnet}",
+          eval.zero_main_probe=true, model.dc.router=end_mlp, model.dc.decision=quantile,
+          "model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}]",
+          "model.ngram_embed={ns: [3, 4, 5, 6, 7, 8], buckets: 12289}",
+          model.dc.router_prior_weight=1.0, model.dc.router_prior_frac=0.1]

@@ -1,0 +1,26 @@
+# EXP-026: Mamba-free outer networks for the best H-Net (EXP-024 `prior`, AdamW lr 1.5e-3, reference 1.635 ± 0.001).
+# The byte-level encoder/decoder (m4 / m4) switch from Mamba-2 to sliding-window softmax attention (`swa`, window 256)
+# or Kimi Delta Attention (`kda`, gated delta-rule linear attention, short convs, value expansion 1.5 so FLOPs match within 2% of SWA, +2.3% vs the Mamba reference); the main network
+# (T8, global attention) is unchanged. EXP-010's SWA arm (2-stage, paper router) ended at 2.005 bpb vs 1.80, and its
+# KDA arms crashed (causal_conv1d channel alignment / OOM with 3 runs per GPU); this reruns both on the 1-stage model.
+name: exp026_mamba_free
+out_root: runs/search/exp026_mamba_free
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp026_mamba_free
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - model.dc.decision=quantile
+  - "model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}]"
+  - "model.ngram_embed={ns: [3, 4, 5, 6, 7, 8], buckets: 12289}"
+  - model.dc.router_prior_weight=1.0
+  - model.dc.router_prior_frac=0.1
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {swa: "outer Mamba-2 -> sliding-window attention (256)", kda: "outer Mamba-2 -> Kimi Delta Attention"}
+runs:
+  - {name: swa, config: configs/runs/tiny_hnet1_2m.yaml,
+     set: ["model.mixer_codes={m: attn, t: attn}", "model.attn.window_size=[256, -1]"]}
+  - {name: kda, config: configs/runs/tiny_hnet1_2m.yaml,
+     set: ["model.mixer_codes={m: kda, t: attn}", "model.mixer_cfg={kda: [{expand_v: 1.5}, {}]}"]}
