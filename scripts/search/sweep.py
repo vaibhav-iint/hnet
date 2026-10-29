@@ -210,6 +210,9 @@ def main(argv=None):
     status_path = out_root / status_filename(shard, only)
     status = {j.name: "pending" for j in jobs}
     lock = threading.Lock()
+    # Post-run diagnostics run in this process; Triton's autotuner (fused Mamba kernels) is not thread-safe, so two
+    # runs finishing together must not run their diagnostics concurrently ('NoneType' object is not a mapping).
+    diag_lock = threading.Lock()
     texts = None
 
     def save_status():
@@ -258,9 +261,10 @@ def main(argv=None):
         if (out / "diverged.json").exists():
             result["diverged"] = True  # a result (e.g. LR too high), no diagnostics on a NaN model
         else:
-            if texts is None:
-                texts = diag_texts()
-            diag = run_diag(job.out, texts)
+            with diag_lock:
+                if texts is None:
+                    texts = diag_texts()
+                diag = run_diag(job.out, texts)
             if diag:
                 (out / "diag.json").write_text(json.dumps(diag, indent=1))
         done.write_text(json.dumps(result))
