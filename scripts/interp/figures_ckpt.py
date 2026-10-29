@@ -27,7 +27,9 @@ CLS_SHOW = ["space", "newline", "punct", "word_start", "word_mid", "word_end"]
 def load():
     out = {}
     for p in sorted((DATA / "ckpt").glob("*.json")):
-        out[p.stem] = json.loads(p.read_text())
+        d = json.loads(p.read_text())
+        if not d.get("skipped"):
+            out[p.stem] = d
     return out
 
 

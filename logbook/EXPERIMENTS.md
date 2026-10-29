@@ -390,3 +390,25 @@ the seed lottery without the whitespace prior; the reference is `vp_ng` (1.682 m
   of whichever tokenizer the seed fell into is not progress. The race is a symptom; the router's objective is the
   disease (→ EXP-028, the gain objective). An earlier interim readout of this experiment (seeds at step 1500 read as
   finals) said "0.13-0.15 worse"; that was wrong and is corrected here (the report now marks interim seeds).
+
+## EXP-028 · Router trained by REINFORCE on the hierarchy's measured gain
+
+*spec `exp028_router_gain.yaml` · base = EXP-023 `vp_ng` (prior-free) · `dc.router_gain_weight=1`: the stage-0 decoder +
+LM head rerun on the bypass alone, per-byte gain credited to its chunk, standardized advantage × log-confidence of the
+realized decisions · arms `gain`, `gain_cste` (+ chunk STE), `gain_rgate` (+ margin-gated bypass) · 3 seeds (seed 2
+preempted, running) · status: **done for seeds 0-1***
+
+| arm | val bpb (s0 / s1) | mean | zero-main (s0) |
+|---|---|---|---|
+| `gain` | 1.772 / 1.765 | 1.768 ± 0.005 | 1.94 |
+| `gain_cste` | 1.769 / 1.767 | 1.768 ± 0.002 | 1.96 |
+| `gain_rgate` | 1.785 / 1.795 | 1.790 ± 0.007 | 1.94 |
+| EXP-023 `vp_ng` (reference) | 1.720 / 1.669 / 1.656 | 1.682 ± 0.034 | |
+
+- **Negative, with one informative side effect.** The gain objective removes the seed lottery (seed spread 0.002-0.007
+  vs 0.034-0.06 for the reference) but every seed lands 0.05-0.11 behind the reference's mean, and the hierarchy's
+  contribution is small (zero-main 1.94 vs 1.77: 0.17 bpb). During training a third of the router's decisions stayed
+  undecided (p in 0.4-0.6) for the first ~1000 steps. Reading: the REINFORCE term at weight 1 dominates the router's
+  other signals and converges on a consistent but less useful segmentation; the offline measurement (gain separates
+  word from suffix tokenizers 2.4x) does not survive being turned into a high-variance online objective at this
+  weight. Untested: weight 0.1-0.3, or switching the term on after the router has decided.
