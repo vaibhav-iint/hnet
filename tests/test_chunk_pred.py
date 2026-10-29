@@ -21,14 +21,14 @@ def test_targets_by_hand_two_segments():
     torch.manual_seed(0)
     cfg = _cfg(k=3)
     m = build_model(cfg).eval()
-    ids = torch.randint(0, 254, (2, 40))  # two segments of 40 bytes
+    ids = torch.randint(0, 254, (2, 38))  # two segments of 38 bytes: the last innermost position (35) loses a target
     labels = torch.roll(ids, -1, dims=1)  # the trainer's convention: labels[t] = ids[t + 1]
     labels[:, -1] = IGNORE_INDEX
     out = m(ids, labels=labels)
     # recompute: innermost byte positions via the boundary masks, targets = the k bytes after each position within
     # its segment, logits from the head applied to the innermost main-network output
     flat = ids.reshape(-1)
-    pos = torch.arange(80)
+    pos = torch.arange(76)
     for r in out.bpred:
         pos = pos[r.boundary_mask]
     z = out.bpred[-1].inner_out
@@ -36,7 +36,7 @@ def test_targets_by_hand_two_segments():
     logits = m.chunk_pred_head(z).float().reshape(pos.numel(), 3, 256)
     tgt = torch.full((pos.numel(), 3), IGNORE_INDEX)
     for i, p in enumerate(pos.tolist()):
-        seg_end = 40 if p < 40 else 80
+        seg_end = 38 if p < 38 else 76
         for j in range(3):
             q = p + 1 + j
             if q < seg_end:
