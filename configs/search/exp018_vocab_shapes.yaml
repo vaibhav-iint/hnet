@@ -1,0 +1,21 @@
+# EXP-018: where should the chunk vocabulary sit? Companion to EXP-017 (2-stage, vocabulary at stage 0).
+# `h1_*`: a 1-stage H-Net with ratio 6 (chunks ~ words): the plain "learned tokenizer + token table + token-level
+# model" shape, no inner hierarchy to starve. (A 2-stage arm with vocabularies at both stages is +3.1% FLOPs vs the
+# 1-stage baseline and goes in its own sweep.) End-of-chunk MLP router, rank decisions, lr 1.5e-3, EXP-002 budget.
+name: exp018_vocab_shapes
+out_root: runs/search/exp018_vocab_shapes
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp018_vocab_shapes
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - model.dc.decision=quantile
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {h1_quant: "1-stage (ratio 6), rank decisions, no vocabulary",
+           h1_vocab_pred: "1-stage + vocabulary + next-chunk prediction"}
+runs:
+  - {name: h1_quant,      config: configs/runs/tiny_hnet1_2m.yaml}
+  - {name: h1_vocab_pred, config: configs/runs/tiny_hnet1_2m.yaml,
+     set: ["model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}]"]}
