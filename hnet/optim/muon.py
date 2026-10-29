@@ -79,6 +79,11 @@ MUON_DEFAULTS = dict(
     adam_betas=(0.8, 0.95),
     adam_eps=1e-8,
     adam_weight_decay=0.0,  # decoupled, Adam params
+    # Decoupled weight decay for the H-Net residual bypass matrices (``*.residual_proj.weight``), which then form
+    # their own Muon group(s) (``role: residual``). None = no split (the default; unchanged behaviour). Muon's
+    # update has spectral norm ~lr whatever the gradient's size, so a zero-init bypass grows by sum(lr) with nothing
+    # anchoring its scale; decoupled decay wd gives it a fixed point at spectral norm ~1/wd (independent of the LR).
+    residual_wd=None,
 )
 
 KINDS = ("muon", "embed", "head", "other")
@@ -279,5 +284,27 @@ def build_muon_optimizer(model: nn.Module, train_cfg, param_groups_fn: Optional[
             group.setdefault("lr_mult", 1.0)
             group["base_lr"] = hp["lr"]
             group["lr"] = hp["lr"] * group["lr_mult"]
-            groups.append(group)
+            if kind == "muon" and c["residual_wd"] is not None:
+                groups.extend(_split_residual(group, float(c["residual_wd"])))
+            else:
+                groups.append(group)
     return MuonAdamW(groups)
+
+
+def _is_residual_proj(name: str) -> bool:
+    return name.endswith("residual_proj.weight")
+
+
+def _split_residual(group: dict, wd: float) -> list:
+    """Move a Muon group's ``residual_proj`` weights into a sibling group (same LR) with weight decay ``wd``."""
+    names = group.get("names")
+    assert names is not None and len(names) == len(group["params"]), "residual_wd needs named param groups"
+    keep = [i for i, n in enumerate(names) if not _is_residual_proj(n)]
+    res = [i for i, n in enumerate(names) if _is_residual_proj(n)]
+    out = []
+    if keep:
+        out.append({**group, "params": [group["params"][i] for i in keep], "names": [names[i] for i in keep]})
+    if res:
+        out.append({**group, "params": [group["params"][i] for i in res], "names": [names[i] for i in res],
+                    "weight_decay": wd, "role": "residual"})
+    return out

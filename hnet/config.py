@@ -183,6 +183,10 @@ class HNetConfig:
     # main network's next-chunk prediction and added to the byte logits, {"rows": int, "dim": 32, "n_hash": 2,
     # "max_len": 16, "query": "main" | "final"}. Empty = off. Needs a 1+-stage H-Net with an "end" stage-0 router.
     trie_head: dict = field(default_factory=dict)
+    # Optimizer-only (Muon), next to lr_multiplier because it is an H-Net-only LR-allocation knob: decoupled weight
+    # decay of the residual bypass matrices (``residual_proj.weight``), fed to ``train.muon.residual_wd`` by
+    # hnet.optim.build_optimizer. None = off (default). Spectral-norm fixed point ~1/wd; see hnet/optim/muon.py.
+    residual_proj_wd: Optional[float] = None
 
     def attn_res_for_stage(self, s: int) -> int:
         return int(_per_stage(self.attn_res, self.n_stages + 1, "attn_res")[s])
