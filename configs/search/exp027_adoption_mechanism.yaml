@@ -6,7 +6,6 @@
 # tables; 1.720 / 1.669 / 1.656, seed 1 not adopted):
 #   cste       dc.chunk_ste: the chunk-level loss trains the router (gradient independent of the decoder's adoption)
 #   rgate      dc.residual_gate=margin: the bypass is scaled by the router's confidence margin (opens when decided)
-#   nores      no bypass at all (residual_dropout 1.0 at train time... see note: uses residual_gate=margin AND cste)
 #   cste_rgate both
 # No whitespace prior anywhere. 3 seeds. Reference: `vp_ng` and EXP-024 `prior` (1.635 with the prior).
 name: exp027_adoption_mechanism
@@ -23,7 +22,7 @@ set:
   - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
 report:
   labels: {cste: "router trained by the next-chunk loss (chunk STE)", rgate: "bypass gated by router margin",
-           cste_rgate: "both", thin_outer: "thin outer nets (m2/m2, d 64) + wider main, same FLOPs"}
+           cste_rgate: "both"}
 runs:
   - {name: cste,       config: configs/runs/tiny_hnet1_2m.yaml, set: [model.dc.chunk_ste=true]}
   - {name: rgate,      config: configs/runs/tiny_hnet1_2m.yaml, set: [model.dc.residual_gate=margin]}
