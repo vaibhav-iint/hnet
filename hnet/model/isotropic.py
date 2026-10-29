@@ -107,6 +107,10 @@ class Isotropic(nn.Module):
 
     def forward(self, h: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
         squeeze = h.dim() == 2
+        for layer in self.layers:  # shared per-stage tables (rotary, masks) built eagerly, outside compiled blocks
+            prep = getattr(layer.mixer, "prepare_ctx", None)
+            if prep is not None:
+                prep(ctx)
         if self.attn_res_block > 0:
             out = self._forward_attn_res(h.unsqueeze(0) if squeeze else h, ctx)
             return out.squeeze(0) if squeeze else out

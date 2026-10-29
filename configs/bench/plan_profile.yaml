@@ -1,0 +1,8 @@
+# torch.profiler op tables (profile_cuda.txt / profile_cpu.txt) of steps 30-34 of one BPE and one H-Net rung.
+sweep: bench_profile
+out_root: runs/bench/profile
+defaults: {set: [train.steps=36, log.every=10, "train.profile={start: 30, steps: 4}"]}
+runs:
+  - {name: prof_bpe_L08_mb16, config: configs/bench/bpe_L08.yaml, set: [data.micro_batch=16]}
+  - {name: prof_hnet_L08_mb4, config: configs/bench/hnet_L08.yaml, set: [data.micro_batch=4]}
+  - {name: prof_hnet_L08_full_mb4, config: configs/bench/hnet_L08_full.yaml, set: [data.micro_batch=4]}

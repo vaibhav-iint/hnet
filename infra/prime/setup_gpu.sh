@@ -25,6 +25,12 @@ if [ -z "$PY" ] || ! $PY -m pip --version >/dev/null 2>&1; then
   PY=python3
 fi
 log "python: $($PY --version 2>&1) at $(command -v $PY)"
+# Triton (torch.compile, mamba_ssm kernels) builds its launcher stubs with a C compiler; slim/runtime images lack one.
+if ! command -v gcc >/dev/null && ! command -v cc >/dev/null; then
+  log "installing gcc (needed by Triton)"
+  $SUDO apt-get update -qq && $SUDO DEBIAN_FRONTEND=noninteractive apt-get install -y -qq gcc g++ >/dev/null \
+    || log "WARN gcc install failed: torch.compile / Triton kernels will not work"
+fi
 PIP="$PY -m pip install -q"
 command -v nvidia-smi >/dev/null && nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader
 

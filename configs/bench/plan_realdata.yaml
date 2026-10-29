@@ -1,0 +1,8 @@
+# Real FineWeb-Edu shards (scripts/data/prepare.py --n-train 1): loader throughput under training. GPT-2 token ids,
+# so the BPE vocab is 50304 here (not the ladder's 32k).
+sweep: bench_realdata
+out_root: runs/bench/realdata
+defaults: {set: [train.steps=50, log.every=10, data.source=hnet, data.n_train_shards=1, data.bytes_per_token=null]}
+runs:
+  - {name: real_bpe_L08_mb16, config: configs/bench/bpe_L08.yaml, set: [data.micro_batch=16, model.vocab_size=50304, data.eot=50256]}
+  - {name: real_hnet_L08_mb4, config: configs/bench/hnet_L08.yaml, set: [data.micro_batch=4]}

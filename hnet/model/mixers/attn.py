@@ -234,6 +234,20 @@ class CausalAttention(nn.Module):
         out = attention(q, k, v, ctx, self.window_size, self.softmax_scale)
         return self.out_proj(out.reshape(1, T, hq * hd))
 
+    def prepare_ctx(self, ctx: SeqCtx) -> None:
+        """Memoize in ``ctx.cache`` what :meth:`forward` reads (rotary table; the flex / sdpa mask when that backend
+        is certain), called eagerly by ``Isotropic`` before its blocks run: torch.compile'd blocks then never build
+        masks inside the graph and see the same cache state at every layer (no cache-dependent recompiles)."""
+        if self.rotary_emb_dim > 0:
+            rotary_cos_sin(ctx, self.rotary_emb_dim, self.rope_theta)
+        dev = ctx.seq_idx.device
+        backend = FORCE_BACKEND or ("sdpa" if dev.type != "cuda" else ("flex" if _flash_varlen is None and
+                                                                        flex_attention is not None else None))
+        if backend == "flex":
+            _block_mask(ctx, self.window_size, dev)
+        elif backend == "sdpa":
+            _dense_mask(ctx, self.window_size)
+
     def extra_repr(self) -> str:
         return (
             f"heads={self.num_heads}, kv_heads={self.num_kv_heads}, head_dim={self.head_dim}, "

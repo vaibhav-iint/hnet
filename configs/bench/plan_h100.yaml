@@ -1,0 +1,29 @@
+# Round-1 throughput plan for one H100/H200 (scripts/bench/bench_train.py run configs/bench/plan_h100.yaml).
+# Every run: 50 optimizer steps, log every 10; the summary takes medians after the first 2 log records.
+sweep: bench_h100
+out_root: runs/bench/h100
+defaults: {set: [train.steps=50, log.every=10]}
+runs:
+  # ---- BPE: micro-batch sweep at L08, then the other rungs
+  - {name: bpe_L08_mb8,  config: configs/bench/bpe_L08.yaml, set: [data.micro_batch=8]}
+  - {name: bpe_L08_mb16, config: configs/bench/bpe_L08.yaml, set: [data.micro_batch=16]}
+  - {name: bpe_L08_mb32, config: configs/bench/bpe_L08.yaml, set: [data.micro_batch=32]}
+  - {name: bpe_L04_mb32, config: configs/bench/bpe_L04.yaml, set: [data.micro_batch=32]}
+  - {name: bpe_L06_mb32, config: configs/bench/bpe_L06.yaml, set: [data.micro_batch=32]}
+  - {name: bpe_L12_mb16, config: configs/bench/bpe_L12.yaml, set: [data.micro_batch=16]}
+  - {name: bpe_L08_mb16_eager, config: configs/bench/bpe_L08.yaml, set: [data.micro_batch=16, train.compile=false]}
+  - {name: bpe_L08_mb16_adamw, config: configs/bench/bpe_L08.yaml, set: [data.micro_batch=16, train.optimizer=adamw]}
+  # ---- H-Net (8192-byte windows)
+  - {name: hnet_L08_mb4, config: configs/bench/hnet_L08.yaml, set: [data.micro_batch=4]}
+  - {name: hnet_L08_mb8, config: configs/bench/hnet_L08.yaml, set: [data.micro_batch=8, data.batch_windows=16]}
+  - {name: hnet_L04_mb8, config: configs/bench/hnet_L04.yaml, set: [data.micro_batch=8, data.batch_windows=16]}
+  - {name: hnet_L12_mb4, config: configs/bench/hnet_L12.yaml, set: [data.micro_batch=4]}
+  - {name: hnet_L08_mb4_eager, config: configs/bench/hnet_L08.yaml, set: [data.micro_batch=4, train.compile=false]}
+  - {name: hnet_L08_full_mb4, config: configs/bench/hnet_L08_full.yaml, set: [data.micro_batch=4]}
+  # ---- packing: 3 small runs sharing one GPU at the same time
+  - {name: pack3_bpe_L04_a, group: pack3_bpe_L04, gpu_frac: 0.33, config: configs/bench/bpe_L04.yaml, set: [data.micro_batch=32, train.steps=100]}
+  - {name: pack3_bpe_L04_b, group: pack3_bpe_L04, gpu_frac: 0.33, config: configs/bench/bpe_L04.yaml, set: [data.micro_batch=32, train.steps=100]}
+  - {name: pack3_bpe_L04_c, group: pack3_bpe_L04, gpu_frac: 0.33, config: configs/bench/bpe_L04.yaml, set: [data.micro_batch=32, train.steps=100]}
+  - {name: pack3_hnet_L04_a, group: pack3_hnet_L04, gpu_frac: 0.33, config: configs/bench/hnet_L04.yaml, set: [data.micro_batch=8, data.batch_windows=16, train.steps=100]}
+  - {name: pack3_hnet_L04_b, group: pack3_hnet_L04, gpu_frac: 0.33, config: configs/bench/hnet_L04.yaml, set: [data.micro_batch=8, data.batch_windows=16, train.steps=100]}
+  - {name: pack3_hnet_L04_c, group: pack3_hnet_L04, gpu_frac: 0.33, config: configs/bench/hnet_L04.yaml, set: [data.micro_batch=8, data.batch_windows=16, train.steps=100]}

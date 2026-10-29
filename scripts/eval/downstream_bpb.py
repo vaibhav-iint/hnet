@@ -176,7 +176,8 @@ def evaluate_downstream(scorer, tasks=None, limit: Optional[int] = None, subset_
 
     tl = task_objs if task_objs is not None else paper7_tasks(tasks, all_choices)
     summary, recs = evaluate_suite(scorer, "paper7", task_objs=tl, limit=limit, n_boot=n_boot, seed=seed,
-                                   subset_seed=subset_seed if limit else None, progress=progress)
+                                   subset_seed=subset_seed if (limit and subset_seed is not None and subset_seed >= 0)
+                                   else None, progress=progress)
     out = {"tasks": {}}
     arrs = []
     for t in tl:
@@ -223,7 +224,8 @@ def main(argv=None):
     ap.add_argument("--model", required=True)
     ap.add_argument("--tasks", default=None, help="comma list (default: the 7 paper7 tasks)")
     ap.add_argument("--limit", type=int, default=None, help="items per task (seeded random subset)")
-    ap.add_argument("--subset-seed", type=int, default=0)
+    ap.add_argument("--subset-seed", type=int, default=0, help="with --limit: seeded random subset; -1 = first N items "
+                    "(the trainer's eval.downstream convention)")
     ap.add_argument("--boundary", default="canonical", choices=["canonical", "lmeval"])
     ap.add_argument("--all-choices", action="store_true", help="also score distractors (accuracies)")
     ap.add_argument("--domains", default=None,
@@ -237,7 +239,7 @@ def main(argv=None):
     t0 = time.time()
     sc, info, model, meta = load_downstream_scorer(a.model, a.boundary, a.device)
     res = {"model": a.model, "info": info, "boundary": a.boundary if info["kind"] == "token" else "exact (bytes)",
-           "limit": a.limit, "subset_seed": a.subset_seed if a.limit else None, "gold_only": not a.all_choices}
+           "limit": a.limit, "subset_seed": a.subset_seed if (a.limit and a.subset_seed >= 0) else None, "gold_only": not a.all_choices}
     res.update(evaluate_downstream(sc, a.tasks.split(",") if a.tasks else None, a.limit, a.subset_seed, a.n_boot,
                                    all_choices=a.all_choices, progress=a.progress))
     if hasattr(sc, "boundary_stats"):

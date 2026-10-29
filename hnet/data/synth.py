@@ -69,3 +69,68 @@ def make_synthetic_dataset(out_dir, n_docs: int = 200, shard_tokens: int = 5000,
             idx_paths.append(ip)
     return dict(docs=docs, stream=stream, token_paths=token_paths, byte_paths=byte_paths, idx_paths=idx_paths,
                 val_token_path=token_paths[0], train_token_paths=token_paths[1:], train_byte_paths=byte_paths[1:])
+
+
+# ---------------------------------------------------------------------------------------------- data mixes
+class InMemoryParquet:
+    """Stand-in for hnet.data.hf_sources.ParquetReader over {file: [row group {column: list}]} (tests)."""
+
+    def __init__(self, files: dict):
+        self.files = files
+
+    def list_files(self):
+        return sorted(self.files)
+
+    def num_row_groups(self, f):
+        return len(self.files[f])
+
+    def read(self, f, a, b, columns):
+        return {c: sum((rg[c] for rg in self.files[f][a:b]), []) for c in columns}
+
+    def prefetch(self, f):
+        pass
+
+    def release(self, f):
+        pass
+
+    def close(self):
+        pass
+
+
+SYNTH_MIX_SPEC = {
+    "name": "synthmix", "seed": 0, "max_doc_bytes": 20000,
+    "categories": {"en": 0.8, "code": 0.2},
+    "sources": {
+        "web": {"repo": "synth/web", "revision": "r0", "files": ["web/*"], "text": "text", "p_val": 0.1,
+                "leaves": {"en.web": {"weight": 1}}},
+        "code": {"repo": "synth/code", "revision": "r0", "files": ["code/*"], "text": "code", "select": "language",
+                 "split_key": "repo_name", "p_val": 0.2,
+                 "leaves": {"code.a": {"value": "A", "weight": 1}, "heldout.h": {"value": "H", "heldout": True}}},
+    },
+}
+
+
+def make_synthetic_mix(root, dataset: str = "synthmix", train_bytes: float = 200_000, seed: int = 0,
+                       vocab_size: int = 512) -> dict:
+    """Fetch + tokenizer + assemble of a tiny two-source mix from in-memory 'parquet' (no network)."""
+    from hnet.data import mix as M
+    from hnet.data.tokenizer import train_bpe
+
+    rng = np.random.default_rng(seed)
+    files = {}
+    for f in range(4):
+        files[f"web/{f}"] = [{"text": [random_text(rng, int(rng.integers(5, 300))).encode() for _ in range(40)]}
+                             for _ in range(4)]
+        files[f"code/{f}"] = [{"code": [("def f(x):\n    return " + random_text(rng, int(rng.integers(3, 100))))
+                                        .encode() for _ in range(40)],
+                               "language": list(rng.choice(["A", "H"], 40, p=[0.8, 0.2])),
+                               "repo_name": [f"r{int(i)}" for i in rng.integers(0, 50, 40)]} for _ in range(4)]
+    spec = M.load_spec(SYNTH_MIX_SPEC)
+    cfg = M.BuildConfig(dataset=dataset, train_bytes=train_bytes, shard_bytes=train_bytes / 4, val_leaf_bytes=8000,
+                        val_group_bytes=8000, val_mix_bytes=20000, tokenizer_sample_bytes=train_bytes)
+    M.fetch(spec, cfg, root, lambda src: InMemoryParquet(files), workers=1, log=lambda s: None)
+    it, _, _ = M.tokenizer_sample(spec, cfg, root)
+    tok_path = Path(root) / f"{dataset}_tok.json"
+    tok_path.write_text(train_bpe(list(it), vocab_size=vocab_size))
+    man = M.assemble(spec, cfg, tok_path, root, log=lambda s: None)
+    return dict(spec=spec, cfg=cfg, manifest=man, tokenizer=tok_path)

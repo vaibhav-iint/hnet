@@ -194,10 +194,9 @@ def fill_tables(bpe: dict, bpt: float, outer: dict, share: float) -> dict:
     p_bpe = count_params(bcfg)
     base = dict(bpe=bpe, bpt=bpt, d0=outer["d0"], n_enc=outer["n_enc"], n_dec=outer["n_dec"],
                 d_state=outer["d_state"], prior=False)
-    p0 = count_params(_cfg(hnet_model(cv_buckets=0 + 1, ng_buckets=1, **base)))
-    rows_fixed = 2 * 1 + len(NGRAM_NS) * 1  # the probe's own table rows
     d0 = outer["d0"]
-    budget_rows = (p_bpe - (p0 - rows_fixed * d0)) / d0
+    probe = count_params(_cfg(hnet_model(cv_buckets=1, ng_buckets=1, **base)))  # tables of one row each
+    budget_rows = (p_bpe - (probe - (2 + len(NGRAM_NS)) * d0)) / d0
     if budget_rows <= 2 * 1024:
         raise SystemExit(f"L{bpe['n_layers']:02d}: outer network leaves no parameter budget for the tables")
     cv = prev_prime(int(share * budget_rows / 2))

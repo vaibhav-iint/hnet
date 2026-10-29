@@ -355,8 +355,9 @@ def make_figures(res, runs, figdir, prefix="ladder"):
 def report(res) -> str:
     ref, new = res["ref"], res["new"]
     L = []
-    L.append(f"runs: {len(res['runs'])}  ({', '.join(f'{a}: {sum(r['arch'] == a for r in res['runs'])}' for a in (ref, new))})"
-             f"  budgets: {', '.join(f'{b:.3g}' for b in res['budgets'])}")
+    counts = ", ".join(f"{a}: {sum(r['arch'] == a for r in res['runs'])}" for a in (ref, new))
+    budgets = ", ".join(f"{b:.3g}" for b in res["budgets"])
+    L.append(f"runs: {len(res['runs'])}  ({counts})  budgets: {budgets}")
     for n in res["notes"]:
         L.append(f"NOTE: {n}")
     for m, r in res["metrics"].items():
@@ -371,9 +372,11 @@ def report(res) -> str:
             L.append(f"   {a:6s} L(C) = {law['E']:.4f} + {law['A']:.4f} (C/1e18)^-{law['alpha']:.4f}"
                      + (f"  alpha ci95 [{ci[0]:.3f}, {ci[1]:.3f}]" if ci else "") + f"  rmse {law['rmse']:.2e}")
         if r["multiplier"]:
-            L.append(f"   multiplier ({new} over {ref}): {_fmt_mult(r['multiplier'])}  "
-                     f"[low-loss end {r['multiplier']['at_low_loss']:.3g}, high-loss end "
-                     f"{r['multiplier']['at_high_loss']:.3g}]")
+            mm = r["multiplier"]
+            ends = "  ".join(f"{lab} {mm[k]:.3g}" for k, lab in (("at_low_loss", "low-loss end"),
+                                                                 ("at_high_loss", "high-loss end"))
+                             if mm.get(k) is not None)
+            L.append(f"   multiplier ({new} over {ref}): {_fmt_mult(mm)}  [{ends}]")
         if r.get("multiplier_interp") and r["multiplier_interp"].get("multiplier"):
             L.append(f"   multiplier (law-free interpolation): {r['multiplier_interp']['multiplier']:.3f}")
         for g in r["matched_budget_gap"]:
