@@ -1,7 +1,7 @@
 # Quick GPU sanity run (minutes): tiny 2-stage H-Net matched to tiny_bpe_2m, 2048-byte windows, 64/step, 50M tok-eq.
 include: _core.yaml
 model: {include: ../models/tiny_hnet2_2m.yaml, lr_multiplier_n_gpt: data}
-data: {seq_len: 2048, micro_batch: 64, batch_bytes: 131072, n_train_shards: 1}
+data: {seq_len: 2048, micro_batch: 16, batch_bytes: 131072, n_train_shards: 1}   # 4 micro-steps of 16 windows (fits 3 runs on one 24 GB GPU)
 train: {out_dir: runs/tiny/tiny_hnet2_2m, train_tokens: 5.0e7, lr: 1.5e-3, ckpt_every: 500}
 eval: {every: 250, val_bytes: 1000000, val_byte_seq_len: 2048, val_token_seq_len: 448, downstream: null}
 log: {every: 10, wandb: null}

@@ -63,7 +63,10 @@ def _norm_name(n: str) -> str:
 
 
 def _rec(st: State, name: str) -> dict:
-    return st.get(_norm_name(name))
+    n = _norm_name(name)
+    if n not in st.data["resources"]:
+        raise UnknownVM(f"no VM named {n!r} in {st.path}")
+    return st.data["resources"][n]
 
 
 def _tracker(name: str) -> S.SerialTracker:
@@ -71,41 +74,34 @@ def _tracker(name: str) -> S.SerialTracker:
 
 
 def refresh(st: State, names: list[str] | None = None) -> None:
-    """Re-observe active records (status, segments) under the state lock."""
+    """Re-observe active records (status, segments) under the state lock. This is what reconciles a
+    ledger that says RUNNING with a VM that stopped, restarted or vanished while we were not looking."""
     with st.locked():
         for rec in st.active():
             if names and rec["name"] not in names:
                 continue
-            if not rec.get("zone"):
-                continue
-            try:
-                inst = gce.describe(rec["name"], rec["zone"])
-            except gce.GcloudError as e:
-                _p(f"[warn] describe {rec['name']}: {e}")
-                continue
-            L.apply_observation(rec, inst)
+            if rec.get("zone"):
+                L.apply_observation(rec, gce.describe(rec["name"], rec["zone"]))
+
+
+class UnknownVM(KeyError):
+    pass
 
 
 # ----------------------------------------------------------------------------- git helpers
+def git(*args: str, check: bool = True) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", "-C", str(C.REPO_ROOT), *args], capture_output=True, text=True, timeout=60,
+                          check=check)
+
+
 def resolve_commit(commit: str | None) -> tuple[str, bool]:
-    """(full sha, pushed?) for `commit` (default HEAD) in the local repo."""
+    """(full sha, pushed?) for `commit` (default HEAD) in the local repo (ValueError if unknown)."""
     ref = commit or "HEAD"
-    try:
-        sha = subprocess.run(["git", "-C", str(C.REPO_ROOT), "rev-parse", ref], capture_output=True, text=True,
-                             timeout=30).stdout.strip()
-    except Exception:
-        sha = ""
-    if not sha:
-        if commit and len(commit) == 40:
-            return commit, True  # trust a full sha we cannot resolve locally
-        raise ValueError(f"cannot resolve commit {ref!r}")
-    try:
-        r = subprocess.run(["git", "-C", str(C.REPO_ROOT), "branch", "-r", "--contains", sha], capture_output=True,
-                           text=True, timeout=30)
-        pushed = bool(r.stdout.strip())
-    except Exception:
-        pushed = False
-    return sha, pushed
+    r = git("rev-parse", "--verify", f"{ref}^{{commit}}", check=False)
+    if r.returncode != 0:
+        raise ValueError(f"cannot resolve commit {ref!r} locally (git fetch first?): {r.stderr.strip()}")
+    sha = r.stdout.strip()
+    return sha, bool(git("branch", "-r", "--contains", sha).stdout.strip())
 
 
 def missing_configs(cmd: str, sha: str, overlay: list[str]) -> list[str]:
@@ -115,23 +111,14 @@ def missing_configs(cmd: str, sha: str, overlay: list[str]) -> list[str]:
     for cfg, _ in _train_invocations(cmd):
         if any(cfg == o.rstrip("/") or cfg.startswith(o.rstrip("/") + "/") for o in overlay):
             continue
-        try:
-            r = subprocess.run(["git", "-C", str(C.REPO_ROOT), "cat-file", "-e", f"{sha}:{cfg}"],
-                               capture_output=True, timeout=30)
-        except Exception:
-            continue
-        if r.returncode != 0:
+        if git("cat-file", "-e", f"{sha}:{cfg}", check=False).returncode != 0:  # non-zero = absent
             out.append(cfg)
     return out
 
 
 def ignored_code(overlay: list[str]) -> list[str]:
     """Ignored-but-present files under the code dirs (a too-broad .gitignore silently drops them from clones)."""
-    try:
-        r = subprocess.run(["git", "-C", str(C.REPO_ROOT), "ls-files", "-o", "-i", "--exclude-standard", "--",
-                            "hnet", "scripts", "configs", "infra"], capture_output=True, text=True, timeout=30)
-    except Exception:
-        return []
+    r = git("ls-files", "-o", "-i", "--exclude-standard", "--", "hnet", "scripts", "configs", "infra")
     out = []
     for f in r.stdout.splitlines():
         if "__pycache__" in f or f.endswith((".pyc", ".pt", ".bin", ".safetensors")):
@@ -169,13 +156,10 @@ def cmd_launch(a) -> int:
     disk_hr = C.disk_price_hr(disk_gb)
     st = _state()
     refresh(st)
-    try:
-        old = st.get(name)
-        if not old.get("ended_at"):
-            _p(f"refusing: {name} is still in the ledger (status {old.get('status')}); teardown first")
-            return 2
-    except KeyError:
-        pass
+    old = st.data["resources"].get(name)
+    if old is not None and not old.get("ended_at"):
+        _p(f"refusing: {name} is still in the ledger (status {old.get('status')}); teardown first")
+        return 2
     projected = L.projected_cost(price, disk_hr, a.max_hours)
     committed = L.committed_total(st.all_records())
     g = L.check_launch(projected, committed, a.budget, a.launch_cap, a.allow_over)
@@ -218,7 +202,7 @@ def cmd_launch(a) -> int:
     if a.overlay:
         try:
             job["overlay_b64"] = startup.make_overlay(a.overlay, C.REPO_ROOT)
-        except (OSError, ValueError) as e:
+        except (FileNotFoundError, ValueError) as e:  # bad --overlay path / too large: a usage error
             _p(f"refusing: {e}")
             return 2
         _p(f"overlay: {', '.join(a.overlay)} ({len(job['overlay_b64']) * 3 // 4} bytes gz)")
@@ -276,13 +260,22 @@ def _fetch(rec: dict, tr: S.SerialTracker | None = None) -> str:
     return tr.fetch(lambda start: gce.serial_output(rec["name"], rec["zone"], start))
 
 
+SERIAL_READABLE = ("RUNNING", "STOPPING")  # GCE answers "not ready" for other states
+
+
+def _fetch_if_readable(rec: dict, tr: S.SerialTracker, quiet: bool = False) -> bool:
+    """Fetch new serial output when the VM can serve it; otherwise the local copy is all there is."""
+    if rec.get("status") in SERIAL_READABLE:
+        _fetch(rec, tr)
+        return True
+    if not quiet:
+        _p(f"  [note] {rec['name']} is {rec.get('status')}: serial console not readable; using the local copy")
+    return False
+
+
 def _sync(rec: dict, out: str | None = None, quiet: bool = False) -> S.Parsed:
     tr = _tracker(rec["name"])
-    try:
-        _fetch(rec, tr)
-    except gce.GcloudError as e:
-        if not quiet:
-            _p(f"[warn] serial fetch failed ({str(e)[:200]}); using the local copy")
+    _fetch_if_readable(rec, tr, quiet)
     p = S.parse_text(tr.read_raw())
     out_root = Path(out) if out else C.REPO_ROOT / "runs" / "gcp" / rec["name"]
     src = "serial"
@@ -314,12 +307,7 @@ def _gcs_records(rec: dict, quiet: bool = False) -> tuple[dict, dict] | None:
     if not bucket:
         return None
     base = f"gs://{bucket}/runs/{rec['name']}/"
-    try:
-        objs = gce.storage_ls_sizes(base)
-    except gce.GcloudError as e:
-        if not quiet:
-            _p(f"[warn] bucket listing failed ({str(e)[:200]}); serial only")
-        return None
+    objs = gce.storage_ls_sizes(base)
     want = [u for u in objs if u.endswith(("/metrics.jsonl", "/eval.jsonl")) and "/_logs/" not in u]
     cache = C.state_dir() / "gcs" / rec["name"]
     metrics, evals = {}, {}
@@ -327,12 +315,7 @@ def _gcs_records(rec: dict, quiet: bool = False) -> tuple[dict, dict] | None:
         rel = u[len(base):]
         dst = cache / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            gce.storage_cp([u], str(dst), timeout=600)
-        except gce.GcloudError as e:
-            if not quiet:
-                _p(f"[warn] {u}: {str(e)[:200]}")
-            continue
+        gce.storage_cp([u], str(dst), timeout=600)
         run = "runs/" + rel.rsplit("/", 1)[0]
         recs = S.read_jsonl_text(dst.read_text())
         (metrics if rel.endswith("metrics.jsonl") else evals)[run] = recs
@@ -420,12 +403,11 @@ def cmd_status(a) -> int:
 def cmd_tail(a) -> int:
     st = _state()
     rec = _rec(st, a.name)
+    refresh(st, [rec["name"]])
+    rec = _rec(st, a.name)
     tr = _tracker(rec["name"])
     before = tr.raw.stat().st_size if tr.raw.exists() else 0
-    try:
-        _fetch(rec, tr)
-    except gce.GcloudError as e:
-        _p(f"[warn] serial fetch failed: {str(e)[:300]}")
+    _fetch_if_readable(rec, tr)
     raw = tr.read_raw()
     if a.all:
         text = raw
@@ -575,10 +557,7 @@ def _teardown_one(st: State, rec: dict, wait_s: int = 300) -> int:
         _p(f"refusing to delete {name}: not an {C.NAME_PREFIX} VM")
         return 2
     if zone:
-        try:
-            gce.delete(name, zone)
-        except gce.GcloudError as e:
-            _p(f"[error] delete {name}: {str(e)[:300]}")
+        gce.delete(name, zone)
         t0 = time.time()
         while time.time() - t0 < wait_s:
             if gce.describe(name, zone) is None:
@@ -588,10 +567,8 @@ def _teardown_one(st: State, rec: dict, wait_s: int = 300) -> int:
             _p(f"[error] {name} still exists after {wait_s}s")
             return 1
     with st.locked():
-        try:
-            L.apply_observation(st.get(name), None)
-        except KeyError:
-            pass
+        if name in st.data["resources"]:  # VMs found only by label (--include-untracked) have no record
+            L.apply_observation(st.data["resources"][name], None)
     _p(f"[teardown] {name} ({zone}): deleted - verified gone")
     return 0
 
@@ -627,11 +604,8 @@ def cmd_ls(a) -> int:
     for r in recs:
         _p(f"{r['name']:28} {str(r.get('zone')):16} {r['machine_type']:16} {'spot' if r.get('spot') else 'ondemand':9} "
            f"{str(r.get('status')):14} {L.running_hours(r):6.2f} {L.actual_cost(r):7.2f}")
-    try:
-        live = gce.list_ours()
-        _p(f"live hnet-* instances: {', '.join(i['name'] + ':' + i.get('status', '?') for i in live) or 'none'}")
-    except gce.GcloudError as e:
-        _p(f"[warn] list failed: {str(e)[:200]}")
+    live = gce.list_ours()
+    _p(f"live hnet-* instances: {', '.join(i['name'] + ':' + i.get('status', '?') for i in live) or 'none'}")
     return 0
 
 
@@ -765,12 +739,9 @@ def main(argv=None) -> int:
     a = build_parser().parse_args(argv)
     try:
         return a.fn(a)
-    except KeyError as e:
-        _p(f"error: {e}")
+    except UnknownVM as e:  # a usage error; everything else propagates with its traceback
+        _p(f"error: {e.args[0]}")
         return 2
-    except gce.GcloudError as e:
-        _p(f"gcloud error: {e}")
-        return 1
 
 
 if __name__ == "__main__":

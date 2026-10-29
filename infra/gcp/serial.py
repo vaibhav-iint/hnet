@@ -138,11 +138,10 @@ def parse_line(line: str) -> Event | None:
         return Event(kind, unesc_dir(run_dir), rec, js)
     if kind == "STATUS":
         state, _, js = rest.partition(" ")
-        try:
-            d = json.loads(js) if js else {}
-        except ValueError:
-            d = {"raw": js}
-        return Event(kind, None, {"state": state, **(d if isinstance(d, dict) else {})}, rest)
+        d = json.loads(js) if js else {}  # ValueError -> counted as corrupt by parse_text
+        if not isinstance(d, dict):
+            raise ValueError("status payload is not an object")
+        return Event(kind, None, {"state": state, **d}, rest)
     if kind == "DONE":
         return Event(kind, None, int(rest.split()[0]), rest)
     if kind in ("STAGE", "INFO", "SUMMARY"):
@@ -244,15 +243,14 @@ def merge_sources(primary: dict, fresher: dict) -> dict:
 
 
 def read_jsonl_text(text: str) -> list[dict]:
-    recs = []
-    for ln in text.splitlines():
-        ln = ln.strip()
-        if not ln:
-            continue
+    """Parse a JSONL object. Only an unterminated last line (the file was uploaded while the trainer was
+    writing it) is skipped; any other bad line raises."""
+    lines = text.split("\n")
+    tail = lines.pop()  # "" when the text ends with a newline, else a partial line
+    recs = [json.loads(ln) for ln in lines if ln.strip()]
+    if tail.strip():
         try:
-            r = json.loads(ln)
-        except ValueError:
-            continue  # a line being written while the object was uploaded
-        if isinstance(r, dict):
-            recs.append(r)
+            recs.append(json.loads(tail))
+        except json.JSONDecodeError:
+            pass  # partial line; the next sync (or the serial channel) has it complete
     return recs

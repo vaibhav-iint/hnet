@@ -218,26 +218,16 @@ def serial_output(name: str, zone: str, start_at: int) -> dict:
 
 
 def parse_serial_response(out: str, err: str, start_at: int) -> dict:
-    out = out or ""
-    try:
-        d = json.loads(out)
-        if isinstance(d, dict) and "contents" in d:
-            return {"contents": d.get("contents") or "", "start": int(d.get("start", start_at)),
-                    "next": int(d.get("next", start_at + len((d.get("contents") or "").encode())))}
-    except ValueError:
-        pass
-    # plain-text form: contents on stdout, "--start=N" hint on stderr
-    m = re.search(r"--start=(\d+)", err or "")
-    nxt = int(m.group(1)) if m else start_at + len(out.encode())
-    return {"contents": out, "start": max(start_at, nxt - len(out.encode())), "next": nxt}
+    """The JSON form of get-serial-port-output (we always pass --format=json)."""
+    d = json.loads(out)
+    contents = d.get("contents") or ""
+    return {"contents": contents, "start": int(d.get("start", start_at)),
+            "next": int(d.get("next", start_at + len(contents.encode())))}
 
 
 def guest_attributes(name: str, zone: str, path: str = "hnet/") -> dict:
-    try:
-        out = run(["compute", "instances", "get-guest-attributes", name, f"--zone={zone}",
-                   f"--query-path={path}"], timeout=120) or []
-    except GcloudError:
-        return {}
+    out = run(["compute", "instances", "get-guest-attributes", name, f"--zone={zone}",
+               f"--query-path={path}"], timeout=120) or []
     return {f"{a.get('namespace')}/{a.get('key')}": a.get("value") for a in out}
 
 
@@ -247,7 +237,7 @@ def storage_ls_sizes(url: str) -> dict[str, int]:
     try:
         out, _ = run(["storage", "ls", "-l", url.rstrip("/") + "/**"], json_out=False, timeout=300)
     except GcloudError as e:
-        if "matched no objects" in e.stderr.lower() or "not found" in e.stderr.lower() or "one or more urls" in e.stderr.lower():
+        if "matched no objects" in e.stderr.lower():  # an empty prefix, not an error
             return {}
         raise
     return parse_ls_sizes(out)
@@ -277,11 +267,8 @@ STOP_OPS = ("compute.instances.preempted", "compute.instances.guestTerminate", "
 
 def last_stop_reason(name: str, zone: str) -> str | None:
     """Why the VM last stopped (preempted / guest shutdown / stop / max-run-duration ...), best effort."""
-    try:
-        ops = run(["compute", "operations", "list", f"--zones={zone}",
-                   f"--filter=targetLink ~ /instances/{name}$"], timeout=120) or []
-    except GcloudError:
-        return None
+    ops = run(["compute", "operations", "list", f"--zones={zone}",
+               f"--filter=targetLink ~ /instances/{name}$"], timeout=120) or []
     ops = [o for o in ops if o.get("operationType") in STOP_OPS or "Duration" in (o.get("operationType") or "")
            or "terminat" in (o.get("operationType") or "").lower()]
     if not ops:

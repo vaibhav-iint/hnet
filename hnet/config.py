@@ -99,8 +99,26 @@ class HNetConfig:
     # lambda^s = sqrt(N_GPT * D^S / D^s / prod_{i<s} N^i), see hnet.optim) or None (all 1.0).
     lr_multiplier: Any = None
     lr_multiplier_n_gpt: float = 4.6  # bytes per BPE token of the training data (paper: GPT-2 on FineWeb-Edu)
-    # Layout code -> mixer registry name. Lower case = no MLP, upper case = + SwiGLU MLP.
-    mixer_codes: dict = field(default_factory=lambda: {"m": "mamba2", "t": "attn"})
+    # Layout code -> mixer registry name. Lower case = no MLP, upper case = + SwiGLU MLP. Either one dict for every
+    # stage, or a per-stage list of dicts (e.g. swap only the main network's attention: [{..}, {..}, {"t": "mla"}]).
+    mixer_codes: Any = field(default_factory=lambda: {"m": "mamba2", "t": "attn"})
+    # Extra constructor kwargs per mixer registry name, e.g. {"mla": {"kv_lora_rank": 64}}. A value may itself be a
+    # per-stage list. Merged on top of the mixer's own ``config_kwargs(cfg, stage)``.
+    mixer_cfg: dict = field(default_factory=dict)
+
+    def mixer_codes_for_stage(self, s: int) -> dict:
+        codes = self.mixer_codes
+        if isinstance(codes, list):
+            assert len(codes) == self.n_stages + 1, "per-stage mixer_codes needs one dict per stage"
+            codes = codes[s]
+        return dict(codes)
+
+    def mixer_cfg_for_stage(self, name: str, s: int) -> dict:
+        v = self.mixer_cfg.get(name, {})
+        if isinstance(v, list):
+            assert len(v) == self.n_stages + 1, f"per-stage mixer_cfg[{name!r}] needs one entry per stage"
+            v = v[s]
+        return dict(v or {})
 
     @property
     def n_stages(self) -> int:
@@ -207,6 +225,8 @@ class DenseConfig:
     tie_embeddings: bool = False
     norm_eps: float = 1e-5
     initializer_range: float = 0.02
+    mixer: str = "attn"  # sequence-mixer registry name for every layer (e.g. "mla", "kda")
+    mixer_kwargs: dict = field(default_factory=dict)  # extra constructor kwargs for that mixer
     extra: dict = field(default_factory=dict)  # variant-specific knobs
 
     @classmethod

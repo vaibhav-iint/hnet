@@ -220,41 +220,57 @@ def _router_counts(name: str, d: int, kwargs: dict, target_ratio=None):
 
 
 # ----------------------------------------------------------------------------- isotropic stacks
-def _block_params(code, mlp, d, f, cfg_ssm, attn_cfg, mixer_codes) -> int:
-    mixer = mixer_codes.get(code, code)
-    p = d  # norm1
+def mixer_counts(mixer: str, d: int, kwargs: dict, L: float, cv: FlopsConvention, cfg_ssm=None):
+    """(params, forward FLOPs per position) of one sequence mixer.
+
+    ``mamba2`` and ``attn`` use the closed forms above. Any other registered mixer must provide a classmethod
+    ``flops_per_position(d_model, L, cv, **kwargs) -> float`` (forward FLOPs per position at sequence length L,
+    honouring ``cv``); its parameter count is taken from the registered class built on the meta device.
+    """
     if mixer == "mamba2":
-        p += mamba2_params(d, cfg_ssm)
-    elif mixer == "attn":
-        p += attn_params(d, attn_cfg)
-    else:
-        raise NotImplementedError(f"no param count for mixer {mixer!r}")
+        return mamba2_params(d, cfg_ssm), mamba2_flops(d, cfg_ssm, cv)
+    if mixer == "attn":
+        return attn_params(d, kwargs), attn_flops(d, kwargs, L, cv)
+    import torch
+
+    from hnet import registry
+
+    cls = registry.get("mixer", mixer)
+    hook = getattr(cls, "flops_per_position", None)
+    if hook is None:
+        raise NotImplementedError(f"mixer {mixer!r} has no flops_per_position classmethod")
+    with torch.device("meta"):
+        m = cls(d, **kwargs)
+    return sum(x.numel() for x in m.parameters()), float(hook(d, L, cv, **kwargs))
+
+
+def _block_counts(mixer, mlp, d, f, kwargs, L, cv, cfg_ssm=None):
+    p, fl = mixer_counts(mixer, d, kwargs, L, cv, cfg_ssm)
+    p += d  # norm1
     if mlp and f:
         p += d + mlp_params(d, f)  # norm2 + SwiGLU
-    return p
-
-
-def _block_flops(code, mlp, d, f, cfg_ssm, attn_cfg, mixer_codes, L, cv) -> float:
-    mixer = mixer_codes.get(code, code)
-    if mixer == "mamba2":
-        fl = mamba2_flops(d, cfg_ssm, cv)
-    elif mixer == "attn":
-        fl = attn_flops(d, attn_cfg, L, cv)
-    else:
-        raise NotImplementedError(f"no FLOP count for mixer {mixer!r}")
-    if mlp:
         fl += mlp_flops(d, f, cv)
-    return fl
+    return p, fl
 
 
 def _iso(cfg: HNetConfig, s: int, code: str, L: float, cv: FlopsConvention):
     d, f = cfg.d_model[s], cfg.d_intermediate[s]
-    a = cfg.attn_for_stage(s)
+    from hnet.model.block import mixer_config_kwargs
+
+    codes = cfg.mixer_codes_for_stage(s)
     p = d  # final RMSNorm of the isotropic stack
     fl = 0.0
     for c, mlp in parse_layout(code):
-        p += _block_params(c, mlp, d, f, cfg.ssm, a, cfg.mixer_codes)
-        fl += _block_flops(c, mlp, d, f, cfg.ssm, a, cfg.mixer_codes, L, cv)
+        mixer = codes.get(c, c)
+        if mixer == "attn":
+            kw = {**cfg.attn_for_stage(s), **cfg.mixer_cfg_for_stage("attn", s)}
+        elif mixer == "mamba2":
+            kw = {}
+        else:
+            kw = mixer_config_kwargs(mixer, cfg, s)
+        bp, bf = _block_counts(mixer, mlp, d, f, kw, L, cv, cfg.ssm)
+        p += bp
+        fl += bf
     return p, fl
 
 
@@ -320,8 +336,10 @@ def _dense(cfg: DenseConfig, seq_len, cv: FlopsConvention):
         pass
     d, V = cfg.d_model, cfg.vocab_size
     a = dict(num_heads=cfg.num_heads, num_kv_heads=cfg.num_kv_heads or cfg.num_heads, window_size=-1)
-    layer_p = d + attn_params(d, a) + d + mlp_params(d, cfg.d_intermediate)
-    layer_f = attn_flops(d, a, seq_len, cv) + mlp_flops(d, cfg.d_intermediate, cv)
+    if cfg.mixer != "attn":  # same kwargs the model passes to the mixer
+        a = dict(num_heads=cfg.num_heads, num_kv_heads=cfg.num_kv_heads, rope_theta=cfg.rope_theta,
+                 nope_every=cfg.nope_every, **cfg.extra.get("attn", {}), **cfg.mixer_kwargs)
+    layer_p, layer_f = _block_counts(cfg.mixer, True, d, cfg.d_intermediate, a, seq_len, cv)
     comp_p = {
         "embedding": V * d,
         "lm_head": 0 if cfg.tie_embeddings else V * d,

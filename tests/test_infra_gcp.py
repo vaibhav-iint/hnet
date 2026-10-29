@@ -630,13 +630,15 @@ class FakeBucket:
         self.obj: dict[str, bytes] = {}
         self.calls = []
 
-    def gc(self, args, timeout=0):
+    def exec(self, args, timeout=0):
         self.calls.append(args)
         verb = args[1]
         if verb == "ls":
             pre = args[-1][:-3] if args[-1].endswith("/**") else args[-1]
             hits = {u: len(b) for u, b in self.obj.items() if u.startswith(pre)}
-            return (0, "".join(f"{s}  2026-01-01T00:00:00Z  {u}\n" for u, s in hits.items())) if hits else (1, "")
+            if not hits:
+                return 1, "", "ERROR: (gcloud.storage.ls) One or more URLs matched no objects."
+            return 0, "".join(f"{s}  2026-01-01T00:00:00Z  {u}\n" for u, s in hits.items()), ""
         if verb == "cp":
             rec = "-r" in args
             srcs, dst = [a for a in args[2:-1] if a != "-r"], args[-1]
@@ -651,7 +653,7 @@ class FakeBucket:
                 else:
                     tgt = dst + os.path.basename(src) if dst.endswith("/") else dst
                     self.obj[tgt] = open(src, "rb").read()
-            return 0, ""
+            return 0, "", ""
         if verb == "rsync":
             src, dst = args[-2], args[-1]
             excl = [a.split("=", 1)[1] for a in args if a.startswith("--exclude=")]
@@ -667,7 +669,7 @@ class FakeBucket:
             if delete:
                 for u in [u for u in self.obj if u.startswith(dst + "/") and u not in seen]:
                     del self.obj[u]
-            return 0, ""
+            return 0, "", ""
         raise AssertionError(args)
 
 
@@ -682,7 +684,7 @@ def _gcs_agent(tmp_path, monkeypatch, bucket, prefix="runs/hnet-a", restore_pref
     ser.write_text("")
     ag = VA.Agent({"gcs": {"bucket": "b", "prefix": prefix, "restore_prefix": restore_prefix or prefix}},
                   VA.Emitter(dev=str(ser)))
-    monkeypatch.setattr(ag.gcs, "gc", bucket.gc)
+    monkeypatch.setattr(ag.gcs, "_exec", bucket.exec)
     return ag, repo
 
 
@@ -805,3 +807,64 @@ def test_cli_pull_latest_checkpoint(tmp_path, monkeypatch):
     assert cli.main(["pull", "hnet-p", "runs/tiny/t", "--out", str(tmp_path / "o")]) == 0
     assert sorted(u.rsplit("tiny/t/", 1)[1] for u in copied) == \
         ["ckpt/step_0000020/meta.json", "ckpt/step_0000020/model.pt", "metrics.jsonl"]
+
+
+def _offline_agent(tmp_path, monkeypatch, job_kw, stub=("clone", "venv", "kernels", "data")):
+    repo = tmp_path / "repo"
+    repo.mkdir(exist_ok=True)
+    for k, v in {"STATE": tmp_path / "state", "REPO": repo, "VENV": tmp_path / "venv"}.items():
+        monkeypatch.setattr(VA, k, str(v))
+    os.makedirs(tmp_path / "state", exist_ok=True)
+    monkeypatch.setattr(VA, "POLL_SEC", 0.05)
+    monkeypatch.setattr(VA, "HB_SEC", 0.1)
+    monkeypatch.setattr(VA, "SYNC_RETRY_WAIT", 0.0)
+    monkeypatch.setattr(VA, "guest_attr", lambda k, v: None)
+    for st in stub:
+        monkeypatch.setattr(VA.Agent, st, lambda self: None)
+    ser = tmp_path / "tty"
+    ser.write_text("")
+    job = startup.job_dict(repo="x", commit="abc", linger_min=0, auto_shutdown=False, **job_kw)
+    return VA.Agent(job, VA.Emitter(dev=str(ser))), ser
+
+
+def test_agent_stage_failure_is_reported_and_raised(tmp_path, monkeypatch):
+    ag, ser = _offline_agent(tmp_path, monkeypatch, {"cmd": "true"}, stub=("clone", "venv", "kernels"))
+
+    def boom(self):
+        raise RuntimeError("prepare exploded")
+
+    monkeypatch.setattr(VA.Agent, "data", boom)
+    with pytest.raises(RuntimeError, match="prepare exploded"):
+        ag.main()
+    p = S.parse_text(ser.read_text())
+    assert p.done == VA.INFRA_FAILURE and p.summary["failed_stage"] == "data"
+    assert any("prepare exploded" in ln for ln in p.logs)
+    assert "Traceback" in (tmp_path / "state" / "agent.log").read_text()
+    assert json.loads((tmp_path / "state" / "done.json").read_text())["failed_stage"] == "data"
+
+
+def test_agent_bucket_failure_stops_the_command(tmp_path, monkeypatch):
+    ag, ser = _offline_agent(tmp_path, monkeypatch, {"cmd": "sleep 30"})
+    ag.gcs = VA.Gcs({"bucket": "b", "prefix": "runs/x", "sync_every_s": 0.05})
+    ag.gcs.gcloud = "/usr/bin/gcloud"
+    calls = []
+
+    def failing(args, timeout):
+        calls.append(args)
+        return 1, "", "ERROR: 503 backend unavailable"
+
+    monkeypatch.setattr(ag.gcs, "_exec", failing)
+    t = time.time()
+    with pytest.raises(RuntimeError, match="background thread failed"):
+        ag.main()
+    assert time.time() - t < 20  # the 30 s command was stopped
+    p = S.parse_text(ser.read_text())
+    assert p.done == VA.INFRA_FAILURE
+    assert sum("bucket sync failed" in ln for ln in p.logs) >= VA.SYNC_RETRIES
+
+
+def test_agent_command_failure_exit_code(tmp_path, monkeypatch):
+    ag, ser = _offline_agent(tmp_path, monkeypatch, {"cmd": "echo bad; exit 4"})
+    assert ag.main() == 4
+    p = S.parse_text(ser.read_text())
+    assert p.done == 4 and any("bad" in ln for ln in p.logs)

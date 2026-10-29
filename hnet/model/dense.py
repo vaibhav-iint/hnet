@@ -35,9 +35,11 @@ class LlamaLM(nn.Module):
             nope_every=cfg.nope_every,
         )
         attn.update(cfg.extra.get("attn", {}))
+        mixer_kwargs = {**attn, **cfg.mixer_kwargs}  # attention-style mixers share the head/RoPE settings
         self.embeddings = nn.Embedding(cfg.vocab_size, cfg.d_model)
         self.backbone = Isotropic(
-            f"T{cfg.n_layers}", cfg.d_model, cfg.d_intermediate, {"t": "attn"}, {"attn": attn}, cfg.norm_eps
+            f"T{cfg.n_layers}", cfg.d_model, cfg.d_intermediate, {"t": cfg.mixer}, {cfg.mixer: mixer_kwargs},
+            cfg.norm_eps,
         )
         self.lm_head = nn.Linear(cfg.d_model, cfg.vocab_size, bias=False)
         if cfg.tie_embeddings:

@@ -73,5 +73,6 @@ def _ensure_builtins_imported():
     import importlib
 
     # Packages register their built-ins on import.
-    for mod in ("hnet.model", "hnet.model.dense_modded", "hnet.optim", "hnet.optim.muon"):
+    for mod in ("hnet.model", "hnet.model.dense_modded", "hnet.model.mixers.deepseek", "hnet.model.mixers.kimi",
+                "hnet.optim", "hnet.optim.muon"):
         importlib.import_module(mod)

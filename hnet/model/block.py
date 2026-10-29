@@ -28,15 +28,17 @@ def mixer_config_kwargs(name: str, cfg, stage: int) -> dict:
     """Constructor kwargs of mixer ``name`` for stage ``stage`` of an ``HNetConfig``.
 
     A mixer class may define ``config_kwargs(cfg, stage) -> dict``; otherwise ``mamba2`` reads ``cfg.ssm`` and
-    any other mixer gets no extra kwargs.
+    any other mixer gets no extra kwargs. ``cfg.mixer_cfg[name]`` (optionally per stage) is merged on top.
     """
     cls = registry.get("mixer", name)
     hook = getattr(cls, "config_kwargs", None)
     if hook is not None:
-        return hook(cfg, stage)
-    if name == "mamba2":
-        return asdict(cfg.ssm)
-    return {}
+        kw = hook(cfg, stage)
+    elif name == "mamba2":
+        kw = asdict(cfg.ssm)
+    else:
+        kw = {}
+    return {**kw, **cfg.mixer_cfg_for_stage(name, stage)}
 
 
 class Block(nn.Module):

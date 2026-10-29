@@ -26,10 +26,7 @@ STOPPED = ("STOPPING", "STOPPED", "TERMINATED", "SUSPENDING", "SUSPENDED")
 def parse_ts(s: str | None) -> float | None:
     if not s:
         return None
-    try:
-        return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
-    except ValueError:
-        return None
+    return datetime.fromisoformat(s.replace("Z", "+00:00")).timestamp()
 
 
 def _h(t0: float, t1: float) -> float:

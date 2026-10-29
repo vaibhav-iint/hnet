@@ -57,10 +57,11 @@ class HNet(nn.Module):
         self.is_innermost = len(layout) == 1
         assert len(layout) in (1, 3), f"stage {stage_idx}: layout must be [main] or [enc, inner, dec], got {layout}"
 
-        mixer_kwargs = {name: mixer_config_kwargs(name, cfg, stage_idx) for name in set(cfg.mixer_codes.values())}
+        codes = cfg.mixer_codes_for_stage(stage_idx)
+        mixer_kwargs = {name: mixer_config_kwargs(name, cfg, stage_idx) for name in set(codes.values())}
 
         def iso(lay):
-            return Isotropic(lay, d, cfg.d_intermediate[stage_idx], cfg.mixer_codes, mixer_kwargs, cfg.norm_eps)
+            return Isotropic(lay, d, cfg.d_intermediate[stage_idx], codes, mixer_kwargs, cfg.norm_eps)
 
         if self.is_innermost:
             self.main_network = iso(layout[0])
