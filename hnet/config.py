@@ -78,6 +78,14 @@ class DCConfig:
     #   probe run shows the router then switches the hierarchy off) or "identity" (the decoder starts from the
     #   encoder output, so the untrained hierarchy is an addition rather than the only signal).
     residual_init: str = "zero"
+    # residual_warmup: fraction of training over which the residual path into each decoder is scaled from 0 to 1
+    #   ("bottleneck first": early on all information must pass through the hierarchy, so the main network learns
+    #   chunk-level representations before the decoder may bypass it). 0 = off.
+    residual_warmup: float = 0.0
+    # residual_warmup: fraction of training over which the residual path into each decoder is scaled from 0 to 1
+    #   ("bottleneck first": early on all information must pass through the hierarchy, so routers and the main
+    #   network learn chunk-level representations before the decoder may bypass them). 0 = off.
+    residual_warmup: float = 0.0
     # main_aux_weight: weight of an auxiliary next-byte CE on the stage-0 dechunked main-network output alone
     #   (before the residual is added), a direct learning signal for everything below stage 0.
     main_aux_weight: float = 0.0

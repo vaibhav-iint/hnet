@@ -86,3 +86,51 @@ def test_residual_identity_init_survives_init_weights():
     for st in z.backbone.stages():
         if not st.is_innermost:
             assert st.residual_proj.weight.abs().sum() == 0
+
+
+def test_residual_warmup_scales_residual_by_progress():
+    m, _ = _model(residual_warmup=0.5)
+    base, _ = _model()
+    m.load_state_dict(base.state_dict())
+    with torch.no_grad():  # make the residual path matter (it is zero-init)
+        for mm in (m, base):
+            for st in mm.backbone.stages():
+                if not st.is_innermost:
+                    torch.nn.init.eye_(st.residual_proj.weight)
+    ids = torch.randint(0, 256, (2, 96))
+    m.eval()
+    base.eval()
+    torch.testing.assert_close(m(ids, labels=ids).loss, base(ids, labels=ids).loss)  # default progress 1.0
+    m.set_progress(0.0)
+    zero = _model()[0]
+    zero.load_state_dict(base.state_dict())
+    zero.eval()  # residual_proj stays zero-init: equals warmup at progress 0
+    torch.testing.assert_close(m(ids, labels=ids).loss, zero(ids, labels=ids).loss)
+    m.set_progress(0.6)
+    torch.testing.assert_close(m(ids, labels=ids).loss, base(ids, labels=ids).loss)
+
+
+def test_residual_warmup_scales_residual_by_progress():
+    m, _ = _model(residual_warmup=0.5)
+    base, _ = _model()
+    m.load_state_dict(base.state_dict())
+    with torch.no_grad():  # make the residual path matter (it is zero-init)
+        for mm in (m, base):
+            for st in mm.backbone.stages():
+                if not st.is_innermost:
+                    torch.nn.init.eye_(st.residual_proj.weight)
+    zero = _model()[0]
+    zero.load_state_dict(base.state_dict())
+    with torch.no_grad():
+        for st in zero.backbone.stages():
+            if not st.is_innermost:
+                st.residual_proj.weight.zero_()
+                st.residual_proj.bias.zero_()
+    ids = torch.randint(0, 256, (2, 96))
+    for mm in (m, base, zero):
+        mm.eval()
+    torch.testing.assert_close(m(ids, labels=ids).loss, base(ids, labels=ids).loss)  # default progress 1.0
+    m.set_progress(0.0)  # residual fully off
+    torch.testing.assert_close(m(ids, labels=ids).loss, zero(ids, labels=ids).loss)
+    m.set_progress(0.6)  # past the warmup: full residual
+    torch.testing.assert_close(m(ids, labels=ids).loss, base(ids, labels=ids).loss)

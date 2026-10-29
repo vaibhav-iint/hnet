@@ -1,0 +1,27 @@
+# EXP-011: router-free line. Tiny 2-stage H-Net with FIXED pooling (every 3rd position at both stages: the paper
+# (3,3) compression and FLOPs, -1.3% without router compute). Hard 0/1 boundaries make the ratio loss constant, the
+# STE a no-op and EMA smoothing the identity: a plain hourglass with dense mixers. Removes the learned router as a
+# confound, to test whether starvation of the main network (EXP-002 diagnosis, probe run) comes from the bypass
+# architecture itself, and which fix restores use of the hierarchy. Compare with EXP-008 `base` (learned paper
+# router, same config otherwise) for the value of learned routing at this scale.
+# Every run logs the zero-main eval probe (val bpb with each stage's main network silenced).
+name: exp011_fixed_hourglass
+out_root: runs/search/exp011_fixed_hourglass
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp011_fixed_hourglass
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=fixed_pool
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  baseline: fixed
+  labels: {fixed: "fixed (3,3) pooling", fixed_rwarm: "+ residual warmup (first 20%)",
+           fixed_rid: "+ identity-init residual", fixed_rdrop: "+ residual path-drop 0.3",
+           fixed_aux: "+ main-path aux head 0.3"}
+runs:
+  - {name: fixed,       config: configs/runs/tiny_hnet2_2m.yaml}
+  - {name: fixed_rwarm, config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.residual_warmup=0.2]}
+  - {name: fixed_rid,   config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.residual_init=identity]}
+  - {name: fixed_rdrop, config: configs/runs/tiny_hnet2_2m.yaml, set: ["model.dc.residual_dropout=0.3"]}
+  - {name: fixed_aux,   config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.main_aux_weight=0.3]}

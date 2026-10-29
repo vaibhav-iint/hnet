@@ -74,6 +74,10 @@ class HNet(nn.Module):
             self.aux_loss_scope = cfg.dc.aux_loss_scope
             self.use_ste = bool(dc["ste"])
             self.residual_dropout = float(dc["residual_dropout"] or 0.0)
+            self.residual_warmup = float(cfg.dc.residual_warmup or 0.0)
+            self.progress = 1.0  # training progress in [0, 1], set by HNetForCausalLM.set_progress
+            self.residual_warmup = float(cfg.dc.residual_warmup or 0.0)
+            self.progress = 1.0  # training progress in [0, 1], set by HNetForCausalLM.set_progress
             self.encoder = iso(layout[0])
             self.main_network = HNet(cfg, stage_idx + 1)
             self.decoder = iso(layout[2])
@@ -123,6 +127,10 @@ class HNet(nn.Module):
             r.extra["dechunk_rms"] = out.detach().float().pow(2).mean().sqrt()
             r.extra["residual_rms"] = residual.detach().pow(2).mean().sqrt()
         r.main_out = out  # with grad: read by an optional auxiliary head (HNetConfig.dc.main_aux_weight)
+        if self.residual_warmup > 0 and self.progress < self.residual_warmup:
+            residual = residual * (self.progress / self.residual_warmup)
+        if self.residual_warmup > 0 and self.progress < self.residual_warmup:
+            residual = residual * (self.progress / self.residual_warmup)
         if self.training and self.residual_dropout > 0:  # drop the residual path for whole segments
             n_seg = ctx.cu_seqlens.numel() - 1
             keep = (torch.rand(n_seg, device=residual.device) >= self.residual_dropout).to(residual.dtype)
