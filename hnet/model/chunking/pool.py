@@ -61,6 +61,12 @@ class PoolChunker(nn.Module):
         return float(f)
 
     def forward(self, h: torch.Tensor, boundary_mask: torch.Tensor, ctx: SeqCtx) -> Tuple[torch.Tensor, SeqCtx]:
+        # The segment reductions run in fp32 with autocast off: under autocast a matmul gives bf16 while exp gives
+        # fp32, and index_add_ requires equal dtypes.
+        with torch.autocast(device_type=h.device.type, enabled=False):
+            return self._forward(h, boundary_mask, ctx)
+
+    def _forward(self, h: torch.Tensor, boundary_mask: torch.Tensor, ctx: SeqCtx) -> Tuple[torch.Tensor, SeqCtx]:
         csum, idx, ctx_inner = select_positions(boundary_mask, ctx)
         M = idx.numel()
         chunk_id = csum - boundary_mask.long()  # end semantics: chunk j = (end_{j-1}, end_j]
@@ -75,15 +81,15 @@ class PoolChunker(nn.Module):
             pooled = torch.zeros(M, hf.shape[-1], device=h.device, dtype=hf.dtype).index_add_(0, cid, hf * w[:, None])
             pooled = pooled / count.clamp(min=1.0)[:, None]
         else:
-            k = self.k_proj(h).float()
-            v = self.v_proj(h).float()
+            k = self.k_proj(hf)
+            v = self.v_proj(hf)
             score = (k @ self.query.float()) / math.sqrt(self.d_model)
             score = torch.where(valid, score, torch.full_like(score, -1e4))
             smax = torch.full((M,), -1e4, device=h.device, dtype=score.dtype)
             smax = smax.scatter_reduce(0, cid, score, reduce="amax", include_self=True).detach()
             e = torch.exp(score - smax[cid]) * valid.to(score.dtype)
             z = torch.zeros(M, device=h.device, dtype=score.dtype).index_add_(0, cid, e)
-            wgt = e / z.clamp(min=1e-20)[cid]
+            wgt = e / z.clamp(min=1e-12)[cid]
             pooled = torch.zeros(M, hf.shape[-1], device=h.device, dtype=hf.dtype).index_add_(0, cid, v * wgt[:, None])
-        x = h.index_select(0, idx) + self.proj(pooled.to(h.dtype))
-        return x, ctx_inner
+        x = hf.index_select(0, idx) + self.proj(pooled)
+        return x.to(h.dtype), ctx_inner

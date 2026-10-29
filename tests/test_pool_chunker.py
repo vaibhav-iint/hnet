@@ -96,3 +96,15 @@ def test_full_model_is_causal_with_pooling():
 def test_pool_refuses_start_semantics():
     with pytest.raises(AssertionError, match="requires 'end'"):
         build_model(_cfg("pool", "mean", router="cosine_lookahead"))
+
+
+@pytest.mark.parametrize("mode", ["mean", "attn"])
+def test_pooling_under_bf16_autocast(mode):
+    """The GPU runs train under bf16 autocast; the segment reductions must not mix dtypes (EXP-012 crash)."""
+    torch.manual_seed(0)
+    m = build_model(_cfg("pool", mode))
+    ids = torch.randint(0, 256, (2, 128))
+    with torch.autocast("cpu", dtype=torch.bfloat16):
+        out = m(ids, labels=ids)
+    (out.loss + out.aux_loss).backward()
+    assert torch.isfinite(out.loss)
