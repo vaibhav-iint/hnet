@@ -131,6 +131,42 @@ def grad_snr(model, docs, k: int = 8, per: int = 6):
     return res
 
 
+def ce_vs_router_shift(model, docs):
+    """dCE/db for a uniform shift b of each stage's boundary logits (b = 0): negative means the LM loss itself
+    pulls the router toward MORE boundaries (more positions, more compute), which the ratio loss must resist."""
+    model.eval()
+    stages = [st for st in model.backbone.stages() if not st.is_innermost]
+    biases = [torch.zeros((), requires_grad=True) for _ in stages]
+    hooks = []
+    for st, b in zip(stages, biases):
+        orig = st.routing_module.forward
+
+        def fwd(h, ctx, _orig=orig, _b=b, **kw):
+            r = _orig(h, ctx, **kw)
+            from hnet.model.routing.base import router_output
+
+            p = torch.sigmoid(torch.logit(r.p.clamp(1e-6, 1 - 1e-6)) + _b)
+            out = router_output(p, ctx, r.semantics)
+            out.extra = r.extra
+            return out
+
+        st.routing_module.forward = fwd
+        hooks.append(st)
+    try:
+        ids, cu, ml = _pack(docs[:16], "cpu")
+        labels = torch.roll(ids, -1)
+        labels[(cu[1:] - 1).long()] = -100
+        out = model(ids, cu_seqlens=cu, max_seqlen=ml, labels=labels)
+        grads = torch.autograd.grad(out.loss, biases, allow_unused=True, retain_graph=True)
+        aux = torch.autograd.grad(out.aux_loss, biases, allow_unused=True) if out.aux_loss.requires_grad else [None] * len(biases)
+    finally:
+        for st in hooks:
+            del st.routing_module.forward
+    return {f"s{st.stage_idx}": {"dCE/dshift": None if g is None else round(float(g), 5),
+                                 "dAux/dshift": None if a is None else round(float(a), 5)}
+            for st, g, a in zip(stages, grads, aux)}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("run")
@@ -147,7 +183,8 @@ def main(argv=None):
     rep = {"checkpoint": meta["checkpoint"], "weight_drift": drift(trained, init),
            "main_output_similarity": output_similarity(trained, init, docs),
            "grad_norm_by_loss": grad_decomposition(trained, docs),
-           "grad_snr_ce": grad_snr(trained, docs)}
+           "grad_snr_ce": grad_snr(trained, docs),
+           "router_shift": ce_vs_router_shift(trained, docs)}
     txt = json.dumps(rep, indent=1)
     if a.out:
         open(a.out, "w").write(txt)
