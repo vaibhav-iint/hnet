@@ -314,3 +314,26 @@ variance / total variance of the stage-0 logit · arms `cons1`, `cons10`, `cons1
 ± 0.005: neutral on average with a larger seed spread (two seeds −0.02, one +0.04); main-network contribution 0.02–0.06
 (baseline 0.03). `cons10_vocab_pred` pending. Consistency can be imposed on a character-pair tokenizer without cost,
 but it does not by itself make the second level useful at (3,3); the word-scale line (EXP-018/023) is where the gain is.*
+
+## EXP-021 · (stopped) word-scale vocabulary with the median/MAD decider
+
+*Stopped at step ~1000: the MAD of a word tokenizer's boundary scores is ~0 (5/6 identical "not a boundary" logits),
+1/σ blew up the gradient and seed 0 diverged (work log). Replaced by EXP-023.*
+
+## EXP-023 · Word-scale chunk vocabulary, trimmed-statistics rank decider (+ n-gram tables, + residual warmup)
+
+*spec `exp023_word_vocab_trimmed.yaml` · 1-stage ratio 6, end_mlp, rank decisions on trimmed-standardized scores,
+chunk vocabulary (2 × 65536 × 96) + next-chunk objective (w 0.5, 1024 candidates) · 3 seeds · baseline EXP-018
+`h1_quant` 1.853 · status: `vp` and `vp_ng` done, `vp_rwarm` finishing*
+
+| arm | val bpb (s0 / s1 / s2) | main-network contribution | vs baseline |
+|---|---|---|---|
+| `vp` vocabulary + prediction | **1.732 / 1.855 / 1.733** | 0.72 / 0.18 / 0.64 | −0.12 / 0.00 / −0.11 |
+| `vp_ng` + byte n-gram tables | **1.720 / 1.669 / 1.656** | 0.09 / 0.41 / 0.42 | BPE is 1.634 ± 0.002 |
+| EXP-018 `h1_vocab_pred` (same arm, mean/std decider) | 1.720 / 1.863 / 1.737 | 0.75 / 0.13 / 0.55 | replication |
+
+- `vp` replicates EXP-018 seed by seed, including the non-adoption of seed 1 with a different decider: adoption is
+  decided by the seed's initialization / data order, early (steps 200–600), not by the score-scale pathology.
+- `vp_ng`: the adopted seeds are 0.02–0.035 bpb from BPE at identical training FLOPs, with a learned word tokenizer
+  and a main network that carries 0.42 bpb. The two parameter-side memories are complementary: n-gram tables give
+  the byte stage local identity, the chunk table gives the hierarchy word identity.
