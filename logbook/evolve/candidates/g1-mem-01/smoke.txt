@@ -1,0 +1,29 @@
+# g1-mem-01 CPU smoke (python -m hnet.train.train, fp32, no compile).
+# (a) The L03 candidate model itself (configs/evolve/models/g1-mem-01.yaml, 20,022,761 params, FLOPs/byte 20.48M) on
+#     mix_v1_small, 2 x 8512-byte windows/step, Muon 0.02: step 2 bpb 7.66, compression 4.14 (target 4.145),
+#     trie/bonus_rms 0.076, prefix_len 2.7; then the process was OOM-killed (exit 137; 70 s/step, the shared 15 GB box
+#     had ~10 GB in other agents' jobs). The mix_v1 train shards are not local, so per docs/EVOLVE.md the full smoke
+#     uses the tiny config:
+# (b) tiny_hnet1_2m + end_mlp + quantile + chunk vocab (2 x 8191, pred 0.5) + n-grams 3..8 + whitespace warm start
+#     + trie_head {rows 49157, dim 32, n_hash 2, max_len 16, query main}, mix_v1_small, 4 x 2048 bytes/step, 30 steps
+#     (log below): train bpb 7.30 -> 3.79, no NaN, compression 5.98 (target 6.0); trie/bonus_rms 0.48 (step 3) ->
+#     1.0-2.0 (steps 15-30). Ablation on the step-30 checkpoint (8 x 2048 bytes of mix_v1_small val-en): bpb 4.597
+#     with the trie, 4.919 with its tables zeroed: after 30 steps the trie path already carries 0.32 bpb.
+#     Command: python -m hnet.train.train --config configs/runs/tiny_hnet1_2m.yaml --set model.dc.router=end_mlp
+#       model.dc.decision=quantile 'model.dc.chunk_vocab=[{buckets: 8191, n_hash: 2, max_len: 16, pred_weight: 0.5,
+#       n_neg: 1024}]' 'model.ngram_embed={ns: [3, 4, 5, 6, 7, 8], buckets: 4093}'
+#       'model.trie_head={rows: 49157, dim: 32, n_hash: 2, max_len: 16, query: main}' model.dc.router_prior_weight=1.0
+#       data.dataset=mix_v1_small data.micro_batch=4 data.batch_bytes=8192 train.train_tokens=null
+#       train.train_bytes=245760 eval.every=0 eval.at_end=false train.compile=false train.precision=fp32 log.every=3
+[train] {"params": 14478657, "params_by_stage": {"0": 7658401, "1": 6820256}, "lr_multipliers": {"0": 3.3248, "1": 0.8312}, "kind": "bytes", "seq_len": 2048, "windows_per_step": 4, "micro_batch": 4, "grad_accum": 1, "world_size": 1, "total_steps": 30, "est_tokens_eq_per_step": 1976.2226277926993, "flops_per_byte@target": 11879808.666666664}
+step 3 | loss 8.483 | ce 5.063 | bpb 7.304 | aux_loss 3.42 | grad_norm 2.447 | lr 0.0015 | tokens_eq 5925 | bytes_per_sec 144 | step_time 56.87 | comp 5.98
+step 6 | loss 6.401 | ce 3.173 | bpb 4.577 | aux_loss 3.228 | grad_norm 1.492 | lr 0.0015 | tokens_eq 1.185e+04 | bytes_per_sec 253.3 | step_time 32.33 | comp 5.98
+step 9 | loss 6.958 | ce 3.649 | bpb 5.264 | aux_loss 3.31 | grad_norm 0.8338 | lr 0.0015 | tokens_eq 1.778e+04 | bytes_per_sec 357.1 | step_time 22.93 | comp 5.98
+step 12 | loss 6.786 | ce 3.458 | bpb 4.989 | aux_loss 3.328 | grad_norm 0.6478 | lr 0.0015 | tokens_eq 2.37e+04 | bytes_per_sec 299.7 | step_time 27.32 | comp 5.98
+step 15 | loss 6.404 | ce 3.125 | bpb 4.509 | aux_loss 3.279 | grad_norm 0.5628 | lr 0.0015 | tokens_eq 2.963e+04 | bytes_per_sec 286.3 | step_time 28.6 | comp 5.98
+step 18 | loss 6.755 | ce 3.577 | bpb 5.161 | aux_loss 3.178 | grad_norm 1.442 | lr 0.0015 | tokens_eq 3.555e+04 | bytes_per_sec 312.8 | step_time 26.17 | comp 5.98
+step 21 | loss 5.624 | ce 2.619 | bpb 3.778 | aux_loss 3.005 | grad_norm 0.6164 | lr 0.0015 | tokens_eq 4.148e+04 | bytes_per_sec 318.2 | step_time 25.75 | comp 5.98
+step 24 | loss 6.303 | ce 3.127 | bpb 4.512 | aux_loss 3.175 | grad_norm 1.382 | lr 0.0015 | tokens_eq 4.741e+04 | bytes_per_sec 365.7 | step_time 22.39 | comp 5.98
+step 27 | loss 6.117 | ce 3.074 | bpb 4.434 | aux_loss 3.043 | grad_norm 0.9176 | lr 0.0004393 | tokens_eq 5.333e+04 | bytes_per_sec 368.8 | step_time 22.2 | comp 5.98
+step 30 | loss 5.749 | ce 2.628 | bpb 3.792 | aux_loss 3.121 | grad_norm 0.9415 | lr 0 | tokens_eq 5.926e+04 | bytes_per_sec 376.7 | step_time 21.73 | comp 5.98
+[train] saved /tmp/claude-0/-home-user-hnet-smollm3/e0ec0617-4cec-5bc8-abcc-216d4a655704/scratchpad/smoke1t/ckpt/step_0000030

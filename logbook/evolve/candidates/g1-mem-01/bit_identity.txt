@@ -1,0 +1,8 @@
+# Default-config forward of this branch vs the starting commit b9b4cb2, bit for bit.
+# Model: configs/models/tiny_hnet1_2m.yaml + end_mlp + quantile + chunk vocab (2 x 4096, pred 0.5) + n-grams (3,4,5),
+# seed 0, tables re-drawn N(0, 0.3), 2 SGD steps, then an eval forward (no trie_head: the flag is off).
+# Script: a one-off (scratchpad bitid.py): build, init, train 2 steps, sha256 of the eval logits.
+b9b4cb2 (parent, git archive):        loss=5.5590052605  aux=2.3363256454  logits_sha256=9c2f8b9767ad9855
+evolve/g1-mem-01 (f5202cd, archive):  loss=5.5590052605  aux=2.3363256454  logits_sha256=9c2f8b9767ad9855
+# In-suite: tests/test_trie_head.py::test_default_config_has_no_trie_head_and_unchanged_state_dict and
+# ::test_zero_tables_leave_the_logits_of_the_default_model_unchanged (flag on with zero tables == default logits).

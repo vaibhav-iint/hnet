@@ -76,6 +76,18 @@ def objective_terms(model, out, ids) -> Dict[str, torch.Tensor]:
 
         _, ctx, _ = pack_inputs(ids.unsqueeze(0), None, None)
         terms["router_gain/s0"] = model._router_gain_loss(model._audit_h, out.bpred[0], ctx, ids)[0]
+    th = getattr(model, "trie_head", None)
+    if th is not None and out.bpred and getattr(model, "_audit_h", None) is not None:
+        # the byte CE through the trie bonus only (the LM-head logits detached): where the trie path reaches
+        from hnet.model.lm import pack_inputs
+
+        shape = getattr(model, "_audit_shape", None)
+        _, ctx, _ = pack_inputs(ids.view(shape) if shape is not None else ids.unsqueeze(0), None, None)
+        r0 = out.bpred[0]
+        q = r0.main_out if th.query == "main" else model._audit_h
+        bonus, _ = th(q, ids, ctx, r0.boundary_mask)
+        logits = model.lm_head(model._audit_h).float().detach() + bonus
+        terms["byte_ce_via_trie"] = torch.nn.functional.cross_entropy(logits, ids)
     return terms
 
 
@@ -97,7 +109,7 @@ def grad_table(model, terms: Dict[str, torch.Tensor], groups: Dict[str, List[tor
 
 def mechanism_metrics(out) -> Dict[str, float]:
     keep = ("compression/", "p_mid/", "p_margin/", "dechunk_rms/", "residual_rms/", "score_std/", "tau/", "F/", "G/",
-            "residual_gate/")
+            "residual_gate/", "trie/")
     m = {k: float(v) for k, v in out.stats.items() if k.startswith(keep)}
     for s, r in enumerate(out.bpred):
         m[f"boundary_frac/s{s}"] = float(r.boundary_mask.float().mean())
@@ -121,6 +133,7 @@ def audit(cfg: HNetConfig, ids: torch.Tensor, steps: int = 0, lr: float = 1e-2, 
     hook = model.backbone.register_forward_hook(lambda mod, args, res: setattr(model, "_audit_h", res[0]))
     out = model(ids, labels=ids)
     hook.remove()
+    model._audit_shape = tuple(ids.shape)
     flat = ids.reshape(-1)
     terms = objective_terms(model, out, flat)
     groups = param_groups(model)

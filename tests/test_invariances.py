@@ -15,13 +15,22 @@ VARIANTS = {
     "end_mlp_quantile_vocab": {"router": "end_mlp", "decision": "quantile",
                                "chunk_vocab": [{"buckets": 4096, "n_hash": 2, "max_len": 16, "pred_weight": 0.5,
                                                 "n_neg": 256}]},
+    # model-level (non-dc) options go under "_model"
+    "end_mlp_quantile_vocab_trie": {"router": "end_mlp", "decision": "quantile",
+                                    "chunk_vocab": [{"buckets": 4096, "n_hash": 2, "max_len": 16, "pred_weight": 0.5,
+                                                     "n_neg": 256}],
+                                    "_model": {"trie_head": {"rows": 4099, "dim": 16, "n_hash": 2, "max_len": 8}}},
 }
 
 
 def _model(name, ngram=False):
     cfg = model_config_from_yaml("configs/models/tiny_hnet1_2m.yaml")
     for k, v in VARIANTS[name].items():
-        setattr(cfg.dc, k, v)
+        if k == "_model":
+            for mk, mv in v.items():
+                setattr(cfg, mk, mv)
+        else:
+            setattr(cfg.dc, k, v)
     if ngram:
         cfg.ngram_embed = {"ns": [3, 4, 5], "buckets": 1024}
     torch.manual_seed(0)

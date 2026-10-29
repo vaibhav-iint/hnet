@@ -156,9 +156,21 @@ def lm_outputs(
     labels: Optional[torch.Tensor],
     return_logits: bool,
     batch_shape: Optional[Tuple[int, int]],
+    logit_bias: Optional[torch.Tensor] = None,
 ) -> CausalLMOutput:
-    """Logits and/or CE from final hidden states h [T, D]."""
+    """Logits and/or CE from final hidden states h [T, D]. ``logit_bias`` [T, V] (fp32), if given, is added to the
+    logits (HNetConfig.trie_head); the logits are then materialized in fp32."""
     out = CausalLMOutput()
+    if logit_bias is not None:
+        logits = head(h).float() + logit_bias
+        if labels is not None:
+            labels = labels.reshape(-1)
+            out.ce_sum = F.cross_entropy(logits, labels, ignore_index=IGNORE_INDEX, reduction="sum")
+            out.n_targets = (labels != IGNORE_INDEX).sum()
+            out.loss = out.ce_sum / out.n_targets.clamp(min=1)
+        if return_logits:
+            out.logits = logits.view(*batch_shape, -1) if batch_shape is not None else logits
+        return out
     if return_logits:
         out.logits = head(h)
     if labels is not None:
@@ -186,6 +198,12 @@ class HNetForCausalLM(nn.Module):
         self.backbone = HNet(cfg, stage_idx=0)
         self.lm_head = nn.Linear(d0, cfg.vocab_size, bias=False)
         self.main_aux_head = nn.Linear(d0, cfg.vocab_size, bias=False) if cfg.dc.main_aux_weight > 0 else None
+        self.trie_head = None
+        if cfg.trie_head:
+            from .trie_head import TrieHead
+
+            assert cfg.n_stages > 0, "trie_head needs a hierarchy (its prefixes are the stage-0 chunks in progress)"
+            self.trie_head = TrieHead(d0, cfg.vocab_size, **cfg.trie_head)
         self.chunk_pred_head = None
         if cfg.dc.chunk_pred_k > 0:
             assert cfg.dc.chunk_pred_weight > 0 and cfg.n_stages > 0, "chunk_pred_k needs a weight and a hierarchy"
@@ -231,7 +249,13 @@ class HNetForCausalLM(nn.Module):
                              max(st.chunk_vocab.max_len for st in vocab_stages))
             binfo = ByteInfo(bank, torch.arange(ids.numel(), device=ids.device))
         h, bpred = self.backbone(x, ctx, input_ids=ids, boundaries=boundaries, binfo=binfo)
-        out = lm_outputs(h, self.lm_head, labels, return_logits, batch_shape)
+        trie_bias = trie_len = None
+        if self.trie_head is not None:
+            r0 = bpred[0]
+            assert r0.semantics == "end", "trie_head needs 'end' boundary semantics at stage 0"
+            q = r0.main_out if self.trie_head.query == "main" else h
+            trie_bias, trie_len = self.trie_head(q, ids, ctx, r0.boundary_mask)
+        out = lm_outputs(h, self.lm_head, labels, return_logits, batch_shape, logit_bias=trie_bias)
         out.bpred = bpred
         aux_terms = self.backbone.aux_losses(bpred)
         out.aux_loss = self.config.dc.ratio_loss_alpha * sum(loss for loss, _ in aux_terms)
@@ -255,6 +279,10 @@ class HNetForCausalLM(nn.Module):
                     vocab_ce[st.stage_idx] = cv.pred_loss(r.inner_out, r.vocab_tgt)
                     out.aux_loss = out.aux_loss + cv.pred_weight * vocab_ce[st.stage_idx]
         stats = {"positions/s0": ids.new_full((), ids.numel(), dtype=torch.float32)}
+        if trie_bias is not None:
+            with torch.no_grad():
+                stats["trie/bonus_rms"] = trie_bias.detach().pow(2).mean().sqrt()
+                stats["trie/prefix_len"] = trie_len.float().mean()
         stats.update({f"chunk_vocab_ce/s{s}": v.detach() for s, v in vocab_ce.items()})
         if dc.router_prior_weight > 0 and self.training and bpred and bpred[0].logit is not None:
             prog = self.backbone.progress
@@ -300,6 +328,8 @@ class HNetForCausalLM(nn.Module):
             nn.init.normal_(self.main_aux_head.weight, std=std)
         if self.chunk_pred_head is not None:
             nn.init.normal_(self.chunk_pred_head.weight, std=std)
+        if self.trie_head is not None:
+            self.trie_head.reset_parameters()
         nn.init.normal_(self.embeddings.weight, std=1.0)
         if self.ngram_embeddings is not None:
             self.ngram_embeddings.reset_parameters()
@@ -384,7 +414,8 @@ class HNetForCausalLM(nn.Module):
         """Stage index owning parameter ``name`` (DDP ``module.`` / compile ``_orig_mod.`` prefixes allowed);
         embeddings and lm_head belong to stage 0."""
         name = name.replace("_orig_mod.", "").removeprefix("module.")
-        if name.startswith(("embeddings.", "ngram_embeddings.", "lm_head.", "main_aux_head.", "chunk_pred_head.")):
+        if name.startswith(("embeddings.", "ngram_embeddings.", "lm_head.", "main_aux_head.", "chunk_pred_head.",
+                            "trie_head.")):
             return 0
         return self._param_stage[name]
 
