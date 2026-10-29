@@ -1,0 +1,30 @@
+{
+ "checkpoint": "runs/gcp/exp002_tiny2m/paper_s0/ckpt/step_0001763",
+ "semantics": "start",
+ "positions": 27719,
+ "b1": {
+  "unigram_bits": 4.834,
+  "from_x_bits": 0.455,
+  "from_z_bits": 1.614
+ },
+ "b2": {
+  "unigram_bits": 3.458,
+  "from_x_bits": 1.682,
+  "from_z_bits": 2.228
+ },
+ "blast": {
+  "unigram_bits": 4.414,
+  "from_x_bits": 4.105,
+  "from_z_bits": 4.129
+ },
+ "len": {
+  "unigram_bits": 3.639,
+  "from_x_bits": 3.438,
+  "from_z_bits": 3.445
+ },
+ "next1": {
+  "unigram_bits": 4.628,
+  "from_x_bits": 4.238,
+  "from_z_bits": 4.213
+ }
+}

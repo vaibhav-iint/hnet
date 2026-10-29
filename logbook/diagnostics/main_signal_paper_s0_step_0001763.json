@@ -1,0 +1,60 @@
+{
+ "checkpoint": "runs/gcp/exp002_tiny2m/paper_s0/ckpt/step_0001763",
+ "weight_drift": {
+  "main": 0.7685,
+  "stage1_encdec": 0.986,
+  "stage0_encdec": 1.2535,
+  "router": 1.21,
+  "residual_proj": 16.1133
+ },
+ "main_output_similarity": {
+  "cos(x, z)": 0.1323,
+  "cos(z_init, z)": 0.1332,
+  "||z - x|| / ||x||": 1.4539
+ },
+ "grad_norm_by_loss": {
+  "ce": {
+   "main": 0.02038,
+   "stage1_encdec": 0.11221,
+   "stage0_encdec": 0.25789,
+   "router": 0.0041,
+   "residual_proj": 0.09228
+  },
+  "aux": {
+   "main": 0.0,
+   "stage1_encdec": 0.00068,
+   "stage0_encdec": 0.00108,
+   "router": 0.00029,
+   "residual_proj": 0.0
+  }
+ },
+ "grad_snr_ce": {
+  "_bytes_per_batch": 5503,
+  "_k": 8,
+  "main": {
+   "signal_norm": 0.00147,
+   "noise_norm_per_batch": 0.01841,
+   "snr_at_131k_bytes": 0.389
+  },
+  "stage1_encdec": {
+   "signal_norm": 0.01072,
+   "noise_norm_per_batch": 0.10856,
+   "snr_at_131k_bytes": 0.482
+  },
+  "stage0_encdec": {
+   "signal_norm": 0.01233,
+   "noise_norm_per_batch": 0.24291,
+   "snr_at_131k_bytes": 0.248
+  },
+  "router": {
+   "signal_norm": 0.00027,
+   "noise_norm_per_batch": 0.00443,
+   "snr_at_131k_bytes": 0.295
+  },
+  "residual_proj": {
+   "signal_norm": 0.00735,
+   "noise_norm_per_batch": 0.0874,
+   "snr_at_131k_bytes": 0.411
+  }
+ }
+}

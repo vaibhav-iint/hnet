@@ -212,6 +212,21 @@ def _router_from_registry(name, d, kwargs, target_ratio):
     return _ROUTER_CACHE[key]
 
 
+def _chunker_counts(name: str, d: int, kwargs: dict, target_ratio: float):
+    """(params, forward FLOPs per outer position) of a chunker; ``select`` has neither."""
+    import torch
+
+    import hnet.model  # noqa: F401
+    from hnet.registry import build
+
+    with torch.device("meta"):
+        c = build("chunker", name, d, **(kwargs or {}))
+    if not isinstance(c, torch.nn.Module):
+        return 0, 0.0
+    fl = c.flops_per_position(d, target_ratio, **(kwargs or {}))
+    return sum(x.numel() for x in c.parameters()), float(fl)
+
+
 def _router_counts(name: str, d: int, kwargs: dict, target_ratio=None):
     p = _router_from_registry(name, d, kwargs, target_ratio)
     if p is None:
@@ -336,6 +351,10 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
             comp_f["router"] = rf if cv.count_dc else 0.0
             comp_p["residual_proj"] = d * d + d
             comp_f["residual_proj"] = 2 * d * d if cv.count_residual_proj else 0.0
+            cp, cf = _chunker_counts(dcs["chunker"], d, dcs.get("chunker_kwargs") or {}, dcs["target_ratio"])
+            if cp:
+                comp_p["chunker"] = cp
+                comp_f["chunker"] = cf if cv.count_dc else 0.0
         else:
             assert len(layout) == 1, layout
             comp_p["main"], comp_f["main"] = _iso(cfg, s, layout[0], L, cv)

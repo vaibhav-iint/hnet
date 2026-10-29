@@ -7,7 +7,7 @@
 #   Phase 3 (40+): the residual path grows and overtakes the hierarchy signal (~step 80); routers drift to p ~ 0.5.
 # Arms: strong ratio loss (alpha 1.0, the blog's "strong auxiliary loss"); identity-init residual; both; and the
 # outer Mamba-2 layers replaced by FLOP-matched sliding-window attention (windows 256 / 384, +1.1%) or by Kimi Delta
-# Attention (expand_v 1.375, -0.8%).
+# Attention (expand_v 1.5 / 1.25 per stage: value channels must be multiples of 8 for causal_conv1d; +0.3%).
 name: exp010_dynamics_and_mixers
 out_root: runs/search/exp010_dynamics_and_mixers
 gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp010_dynamics_and_mixers
@@ -28,4 +28,4 @@ runs:
   - {name: swa,             config: configs/runs/tiny_hnet2_2m.yaml,
      set: ["model.mixer_codes={m: attn, t: attn}", "model.attn.window_size=[256, 384, -1]"]}
   - {name: kda,             config: configs/runs/tiny_hnet2_2m.yaml,
-     set: ["model.mixer_codes={m: kda, t: attn}", "model.mixer_cfg={kda: {expand_v: 1.375}}"]}
+     set: ["model.mixer_codes={m: kda, t: attn}", "model.mixer_cfg={kda: [{expand_v: 1.5}, {expand_v: 1.25}, {}]}"]}

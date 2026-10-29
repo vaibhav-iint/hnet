@@ -84,7 +84,11 @@ class HNet(nn.Module):
             self.routing_module = registry.build(
                 "router", dc["router"], d, target_ratio=dc["target_ratio"], **(dc["router_kwargs"] or {})
             )
-            self.chunk_layer = registry.build("chunker", dc["chunker"])
+            self.chunk_layer = registry.build("chunker", dc["chunker"], d, **(dc["chunker_kwargs"] or {}))
+            need = getattr(self.chunk_layer, "requires_semantics", None)
+            have = self.routing_module.boundary_semantics
+            assert need is None or need == have, (
+                f"chunker {dc['chunker']!r} requires {need!r} boundary semantics, router {dc['router']!r} has {have!r}")
             self.dechunk_layer = registry.build("dechunker", dc["dechunker"])
             self.residual_proj = nn.Linear(d, d, dtype=torch.float32)
             assert cfg.dc.residual_init in ("zero", "identity"), cfg.dc.residual_init

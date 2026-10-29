@@ -510,3 +510,32 @@ on the main network's input x and output z at every innermost position, target =
   auxiliary head; EXP-008/011) rather than widen the decoder.
 - Caveat: the end_mlp probe targets differ (end-of-chunk anchor → the first byte of the next chunk, a harder,
   higher-entropy target: unigram 4.92 vs 3.98), so the two rows are not comparable to each other, only within row.
+
+### Finding: the chunk vector is a boundary *state*, not a chunk *summary* (`probe_main.py --identity`)
+Probes from the innermost main network's input x (the chunk vector) to the bytes of the chunk it represents, on
+27–33k held-out positions (logbook/diagnostics/probe_identity_*.json):
+
+| model (semantics) | target | unigram | linear from x | MLP from x | linear from z (main output) |
+|---|---|---|---|---|---|
+| paper_s0 (start) | first byte of its chunk | 4.83 | **0.46** | – | 1.61 |
+| paper_s0 (start) | last byte of its chunk | 4.41 | 4.11 | – | 4.13 |
+| end_mlp_s1 (end) | last byte of its chunk | 2.01 | **0.18** | 0.08 | 0.58 |
+| end_mlp_s1 (end) | first byte of its chunk | 4.76 | 3.60 | **3.26** | 3.81 |
+| end_mlp_s1 (end) | second byte | 4.21 | 3.32 | 2.99 | 3.48 |
+| end_mlp_s1 (end) | chunk length (1–16) | 3.64 | 2.95 | 2.51 | 3.07 |
+
+- The vector handed to the main network is the encoder's residual-stream state at the boundary byte. It encodes
+  that byte almost losslessly and the rest of the chunk barely (only ~1.5 of 4.8 bits about the first byte of a
+  ~9-byte chunk, even with a nonlinear probe). **The main network does not know which word it is looking at**, so
+  it cannot do word-level language modelling, which is where the whole gap to BPE sits (84% of the gap is in the
+  letters of "space+word" tokens). The BPE model's input, by contrast, is the token's identity.
+- With the paper's "start" semantics the vector encodes the chunk's *first* byte and nothing of its content, which
+  can only arrive one chunk later: a built-in one-chunk lag for within-chunk prediction.
+- Also: the main network's output z encodes *less* of everything than its input (the 7-layer stack destroys the
+  identity information it was given), and its gradient SNR at the training batch size is normal (2.4 at step 500 vs
+  1.9 for stage 0; `main_signal.py`), so this is not a noisy-gradient problem: the main network is trained on a signal
+  that contains little word identity.
+- Fix to test next: a **pooling chunker**. The chunk vector becomes a learned summary over all bytes of the chunk
+  (mean or attention pooling of encoder states within the chunk, plus the boundary state), so the main network's
+  input carries the chunk's identity. This is BLT's byte→patch cross-attention in H-Net clothing, and it is natural
+  only with "end" semantics (the chunk must be complete when its vector is formed).

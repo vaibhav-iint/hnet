@@ -1,0 +1,39 @@
+{
+ "checkpoint": "runs/gcp/exp002_tiny2m/end_mlp_s1/ckpt/step_0001763",
+ "weight_drift": {
+  "main": 0.822,
+  "stage1_encdec": 1.0066,
+  "stage0_encdec": 1.2354,
+  "router": 0.953,
+  "residual_proj": 16.1752
+ },
+ "main_output_similarity": {
+  "cos(x, z)": 0.1663,
+  "cos(z_init, z)": 0.1673,
+  "||z - x|| / ||x||": 1.4412
+ },
+ "grad_norm_by_loss": {
+  "ce": {
+   "main": 0.02695,
+   "stage1_encdec": 0.11415,
+   "stage0_encdec": 0.24802,
+   "router": 0.01142,
+   "residual_proj": 0.09282
+  },
+  "aux": {
+   "main": 0.0,
+   "stage1_encdec": 9e-05,
+   "stage0_encdec": 0.0014,
+   "router": 0.00144,
+   "residual_proj": 0.0
+  }
+ },
+ "grad_snr_ce": {
+  "main": 0.3687,
+  "stage1_encdec": 0.3647,
+  "stage0_encdec": 0.3591,
+  "router": 0.4035,
+  "residual_proj": 0.3546,
+  "_noise_floor": 0.3536
+ }
+}

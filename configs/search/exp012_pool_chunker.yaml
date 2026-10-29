@@ -1,0 +1,27 @@
+# EXP-012: chunk vectors that summarize the chunk (hnet/model/chunking/pool.py). Diagnosis (logbook, "boundary
+# state, not a chunk summary"): with the end-of-chunk router the main network's input encodes the boundary byte
+# almost losslessly and the rest of the chunk barely, so it cannot do word-level LM. Arms (tiny 2-stage (3,3),
+# end-of-chunk MLP router, same budget as EXP-002/006/008): select (baseline, = EXP-002 end_mlp re-run with 3 seeds),
+# mean pooling (+0.3% FLOPs), attention pooling (+1.6%), and attention pooling + residual warmup (the two fixes
+# target different failures: input identity and early starvation of the hierarchy).
+name: exp012_pool_chunker
+out_root: runs/search/exp012_pool_chunker
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp012_pool_chunker
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  baseline: select
+  labels: {select: "end-of-chunk MLP router, select chunker", pool_mean: "+ mean-pool chunk vectors",
+           pool_attn: "+ attention-pool chunk vectors", pool_attn_rwarm: "+ attention pool + residual warmup 20%"}
+runs:
+  - {name: select,          config: configs/runs/tiny_hnet2_2m.yaml}
+  - {name: pool_mean,       config: configs/runs/tiny_hnet2_2m.yaml,
+     set: [model.dc.chunker=pool, "model.dc.chunker_kwargs={mode: mean}"]}
+  - {name: pool_attn,       config: configs/runs/tiny_hnet2_2m.yaml,
+     set: [model.dc.chunker=pool, "model.dc.chunker_kwargs={mode: attn}"]}
+  - {name: pool_attn_rwarm, config: configs/runs/tiny_hnet2_2m.yaml,
+     set: [model.dc.chunker=pool, "model.dc.chunker_kwargs={mode: attn}", model.dc.residual_warmup=0.2]}

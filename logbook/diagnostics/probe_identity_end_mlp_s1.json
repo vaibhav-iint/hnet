@@ -1,0 +1,35 @@
+{
+ "checkpoint": "runs/gcp/exp002_tiny2m/end_mlp_s1/ckpt/step_0001763",
+ "semantics": "end",
+ "positions": 33281,
+ "b1": {
+  "unigram_bits": 4.756,
+  "from_x_bits": 3.599,
+  "from_z_bits": 3.805,
+  "from_x_mlp_bits": 3.256
+ },
+ "b2": {
+  "unigram_bits": 4.213,
+  "from_x_bits": 3.318,
+  "from_z_bits": 3.48,
+  "from_x_mlp_bits": 2.989
+ },
+ "blast": {
+  "unigram_bits": 2.005,
+  "from_x_bits": 0.178,
+  "from_z_bits": 0.575,
+  "from_x_mlp_bits": 0.075
+ },
+ "len": {
+  "unigram_bits": 3.637,
+  "from_x_bits": 2.947,
+  "from_z_bits": 3.067,
+  "from_x_mlp_bits": 2.513
+ },
+ "next1": {
+  "unigram_bits": 4.943,
+  "from_x_bits": 3.832,
+  "from_z_bits": 4.037,
+  "from_x_mlp_bits": 3.761
+ }
+}

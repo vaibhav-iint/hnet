@@ -129,7 +129,7 @@ class BaseScorer:
             tot[i] += lp
         return [(tot[i], len(t.encode("utf-8"))) for i, t in enumerate(texts)]
 
-    @torch.inference_mode()
+    @torch.no_grad()  # not inference_mode: compiled flex attention falls back to the O(T^2) eager path under it
     def score_sequences(self, seqs: List[List[int]], ncont: List[int], progress: bool = False):
         """Sum log p(seq[-n:]) given the prefix, for each (seq, n). Returns [(logprob, greedy)] in input order."""
         items = []
@@ -208,7 +208,8 @@ class ByteModelScorer(_OwnModelScorer):
     unit = "byte"
     name = "byte"
 
-    def __init__(self, model, bos_id: int = BOS_ID, max_len: int = 8192, batch_tokens: int = 32768, **kw):
+    # batch_tokens = the training micro-batch (16 x 2048 bytes): packed eval sequences never exceed what training ran
+    def __init__(self, model, bos_id: int = BOS_ID, max_len: int = 8192, batch_tokens: int = 16384, **kw):
         super().__init__(model, max_len=max_len, batch_tokens=batch_tokens, **kw)
         self.bos_id = bos_id
 
