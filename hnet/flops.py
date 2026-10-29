@@ -253,6 +253,21 @@ def _block_counts(mixer, mlp, d, f, kwargs, L, cv, cfg_ssm=None):
     return p, fl
 
 
+def attn_res_counts(height: int, block: int, d: int, cv: FlopsConvention):
+    """(params, forward FLOPs/position) of Block Attention Residuals on a stack of ``height`` sub-layers
+    (hnet.model.isotropic): height + 1 depth-attention operators, each a query vector and an RMSNorm weight. Operator
+    j (the output one is j = height) attends over 1 + ceil(j / block) sources; per source a 2d logit dot and a 2d
+    weighted sum, plus the RMSNorm and softmax elementwise work when counted. One source is a pass-through."""
+    if block <= 0:
+        return 0, 0.0
+    fl = 0.0
+    for j in range(height + 1):
+        n = 1 + -(-j // block)
+        if n > 1:
+            fl += 4 * d * n + ((4 * d + 3) * n if cv.count_elementwise else 0)
+    return 2 * d * (height + 1), fl
+
+
 def _iso(cfg: HNetConfig, s: int, code: str, L: float, cv: FlopsConvention):
     d, f = cfg.d_model[s], cfg.d_intermediate[s]
     from hnet.model.block import mixer_config_kwargs
@@ -271,7 +286,9 @@ def _iso(cfg: HNetConfig, s: int, code: str, L: float, cv: FlopsConvention):
         bp, bf = _block_counts(mixer, mlp, d, f, kw, L, cv, cfg.ssm)
         p += bp
         fl += bf
-    return p, fl
+    height = sum(2 if mlp and f else 1 for _, mlp in parse_layout(code))
+    ap, af = attn_res_counts(height, cfg.attn_res_for_stage(s), d, cv)
+    return p + ap, fl + af
 
 
 # ----------------------------------------------------------------------------- H-Net
@@ -350,6 +367,9 @@ def _dense(cfg: DenseConfig, seq_len, cv: FlopsConvention):
         "lm_head": 2 * V * d if cv.count_lm_head else 0.0,
         "body": cfg.n_layers * layer_f,
     }
+    ap, af = attn_res_counts(2 * cfg.n_layers if cfg.d_intermediate else cfg.n_layers, cfg.attn_res, d, cv)
+    comp_p["body"] += ap
+    comp_f["body"] += af
     return comp_p, comp_f
 
 

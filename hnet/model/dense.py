@@ -39,7 +39,7 @@ class LlamaLM(nn.Module):
         self.embeddings = nn.Embedding(cfg.vocab_size, cfg.d_model)
         self.backbone = Isotropic(
             f"T{cfg.n_layers}", cfg.d_model, cfg.d_intermediate, {"t": cfg.mixer}, {cfg.mixer: mixer_kwargs},
-            cfg.norm_eps,
+            cfg.norm_eps, attn_res=cfg.attn_res,
         )
         self.lm_head = nn.Linear(cfg.d_model, cfg.vocab_size, bias=False)
         if cfg.tie_embeddings:

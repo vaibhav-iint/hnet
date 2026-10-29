@@ -435,3 +435,15 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
   $9.26; fairness gate (tuned) reports no problems.
 - Babysitter (`launch/babysit.sh`) covers EXP-002 VM d and the EXP-003 VMs. It restarts a preempted VM in place, or
   recreates it in another zone from the exact `launch.py` create command.
+
+### Attention Residuals wired into configs, models and FLOPs
+- `HNetConfig.attn_res` (scalar or per-stage list: block size S, 0 = off) is passed to every Isotropic stack of the
+  stage. `DenseConfig.attn_res` does the same for the dense backbone.
+- `flops.attn_res_counts`:
+  - params: 2d(height+1);
+  - forward FLOPs: operator j attends over 1 + ⌈j/S⌉ sources at 4d per source, plus RMSNorm and softmax elementwise
+    work.
+- Tests (`tests/test_attn_res_wiring.py`): the parameter count equals the real model's for H-Net and dense with
+  S ∈ {0, 1, 3}; the FLOPs overhead is under 5%; the counts match a hand calculation; H-Net forward works with AttnRes
+  on in the main network only. Full suite: 603 passed.
+- It can now be added as an EXP-005 variant, e.g. `--set model.attn_res=[0,0,2]` for the main network only.

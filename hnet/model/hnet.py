@@ -61,7 +61,8 @@ class HNet(nn.Module):
         mixer_kwargs = {name: mixer_config_kwargs(name, cfg, stage_idx) for name in set(codes.values())}
 
         def iso(lay):
-            return Isotropic(lay, d, cfg.d_intermediate[stage_idx], codes, mixer_kwargs, cfg.norm_eps)
+            return Isotropic(lay, d, cfg.d_intermediate[stage_idx], codes, mixer_kwargs, cfg.norm_eps,
+                             attn_res=cfg.attn_res_for_stage(stage_idx))
 
         if self.is_innermost:
             self.main_network = iso(layout[0])

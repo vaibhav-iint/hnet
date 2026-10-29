@@ -105,6 +105,12 @@ class HNetConfig:
     # Extra constructor kwargs per mixer registry name, e.g. {"mla": {"kv_lora_rank": 64}}. A value may itself be a
     # per-stage list. Merged on top of the mixer's own ``config_kwargs(cfg, stage)``.
     mixer_cfg: dict = field(default_factory=dict)
+    # Block Attention Residuals (Kimi, arXiv 2603.15031) in every isotropic stack of a stage: 0 = standard residuals,
+    # S > 0 = softmax attention over depth with blocks of S sub-layers (1 = Full AttnRes). Scalar or per-stage list.
+    attn_res: Any = 0
+
+    def attn_res_for_stage(self, s: int) -> int:
+        return int(_per_stage(self.attn_res, self.n_stages + 1, "attn_res")[s])
 
     def mixer_codes_for_stage(self, s: int) -> dict:
         codes = self.mixer_codes
@@ -227,6 +233,7 @@ class DenseConfig:
     initializer_range: float = 0.02
     mixer: str = "attn"  # sequence-mixer registry name for every layer (e.g. "mla", "kda")
     mixer_kwargs: dict = field(default_factory=dict)  # extra constructor kwargs for that mixer
+    attn_res: int = 0  # Block Attention Residuals block size (0 = off); see HNetConfig.attn_res
     extra: dict = field(default_factory=dict)  # variant-specific knobs
 
     @classmethod
