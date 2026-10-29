@@ -144,7 +144,17 @@ class HNet(nn.Module):
         if self.chunk_vocab is not None:  # the chunk's identity (hashed content) joins its boundary state
             assert binfo is not None, "dc.chunk_vocab needs the byte hash bank (HNetForCausalLM builds it)"
             bucket = self.chunk_vocab.chunk_ids(binfo, ctx, ctx_inner)
+            x_bound = x
             x = x + self.chunk_vocab.embed(bucket, x.dtype)
+            if self.chunk_vocab.suffix_lens:  # rows of every suffix ending at the chunk end (consistent keys)
+                e_suf, gate = self.chunk_vocab.suffix_embed(x_bound, binfo, ctx, ctx_inner)
+                x = x + e_suf
+                with torch.no_grad():  # mean gate over the looked-up (unmasked) suffixes
+                    g = gate.detach()
+                    used = (g > 0).float()
+                    r.extra["suffix_gate"] = g.sum() / used.sum().clamp(min=1)
+                    for i, n in enumerate(self.chunk_vocab.suffix_lens):
+                        r.extra[f"suffix_gate_n{n}"] = g[:, i].sum() / used[:, i].sum().clamp(min=1)
             r.vocab_tgt = self.chunk_vocab.next_targets(bucket[0], ctx_inner)
         z, inner_preds = self.main_network(x, ctx_inner, input_ids=inner_ids, boundaries=inner_boundaries,
                                            binfo=inner_binfo)

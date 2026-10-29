@@ -1,0 +1,40 @@
+id: g1-mem-02
+parents: [hnet]
+track: memory
+hypothesis: >-
+  Key the chunk vocabulary by the string that ends at the boundary, at every length, not by the string since the
+  previous boundary. Insight: a vocabulary is useful because its key is a deterministic function of the text (BPE: the
+  same string always hits the same row). The hashed chunk vocabulary's key (chunk = bytes since the previous boundary)
+  depends on TWO router decisions, so it is only consistent once the segmentation is; the logbook measured that the
+  vocabulary helps only once chunks are word-like, and prior-free seeds fall into word-like or suffix-like basins at
+  random. Keys that end at the chunk's last byte depend on ONE decision only: with suffix_lens the chunk vector also
+  gets the rows of every string of length 2, 3, 4, 6, 8, 12, 16 ending at the boundary, from the same 2 x 25733 tables
+  with the same hashes (the realized chunk is the suffix of its own length, so "cat" has one row whether it was cut as
+  a chunk or ends " cat" or "bobcat"). The memory is consistent from step 0 whatever tokenizer the router falls into,
+  so the hierarchy's input carries word identity before the router has settled, which should help it win the early
+  race against the residual bypass (prior-free hnet ends with bypass_ratio 8.2) without a whitespace prior. Each extra
+  row is gated by sigmoid(W x_j + b + E[len_j]) (x_j boundary state, len_j realized length; W, E zero-init), so the
+  model can fall back to the realized-length key when chunks are word-like; suffixes equal to the realized length or
+  crossing the segment start are skipped. Cost: +1,470 parameters (20.011M <= 20.023M), FLOPs/byte +0.03%.
+  Builds on: BPE's advantage is FLOP-free, perfectly consistent string-keyed memory; the chunk vocab helped only with
+  word-like chunks; n-gram tables (also consistent string keys) help +0.06.
+prediction:
+  fitness: 0.135
+  fitness_vs_parent: -0.05
+  mechanism: >-
+    the suffix gates open (mean suffix_gate/s0 > 0.5 by step 300, long lengths 8-16 more than 2-3 for word-like
+    chunks); the hierarchy is adopted earlier than in hnet: bypass_ratio (residual_rms / dechunk_rms) at step 300 and
+    at the end at most half of hnet's (8.19 at the end); the seed spread is no larger than hnet's. Falsified if
+    fitness_vs_parent > -0.015 or the gates close (mean < 0.2) by the end.
+branch: evolve/g1-mem-02
+model: configs/evolve/models/g1-mem-02.yaml
+set: []
+checks:
+  tests: pass
+  fairness: pass
+  grad_audit: logbook/evolve/candidates/g1-mem-02/grad_audit.txt
+  smoke: pass
+  smoke_log: logbook/evolve/candidates/g1-mem-02/smoke.txt
+  bit_identity: logbook/evolve/candidates/g1-mem-02/bit_identity.txt
+  numbers: {params: 20011495, params_bpe: 20023040, gflops_per_byte: 0.02038, gflops_per_byte_hnet: 0.02037,
+            flops_vs_hnet: +0.03%, smoke_suffix_gate_step30: 0.81}

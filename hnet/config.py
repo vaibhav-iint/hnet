@@ -72,6 +72,9 @@ class DCConfig:
     decision_kwargs: Any = None  # QuantileDecider options: {temp: 2.0, normalize: true, momentum: 0.99}
     # chunk_vocab: a hashed vocabulary for the learned chunks (model/chunk_vocab.py), dict or per-stage list:
     #   {buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 4096}; null = off. Needs "end" routers.
+    #   Optional suffix keys: suffix_lens: [2, 3, ...] (each <= max_len), suffix_gate_init: 0.0 -- the chunk vector also
+    #   gets the gated rows of every listed-length string ending at the chunk's last byte (keys that depend on the
+    #   chunk end only, not on the previous boundary); absent / [] = off.
     chunk_vocab: Any = None
     # router_consistency_weight: penalty on the share of the stage-0 router logit's variance that is NOT explained by
     #   the last router_consistency_n bytes (within-group / total variance, scale-free; a tokenizer is a function of the

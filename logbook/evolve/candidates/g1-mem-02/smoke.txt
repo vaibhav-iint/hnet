@@ -1,0 +1,26 @@
+# g1-mem-02 CPU smoke (python -m hnet.train.train, fp32, no compile).
+# (a) The L03 candidate model itself (configs/evolve/models/g1-mem-02.yaml, 20,011,495 params) on mix_v1_small with
+#     2048-byte windows, 2 windows/step, Muon 0.02: steps 1-3 bpb 8.013 -> 7.449 -> 5.873, compression 4.12-4.14
+#     (target 4.145), then the process was OOM-killed (exit 137) by the shared 15 GB box (other agents' jobs used
+#     ~10 GB); the mix_v1 train shards are not local, so per docs/EVOLVE.md the full smoke uses the tiny config:
+# (b) tiny_hnet1_2m + end_mlp + quantile + chunk vocab (2 x 16381, pred 0.5) with suffix_lens [2,3,4,6,8,12,16]
+#     + n-grams 3..8, mix_v1_small, 4 x 2048 bytes/step, 30 steps (log below): bpb 7.45 -> 4.02, no NaN,
+#     compression 5.98 (target 6.0); the suffix gates open from 0.5 to 0.80-0.86 (suffix_gate/s0 in metrics.jsonl:
+#     step 3 0.53, 12 0.66, 21 0.86, 30 0.81; n4-n6 highest). Command:
+#     python -m hnet.train.train --config configs/runs/tiny_hnet1_2m.yaml --set model.dc.router=end_mlp
+#       model.dc.decision=quantile 'model.dc.chunk_vocab=[{buckets: 16381, n_hash: 2, max_len: 16, pred_weight: 0.5,
+#       n_neg: 1024, suffix_lens: [2, 3, 4, 6, 8, 12, 16]}]' 'model.ngram_embed={ns: [3, 4, 5, 6, 7, 8], buckets: 4093}'
+#       data.dataset=mix_v1_small data.micro_batch=4 data.batch_bytes=8192 train.train_tokens=null
+#       train.train_bytes=245760 eval.every=0 eval.at_end=false train.compile=false train.precision=fp32 log.every=3
+[train] {"params": 12902815, "params_by_stage": {"0": 6082559, "1": 6820256}, "lr_multipliers": {"0": 3.3248, "1": 0.8312}, "kind": "bytes", "seq_len": 2048, "windows_per_step": 4, "micro_batch": 4, "grad_accum": 1, "world_size": 1, "total_steps": 30, "est_tokens_eq_per_step": 1976.2226277926993, "flops_per_byte@target": 11788914.166666664}
+step 3 | loss 8.403 | ce 5.165 | bpb 7.452 | aux_loss 3.238 | grad_norm 2.3 | lr 0.0015 | tokens_eq 5925 | bytes_per_sec 266.1 | step_time 30.77 | comp 5.98
+step 6 | loss 7.133 | ce 3.908 | bpb 5.637 | aux_loss 3.226 | grad_norm 1.427 | lr 0.0015 | tokens_eq 1.185e+04 | bytes_per_sec 294.9 | step_time 27.77 | comp 5.98
+step 9 | loss 6.775 | ce 3.585 | bpb 5.172 | aux_loss 3.19 | grad_norm 0.5489 | lr 0.0015 | tokens_eq 1.778e+04 | bytes_per_sec 481.7 | step_time 17 | comp 5.98
+step 12 | loss 6.477 | ce 3.38 | bpb 4.876 | aux_loss 3.097 | grad_norm 1.2 | lr 0.0015 | tokens_eq 2.37e+04 | bytes_per_sec 359.1 | step_time 22.8 | comp 5.98
+step 15 | loss 6.217 | ce 3.163 | bpb 4.563 | aux_loss 3.054 | grad_norm 0.6822 | lr 0.0015 | tokens_eq 2.963e+04 | bytes_per_sec 366.8 | step_time 22.32 | comp 5.98
+step 18 | loss 6.875 | ce 3.756 | bpb 5.418 | aux_loss 3.119 | grad_norm 5.513 | lr 0.0015 | tokens_eq 3.555e+04 | bytes_per_sec 531.6 | step_time 15.4 | comp 5.98
+step 21 | loss 6.026 | ce 2.937 | bpb 4.237 | aux_loss 3.089 | grad_norm 0.6757 | lr 0.0015 | tokens_eq 4.148e+04 | bytes_per_sec 383.6 | step_time 21.36 | comp 5.98
+step 24 | loss 6.49 | ce 3.312 | bpb 4.778 | aux_loss 3.178 | grad_norm 1.352 | lr 0.0015 | tokens_eq 4.741e+04 | bytes_per_sec 320.6 | step_time 25.54 | comp 5.98
+step 27 | loss 6.243 | ce 3.269 | bpb 4.716 | aux_loss 2.974 | grad_norm 0.9458 | lr 0.0004393 | tokens_eq 5.333e+04 | bytes_per_sec 238 | step_time 34.41 | comp 5.98
+step 30 | loss 6.132 | ce 2.789 | bpb 4.024 | aux_loss 3.343 | grad_norm 0.5436 | lr 0 | tokens_eq 5.926e+04 | bytes_per_sec 189.5 | step_time 43.22 | comp 5.98
+[train] saved /tmp/claude-0/-home-user-hnet-smollm3/e0ec0617-4cec-5bc8-abcc-216d4a655704/scratchpad/smoke2/ckpt/step_0000030

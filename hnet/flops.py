@@ -370,6 +370,12 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
                 comp_p["chunk_vocab"] = rows * d
                 comp_f["chunk_vocab"] = ((2 * rows * d * L_in / seq_len if cv.count_embedding else 0.0)
                                          + (int(cvk["n_hash"]) * d * L_in / seq_len if cv.count_elementwise else 0.0))
+                n_suf = len(cvk.get("suffix_lens") or [])
+                if n_suf:  # suffix keys: gate (d -> S matmul + length table) and S x n_hash extra rows, weighted
+                    comp_p["chunk_vocab"] += d * n_suf + n_suf + (int(cvk.get("max_len", 16)) + 1) * n_suf
+                    comp_f["chunk_vocab"] += (2 * d * n_suf + ((int(cvk["n_hash"]) * n_suf * d + 2 * n_suf * d
+                                                               + 5 * n_suf) if cv.count_elementwise else 0.0)
+                                              ) * L_in / seq_len
                 if float(cvk["pred_weight"]) > 0:
                     comp_p["chunk_vocab_head"] = d_in * d
                     comp_f["chunk_vocab_head"] = ((2 * d_in * d + 2 * d * (int(cvk["n_neg"]) + 1)) * L_in / seq_len

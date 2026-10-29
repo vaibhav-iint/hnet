@@ -20,6 +20,9 @@ VARIANTS = {
                                     "chunk_vocab": [{"buckets": 4096, "n_hash": 2, "max_len": 16, "pred_weight": 0.5,
                                                      "n_neg": 256}],
                                     "_model": {"trie_head": {"rows": 4099, "dim": 16, "n_hash": 2, "max_len": 8}}},
+    "end_mlp_quantile_vocab_suffix": {"router": "end_mlp", "decision": "quantile",
+                                      "chunk_vocab": [{"buckets": 4096, "n_hash": 2, "max_len": 16, "pred_weight": 0.5,
+                                                       "n_neg": 256, "suffix_lens": [2, 3, 4, 6, 8, 12, 16]}]},
 }
 
 
