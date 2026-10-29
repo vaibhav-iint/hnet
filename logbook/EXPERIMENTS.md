@@ -360,3 +360,18 @@ then released; `temp4` = confidence temperature 4 · 3 seeds · status: **done**
 - The curriculum is BPE's own pre-tokenization used as a 10%-of-training warm start, not a constraint: the router
   is free afterwards (chunk statistics of the final checkpoint in the work log).
 - A sharper confidence temperature does the opposite: it lowers the hierarchy's share and ends 0.04 behind `vp_ng`.
+
+## EXP-027 · Breaking the adoption race at its mechanism (chunk STE, margin-gated bypass)
+
+*spec `exp027_adoption_mechanism.yaml` · base = EXP-023 `vp_ng` (prior-free best: 1-stage ratio 6, end_mlp router,
+trimmed rank decisions, chunk vocabulary + next-chunk objective, byte n-gram tables; 1.720 / 1.669 / 1.656, seed 1 not
+adopted) · arms: `cste` = `dc.chunk_ste` (the chunk vectors entering the main network are multiplied by STE(confidence),
+so the next-chunk loss trains the router directly, independent of the decoder's adoption); `rgate` =
+`dc.residual_gate=margin` (the residual bypass into the decoder is scaled by the router's mean margin 2·mean|p−0.5|, so
+it opens only once the tokenizer is decided); `cste_rgate` = both · 3 seeds · 2 L4 spot VMs, worst case $2.22 ·
+status: **running** (launched 18:30 UTC)*
+
+Hypothesis (work log, "Deep dive: the adoption race"): the bypass opens at steps 60–130 while the router is undecided,
+the decoder switches to it, the router loses its only gradient and drifts into a random basin. Either arm should remove
+the seed lottery without the whitespace prior; the reference is `vp_ng` (1.682 mean, one seed not adopted) and EXP-024
+`prior` (1.635 with the prior). Tests: `tests/test_adoption_options.py`, step-0 audit `hnet/analysis/grad_audit.py`.

@@ -897,3 +897,33 @@ so the race may be a small-scale artefact — the ladder decides. The next-chunk
 and suffix tokenizers is the deeper problem: predictability is not usefulness; a tokenizer objective must be tied to
 the byte-level loss (BPE's "compress the corpus" criterion is also predictability-blind, which is why it needs the
 pretokenizer). EXP-027 tests (a), (b) and a thin-outer/heavy-main allocation at equal FLOPs.
+
+### Why the issues were found late: CLAUDE.md, a step-0 gradient audit, an invariance suite, a visibility tool
+User request after the adoption deep dive: explain why these failures took weeks to find, and write the meta of
+finding them into `CLAUDE.md`. The table there lists nine misses with how we found each and when we could have:
+every one was derivable from the gradient graph or from the first 200 steps of a CPU run, and we found them from the
+final bpb of paid sweeps instead. Twelve rules follow (gradient graph first, step-0 audit, every aux loss is a
+controller, what the lazy optimizer does, statistics that survive bimodal scores, mechanism metrics from step 1, seeds
+are experiments, cheap before expensive, the paper as a list of fragile components, a standing invariance suite, fail
+loudly, post-mortem against the list). Three are now code:
+- `hnet/analysis/grad_audit.py` (tests `test_grad_audit.py`): autograd of each objective term against each parameter
+  group at init and after N SGD steps, plus the mechanism metrics and plain-language warnings. On the prior-free
+  best configuration it prints at step 0 that the next-chunk CE reaches only the chunk table (zero to the router, zero
+  to the main network while the table is zero-initialised) and that with `dc.chunk_ste` the path opens.
+  Side finding: `residual_proj` is "zero-init" only in its weight; the default `nn.Linear` bias is live (rms 0.064 at
+  init), so the "bypass closed at init" assumption was never exactly true.
+- `tests/test_invariances.py`: causality (a change at byte 200+ leaves logits before 200 bit-identical) and packing
+  equivalence (two documents packed with `cu_seqlens` ≡ run separately) for the paper router, end_mlp + rank decisions,
+  and the chunk vocabulary, with and without n-gram tables. All pass. Documented rather than fixed: in training mode
+  the rank decision ranks over the whole batch (BatchNorm-like coupling); in eval mode it is causal. No cached-decoding
+  test yet because there is no incremental decoding path.
+- `logbook/training_report.py` + `$S2/report.sh`: every status update is TL;DR + per-sweep table + val-bpb curves +
+  stage-0 mechanism panels (margin, undecided fraction, score std, hierarchy vs bypass rms, next-chunk CE, grad norm) +
+  LR plots, with computed alerts. First report: the bypass rms is 5–40× the hierarchy's in every H-Net run of EXP-025
+  and the ladder LR sweep, i.e. the adoption race is the normal state of these runs, not an exception.
+
+Also today: `dc.chunk_ste` and `dc.residual_gate` implemented (tests `test_adoption_options.py`; the first version of
+the chunk-STE test was wrong twice, both times for reasons the audit now prints: the ratio loss does reach the router
+through G, and the zero-initialised table kills the next-chunk gradient at init). EXP-027 launched (two L4 spot VMs).
+`hnet-ladder-lr` finished its queue (hnet / hnet_ws LR grid, results mirrored) and was deleted; the BPE retries and the
+LR extension run on `hnet-ladder-lr2`, which was preempted and resumed three times in 20 minutes.
