@@ -108,6 +108,9 @@ class HNetConfig:
     # Block Attention Residuals (Kimi, arXiv 2603.15031) in every isotropic stack of a stage: 0 = standard residuals,
     # S > 0 = softmax attention over depth with blocks of S sub-layers (1 = Full AttnRes). Scalar or per-stage list.
     attn_res: Any = 0
+    # Hashed byte n-gram embeddings added to the byte embedding (hnet.model.ngram; BLT-style): {"ns": [3, ..., 8],
+    # "buckets": int or one per n}. Empty = off. Parameter-rich and FLOP-free (lookups, like the BPE embedding).
+    ngram_embed: dict = field(default_factory=dict)
 
     def attn_res_for_stage(self, s: int) -> int:
         return int(_per_stage(self.attn_res, self.n_stages + 1, "attn_res")[s])

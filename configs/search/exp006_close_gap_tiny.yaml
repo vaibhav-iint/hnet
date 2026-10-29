@@ -1,0 +1,32 @@
+# EXP-006: closing the H-Net vs BPE gap at the tiny 2M FLOPs-matched scale (EXP-002 found H-Net ~0.19 bpb behind).
+# Hypothesis (logbook/WORKLOG.md, docs/RESEARCH_HNET_IMPROVEMENTS.md): BPE gets a 6.4M-param vocabulary embedding
+# for free (lookups cost no FLOPs) while the FLOPs-matched H-Net has half the parameters. Cartesia's ladder matches
+# the outer networks to the BPE embedding + head in parameters AND FLOPs. Hashed byte n-gram embeddings (BLT-style,
+# hnet/model/ngram.py) add ~7M FLOP-free parameters to the H-Net's byte stage, matching BPE's 15.0M.
+# Arms: BPE; 2-stage paper router +/- n-grams; 1-stage (the ladder's architecture) +/- n-grams; 2-stage end-of-chunk
+# MLP router + n-grams. 3 seeds (EXP-002: H-Net seed spread up to 0.05 bpb). Same data/budget/eval as EXP-002.
+name: exp006_close_gap_tiny
+out_root: runs/search/exp006_close_gap_tiny
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp006_close_gap_tiny
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  baseline: bpe
+  groups:
+    "2-stage": [paper, paper_ng, end_mlp_ng]
+    "1-stage": [hnet1, hnet1_ng]
+  labels: {bpe: BPE baseline, paper: "2-stage, paper router", paper_ng: "2-stage + n-gram emb",
+           end_mlp_ng: "2-stage end-of-chunk MLP + n-gram emb", hnet1: "1-stage, paper router",
+           hnet1_ng: "1-stage + n-gram emb"}
+runs:
+  - {name: bpe,        config: configs/runs/tiny_bpe_2m.yaml}
+  - {name: paper,      config: configs/runs/tiny_hnet2_2m.yaml}
+  - {name: paper_ng,   config: configs/runs/tiny_hnet2_2m.yaml,
+     set: ["model.ngram_embed={ns: [3, 4, 5, 6, 7, 8], buckets: 12289}"]}
+  - {name: end_mlp_ng, config: configs/runs/tiny_hnet2_2m.yaml,
+     set: [model.dc.router=end_mlp, "model.ngram_embed={ns: [3, 4, 5, 6, 7, 8], buckets: 12289}"]}
+  - {name: hnet1,      config: configs/runs/tiny_hnet1_2m.yaml}
+  - {name: hnet1_ng,   config: configs/runs/tiny_hnet1_2m.yaml,
+     set: ["model.ngram_embed={ns: [3, 4, 5, 6, 7, 8], buckets: 13200}"]}

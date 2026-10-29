@@ -311,6 +311,13 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
         if s == 0:
             comp_p["embedding"] = V * d0
             comp_f["embedding"] = 2 * V * d0 if cv.count_embedding else 0.0
+            if cfg.ngram_embed:  # hashed n-gram tables: lookups like the embedding, plus one add per n
+                ns = list(cfg.ngram_embed["ns"])
+                b = cfg.ngram_embed["buckets"]
+                rows = sum([int(b)] * len(ns) if isinstance(b, int) else [int(x) for x in b])
+                comp_p["ngram_embedding"] = rows * d0
+                comp_f["ngram_embedding"] = ((2 * rows * d0 if cv.count_embedding else 0.0)
+                                             + (len(ns) * d0 if cv.count_elementwise else 0.0))
             comp_p["lm_head"] = 0 if cfg.tie_embeddings else V * d0
             comp_f["lm_head"] = 2 * V * d0 if cv.count_lm_head else 0.0
         if s > 0 and d > cfg.d_model[s - 1]:

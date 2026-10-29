@@ -26,6 +26,7 @@ from hnet.config import IGNORE_INDEX, HNetConfig
 from .block import Block
 from .ctx import SeqCtx
 from .hnet import HNet
+from .ngram import HashNgramEmbedding
 from .routing.base import RouterOutput
 
 # Max logits materialized at once by the chunked cross-entropy (return_logits=False): 2**25 fp32 = 128 MiB.
@@ -110,6 +111,7 @@ class HNetForCausalLM(nn.Module):
         self.config = cfg
         d0 = cfg.d_model[0]
         self.embeddings = nn.Embedding(cfg.vocab_size, d0)
+        self.ngram_embeddings = HashNgramEmbedding(d0, **cfg.ngram_embed) if cfg.ngram_embed else None
         self.backbone = HNet(cfg, stage_idx=0)
         self.lm_head = nn.Linear(d0, cfg.vocab_size, bias=False)
         if cfg.tie_embeddings:
@@ -136,7 +138,10 @@ class HNetForCausalLM(nn.Module):
     ) -> CausalLMOutput:
         """See module docstring. ``boundaries``: optional per-stage [T_s] tensors for the ``external`` router."""
         ids, ctx, batch_shape = pack_inputs(input_ids, cu_seqlens, max_seqlen)
-        h, bpred = self.backbone(self.embeddings(ids), ctx, input_ids=ids, boundaries=boundaries)
+        x = self.embeddings(ids)
+        if self.ngram_embeddings is not None:
+            x = x + self.ngram_embeddings(ids, ctx)
+        h, bpred = self.backbone(x, ctx, input_ids=ids, boundaries=boundaries)
         out = lm_outputs(h, self.lm_head, labels, return_logits, batch_shape)
         out.bpred = bpred
         aux_terms = self.backbone.aux_losses(bpred)
@@ -158,13 +163,15 @@ class HNetForCausalLM(nn.Module):
         std = self.config.initializer_range
         nn.init.normal_(self.lm_head.weight, std=std)
         nn.init.normal_(self.embeddings.weight, std=1.0)
+        if self.ngram_embeddings is not None:
+            self.ngram_embeddings.reset_parameters()
         self.backbone.init_weights(std)
 
     def stage_of_param(self, name: str) -> int:
         """Stage index owning parameter ``name`` (DDP ``module.`` / compile ``_orig_mod.`` prefixes allowed);
         embeddings and lm_head belong to stage 0."""
         name = name.replace("_orig_mod.", "").removeprefix("module.")
-        if name.startswith(("embeddings.", "lm_head.")):
+        if name.startswith(("embeddings.", "ngram_embeddings.", "lm_head.")):
             return 0
         return self._param_stage[name]
 
