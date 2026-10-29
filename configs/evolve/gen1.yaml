@@ -57,6 +57,20 @@ runs:
   - data.micro_batch=8
   - data.batch_bytes=544768
   - train.train_bytes=494649344
+- name: g1_arch_01
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g1-arch-01.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g1_arch_02
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g1-arch-02.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
 - name: g1_mem_01
   config: configs/ladder/runs/ladder_hnet.yaml
   model: configs/evolve/models/g1-mem-01.yaml
@@ -112,6 +126,10 @@ report:
     hnet_ws: 'control: hnet_ws'
     g1_alloc_01: A BPE model's compute per position is pinned by its vocabulary (4
     g1_alloc_02: A BPE model's compute per position is pinned by its vocabulary (4
+    g1_arch_01: 'Scale-balanced decoder input: both paths into the byte decoder are RMS-normalized and get gains trained by
+      the same opti'
+    g1_arch_02: 'Offset-resolved read-back of the chunk vector: each byte of the next chunk reads its own learned projection
+      of the main '
     g1_mem_01: A prefix-trie output vocabulary gives the byte model the output half of BPE's string-keyed memory
     g1_mem_02: 'Key the chunk vocabulary by the string that ends at the boundary, at every length, not by the string since
       the previous '
