@@ -305,3 +305,12 @@ the same string is always cut the same way) + rank decisions · arms `local`, `l
 Motivation: `chunk_stats` on trained routers (work log): stage-1 chunks are 48–55% singletons and recurring words
 are segmented consistently only 23–53% of the time. Prediction: `local*` arms score far higher on consistency; if
 the vocabulary then helps more than in EXP-017, consistency is the missing ingredient of learned tokenization.
+
+## EXP-020 · Router self-consistency penalty (second launch, scale-free)
+
+*spec `exp020_router_consistency.yaml` · 2-stage (3,3), end_mlp, rank decisions · penalty = within-4-gram-group
+variance / total variance of the stage-0 logit · arms `cons1`, `cons10`, `cons10_vocab_pred` · 3 seeds · status:
+`cons1` **1.768 / 1.812 / 1.813 → 1.798**, `cons10` **1.775 / 1.783 / 1.840 → 1.799**, vs EXP-017 `quant_fix` 1.799
+± 0.005: neutral on average with a larger seed spread (two seeds −0.02, one +0.04); main-network contribution 0.02–0.06
+(baseline 0.03). `cons10_vocab_pred` pending. Consistency can be imposed on a character-pair tokenizer without cost,
+but it does not by itself make the second level useful at (3,3); the word-scale line (EXP-018/023) is where the gain is.*
