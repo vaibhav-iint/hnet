@@ -6,6 +6,9 @@ set -euo pipefail
 MD=http://metadata.google.internal/computeMetadata/v1/instance/attributes
 attr() { curl -sf -H "Metadata-Flavor: Google" "$MD/$1"; }
 COMMIT=$(attr hnet-commit); SPEC=$(attr hnet-spec); GCS=$(attr hnet-gcs); PARALLEL=$(attr hnet-parallel || echo 3)
+# Optional: comma-separated run names (no seed suffix) so several VMs can split one sweep without touching each
+# other's run directories (restore and mirror are restricted to those runs).
+ONLY=$(attr hnet-only || echo "")
 LOG=/var/log/hnet_sweep.log
 exec > >(tee -a "$LOG" | sed -u 's/^/HNET /' > /dev/console) 2>&1
 upload_log() { gcloud storage cp "$LOG" "$GCS/_logs/$(hostname)-$(date -u +%Y%m%dT%H%M%S).log" || true; }
@@ -31,8 +34,10 @@ gcloud storage rsync -r gs://neat-dispatch-501718-a5-hnet/data/finewebedu10B dat
 python3 scripts/data/prepare.py --dataset finewebedu10B --n-train 1
 OUT=$(python3 -c "import yaml,sys; print(yaml.safe_load(open(sys.argv[1]))['out_root'])" "$SPEC")
 mkdir -p "$OUT"
+SCOPE=(); ONLY_ARGS=()
+if [ -n "$ONLY" ]; then SCOPE=(--exclude "^(?!(${ONLY//,/|})_s[0-9]+/).*"); ONLY_ARGS=(--only "$ONLY"); fi
 # Resume across VMs / spot preemptions: restore finished and partial runs (incl. checkpoints) from GCS.
-if gcloud storage ls "$GCS/" >/dev/null 2>&1; then gcloud storage rsync -r "$GCS" "$OUT"; fi
-( while true; do sleep 120; gcloud storage rsync -r "$OUT" "$GCS" >/dev/null 2>&1 || echo "WARN live mirror failed"; done ) &
-python3 scripts/search/sweep.py "$SPEC" --parallel "$PARALLEL" --gcs "$GCS"
+if gcloud storage ls "$GCS/" >/dev/null 2>&1; then gcloud storage rsync -r "${SCOPE[@]}" "$GCS" "$OUT"; fi
+( while true; do sleep 120; gcloud storage rsync -r "${SCOPE[@]}" "$OUT" "$GCS" >/dev/null 2>&1 || echo "WARN live mirror failed"; done ) &
+python3 scripts/search/sweep.py "$SPEC" --parallel "$PARALLEL" --gcs "$GCS" "${ONLY_ARGS[@]}"
 echo "sweep finished OK"
