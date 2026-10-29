@@ -15,7 +15,7 @@ set:
 report:
   labels: {q_rdrop: "quantile + residual path-drop 0.3", q_aux: "quantile + main-path aux head 0.3",
            q_rdrop_aux: "quantile + path-drop + aux head",
-           q_rdrop_aux_pool: "quantile + path-drop + aux head + attention-pool chunk vectors"}
+           q_rdrop_aux_pool: "quantile + path-drop + aux head + mean-pool chunk vectors"}
 runs:
   - {name: q_rdrop,          config: configs/runs/tiny_hnet2_2m.yaml, set: ["model.dc.residual_dropout=0.3"]}
   - {name: q_aux,            config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.main_aux_weight=0.3]}
@@ -23,4 +23,4 @@ runs:
      set: ["model.dc.residual_dropout=0.3", model.dc.main_aux_weight=0.3]}
   - {name: q_rdrop_aux_pool, config: configs/runs/tiny_hnet2_2m.yaml,
      set: ["model.dc.residual_dropout=0.3", model.dc.main_aux_weight=0.3, model.dc.chunker=pool,
-           "model.dc.chunker_kwargs={mode: attn}"]}
+           "model.dc.chunker_kwargs={mode: mean}"]}
