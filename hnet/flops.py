@@ -355,6 +355,9 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
             comp_f["router"] = rf if cv.count_dc else 0.0
             comp_p["residual_proj"] = d * d + d
             comp_f["residual_proj"] = 2 * d * d if cv.count_residual_proj else 0.0
+            if cfg.dc.fusion == "balanced":  # two RMSNorm gains on the decoder input (norms: no counted FLOPs)
+                comp_p["fusion"] = 2 * d
+                comp_f["fusion"] = 0.0
             if dcs.get("chunk_vocab"):  # hashed chunk tables (lookups, like the embedding) + training-only head
                 cvk = {"buckets": 65536, "n_hash": 2, "pred_weight": 0.0, "n_neg": 4096, **dcs["chunk_vocab"]}
                 d_in = d  # the inner stage returns its output at this stage's width

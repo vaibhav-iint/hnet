@@ -107,6 +107,16 @@ class DCConfig:
     #   confidence margin 2*mean|p-0.5| (detached), so the bypass only opens once the router has decided (logbook
     #   "Deep dive: the adoption race": the bypass opens at steps 60-130 while the router is still undecided).
     residual_gate: str = "none"
+    # fusion: how the decoder input is formed from the dechunked hierarchy output and the residual bypass.
+    #   "add" (paper / official): h = dechunk(z) * STE(c) + residual_proj(h_enc).
+    #   "balanced": h = g_h * RMSNorm(dechunk(z)) * STE(c) + g_r * RMSNorm(residual_proj(h_enc)), with per-channel
+    #   gains g_h (init 1) and g_r (init 0, so the bypass is exactly closed at init, bias included) trained by the same
+    #   optimizer at the same LR. Motivation (ladder 1e16 L03 metrics): the hierarchy's rms is pinned at ~1 by the main
+    #   network's Adam-trained final-norm gain, while residual_proj (a Muon matrix at 2.35x the base LR) grows the bypass
+    #   to 6-8x by the end of training, monotonically and in step with the LR schedule: the race between the two paths
+    #   is refereed by the optimizer's scale dynamics, not by usefulness. The norm sits before the STE (a per-position
+    #   RMSNorm after it would cancel the STE's gradient to the router). Each norm adds d parameters, no counted FLOPs.
+    fusion: str = "add"
     # chunk_ste: multiply the chunk vectors entering the main network by STE(selected_probs), so chunk-level losses
     #   (next-chunk CE, main_aux) reach the router directly instead of only through the decoder's use of the output.
     chunk_ste: bool = False

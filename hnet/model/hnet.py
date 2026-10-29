@@ -9,6 +9,7 @@ Stage s with layout ``[enc, inner, dec]`` maps h [T, D^{s-1}] -> [T, D^{s-1}]:
     x, ctx'  = chunker(h, r.boundary_mask, ctx)          (keeps the selected positions)
     z, preds = main_network(x, ctx', **extras')           (HNet stage s+1, or Isotropic if innermost)
     h        = dechunker(z, r, ctx, ctx') * STE(r.selected_probs) + residual      (fp32)
+               (dc.fusion = "balanced": g_h * RMSNorm(dechunker(...)) * STE(...) + g_r * RMSNorm(residual))
     h        = decoder(h)[:, :D^{s-1}]
 
 A layout ``[main]`` is an innermost stage (pad, Isotropic, truncate). Router / chunker / dechunker / STE are
@@ -29,6 +30,7 @@ from hnet import registry
 from .block import mixer_config_kwargs
 from .ctx import SeqCtx
 from .isotropic import Isotropic
+from .norm import RMSNorm
 from .routing.base import RouterOutput
 
 
@@ -109,6 +111,12 @@ class HNet(nn.Module):
             else:
                 nn.init.zeros_(self.residual_proj.weight)
             self.residual_proj.weight._no_reinit = True
+            assert cfg.dc.fusion in ("add", "balanced"), cfg.dc.fusion
+            self.fusion = cfg.dc.fusion
+            if self.fusion == "balanced":  # scale-balanced decoder input (HNetConfig.dc.fusion)
+                self.fuse_hier = RMSNorm(d, eps=cfg.norm_eps)  # gain g_h, init 1
+                self.fuse_bypass = RMSNorm(d, eps=cfg.norm_eps)  # gain g_r, init 0: bypass closed at init
+                nn.init.zeros_(self.fuse_bypass.weight)
 
         d_prev = cfg.d_model[stage_idx - 1] if stage_idx > 0 else d
         self.pad_dimension = nn.Parameter(torch.zeros(d - d_prev)) if d > d_prev else None
@@ -132,6 +140,8 @@ class HNet(nn.Module):
         h = self.encoder(h, ctx)
         with _no_autocast(h.device):
             residual = self.residual_proj(h.float())
+            if self.fusion == "balanced":
+                residual = self.fuse_bypass(residual)
         r = self.routing_module(h, ctx, input_ids=input_ids, boundaries=boundaries[0] if boundaries else None)
         if self.decider is not None:
             r = self.decider(r, ctx)
@@ -149,6 +159,8 @@ class HNet(nn.Module):
         z, inner_preds = self.main_network(x, ctx_inner, input_ids=inner_ids, boundaries=inner_boundaries,
                                            binfo=inner_binfo)
         out = self.dechunk_layer(z, r, ctx, ctx_inner)
+        if self.fusion == "balanced":  # before the STE: a per-position norm after it would cancel the STE gradient
+            out = self.fuse_hier(out.float())
         if self.use_ste:
             out = out * STE.apply(r.selected_probs)
         with torch.no_grad():  # how strongly the hierarchy below speaks to the decoder, vs the residual path

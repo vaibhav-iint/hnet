@@ -30,7 +30,11 @@ def param_groups(model) -> Dict[str, List[torch.nn.Parameter]]:
     """Name -> parameters, by stage and role (encoder / routing_module / decider / chunk_vocab / residual_proj /
     decoder / main_network for the innermost stage), plus embeddings, n-gram tables and the LM head."""
     groups: Dict[str, List[torch.nn.Parameter]] = {}
-    roles = ("encoder", "routing_module", "decider", "chunk_vocab", "residual_proj", "decoder", "pad_dimension")
+    roles = {"encoder", "routing_module", "decider", "chunk_vocab", "residual_proj", "decoder", "pad_dimension"}
+    for st in model.backbone.stages():  # any other module / parameter owned directly by a hierarchy stage is a role too
+        if not st.is_innermost:
+            roles |= {n for n, _ in st.named_children()} | {n for n, _ in st.named_parameters(recurse=False)}
+    roles.discard("main_network")
     for name, p in model.named_parameters():
         if not p.requires_grad:
             continue
