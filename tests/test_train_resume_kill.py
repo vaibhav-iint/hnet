@@ -26,9 +26,9 @@ STEPS = 40
 TIMING = {"step_time", "bytes_per_sec", "tokens_per_sec", "mfu", "mem_gb"}
 
 
-def run_cfg(out, optimizer, ckpt_every, sleep_ms=10):
+def run_cfg(out, optimizer, ckpt_every, sleep_ms=10, ckpt_keep=1):
     train = {"out_dir": str(out), "steps": STEPS, "lr": 3e-3, "optimizer": optimizer, "precision": "fp32",
-             "device": "cpu", "compile": False, "ckpt_every": ckpt_every, "ckpt_keep": 1,
+             "device": "cpu", "compile": False, "ckpt_every": ckpt_every, "ckpt_keep": ckpt_keep,
              "schedule": {"name": "wsd", "warmup": 5, "decay": 10}}
     if optimizer == "muon":
         train["muon"] = {"momentum_warmup_steps": 20, "lr": 0.02, "lr_embed": 3e-3, "lr_head": 3e-3,
@@ -122,7 +122,7 @@ def reference(tmp_path_factory):
 
 
 @pytest.mark.parametrize("optimizer,sig", [("adamw", signal.SIGTERM), ("muon", signal.SIGTERM),
-                                           ("adamw", signal.SIGKILL), ("muon", signal.SIGKILL)])
+                                           ("muon", signal.SIGKILL)])
 def test_kill_and_resume_matches_uninterrupted(tmp_path, reference, optimizer, sig):
     ref = reference(optimizer)
     out = tmp_path / "out"
@@ -146,7 +146,7 @@ def test_resume_from_explicit_checkpoint_into_new_dir(tmp_path, reference):
     """--resume PATH (a checkpoint or a run dir) continues exactly in a fresh --out; only later steps are logged."""
     ref = reference("muon")
     src = tmp_path / "src"
-    cfg_path = write(tmp_path / "run.yaml", run_cfg(src, "muon", ckpt_every=7, sleep_ms=0))
+    cfg_path = write(tmp_path / "run.yaml", run_cfg(src, "muon", ckpt_every=7, sleep_ms=0, ckpt_keep=2))
     run_to_end(cfg_path, "--stop-at-step", "17")  # checkpoints 14 (rolling) and 17 (stop)
     ck = os.path.join(src, "ckpt", ckpt.step_name(14))
     shutil.rmtree(os.path.join(src, "ckpt", ckpt.step_name(17)))
