@@ -1002,8 +1002,8 @@ recreated in europe-west4-a (runs resume from the bucket checkpoints).
 | L05 | 1.756 | 1.985 | 1.939 | +0.23 | +0.18 |
 | L06 | 1.841 | 2.083 | 2.035 | +0.24 | +0.19 |
 At 1e16 FLOPs the BPE iso-FLOP optimum is L04 and both H-Nets are best at L03 (the smallest rung): at this budget
-the H-Net wants a smaller model and more bytes, the opposite of the blog's claim that it is the more data-hungry
-architecture's compute that scales better. The gap is 0.18-0.29 bpb prior-free and 0.13-0.24 with the warm start, at
+the H-Net wants a smaller model and more bytes. (Corrected later: this is *consistent* with the blog, whose H-Net
+optimum is also one rung below BPE's; see docs/BLOG_GAP_ANALYSIS.md.) The gap is 0.18-0.29 bpb prior-free and 0.13-0.24 with the warm start, at
 equal FLOPs and data; the bypass dominates (rms 5× the hierarchy's) in every prior-free run. One seed each; the L04
 BPE run is byte-identical to the LR-sweep run (reproducible pipeline). Caveat: BPE's LR transferred to the H-Nets
 costs them ~0.04 (their own optimum is 0.01). → 1e17 rungs next (decided after checking the cost table).
@@ -1015,3 +1015,30 @@ step column showed the sweep maximum, not the seed's). Finals: `cste` 1.778 / 1.
 The conclusion stands (the interventions change the mechanism, not the tokenizer the seed falls into) but the
 magnitude claim was wrong. `training_report.py` now prints interim seeds with their step and leaves them out of the
 mean. The EXPERIMENTS.md entry is corrected.
+
+
+### Blog gap analysis (docs/BLOG_GAP_ANALYSIS.md): we have been testing below the blog's smallest run, with a smaller outer network
+An independent agent re-read both posts and extracted the per-run data embedded in their plot bundles (30 BPE +
+30 H-Net iso-FLOP runs). Findings that change the plan:
+- **The blog's ladder starts at 1e18 FLOPs**, every run sees >= ~0.6B tokens, and its two most data-starved 1e18 runs
+  (3-8 tokens/param) *lose* to BPE by 0.015-0.038 bpb; the H-Net lead grows with tokens/param (up to -0.063 on its
+  D=256 rung at ~4.4B tokens). Our runs (0.03-0.5B tokens) are all below the blog's smallest. Its 1.28x multiplier is
+  constant by construction of a shared-floor/shared-exponent fit and says nothing about 1e16-1e17. A 0.2-0.3 deficit is
+  still far beyond the <= 0.04 small-data effect in the blog's own data, so protocol and implementation matter too.
+- **Vocabulary size sets the H-Net's outer budget, and I ruled this out wrongly earlier.** The outer encoder/decoder are
+  FLOP-matched to the BPE embedding + head. Verified from configs/ladder/ladder.json (share of BPE FLOPs in the head,
+  ours with 32k vs the same rung with the blog's 128k): L03 0.60 -> 0.86, L04 0.48 -> 0.79, L05 0.39 -> 0.72,
+  L08 0.22 -> 0.53. At our rungs the H-Net's byte-level networks get 2.4-4x less compute relative to the main network
+  than the blog's, and our BPE wastes less on its head. My earlier dismissal compared parameter ratios across different
+  rungs, which is the wrong comparison.
+- Our LR transfer stacks the paper's Adam-derived `auto` per-stage multipliers (x2.35 outer at L04) on top of BPE's Muon
+  LR; the blog describes no such multipliers. The H-Net's own best Muon LR is half of BPE's.
+- The H-Net's optimum one rung below BPE's matches the blog and dnaHNet (arXiv 2602.10603); the 1e16 grid should add L02.
+- Code is the strongest cheap signal in the blog (per-language gaps 2-4x the overall gap at 1e18); our per-source
+  validation sets exist and are now being scored on the 1e16 checkpoints.
+Ranked missing ingredients (report section 3): training length/steps; 128k-vocab outer budget; LR transfer under Muon;
+compression control / router form (strong ratio loss instead of the rank decider, cosine-style end router, compression
+ramp per ATDC arXiv 2605.30080); evaluation protocol (per source, 2 seeds per frontier point, L02 rung). First, a
+cheap one-factor-at-a-time bridge from EXP-024 (BPE parity) to the 1e16 L04 rung (-0.24): six factors change between
+them (steps 1763->728, batch 131k->545k bytes, AdamW->Muon+auto multipliers, FineWeb-Edu->mix, ratio 6->4.145,
+GPT-2 50k -> in-corpus 32k baseline).
