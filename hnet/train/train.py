@@ -247,13 +247,12 @@ class Trainer:
             dyn = tc.get("compile_dynamic")
             if dyn is None:
                 dyn = True if self.is_hnet else None
-            import torch._dynamo
+            import torch._dynamo as dynamo
 
             # every Block shares one code object (Block.forward): each (mixer, width, residual-is-None) variant is
             # a separate cache entry, so the default limit (8) can silently send 2-stage models back to eager
-            torch._dynamo.config.cache_size_limit = max(torch._dynamo.config.cache_size_limit, 64)
-            torch._dynamo.config.accumulated_cache_size_limit = max(
-                torch._dynamo.config.accumulated_cache_size_limit, 512)
+            dynamo.config.cache_size_limit = max(dynamo.config.cache_size_limit, 64)
+            dynamo.config.accumulated_cache_size_limit = max(dynamo.config.accumulated_cache_size_limit, 512)
             ckw = {"dynamic": dyn, "backend": tc.get("compile_backend") or "inductor", "mode": tc.get("compile_mode")}
             if comp == "blocks" and blocks:
                 for b in blocks:
