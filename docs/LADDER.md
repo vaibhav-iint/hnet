@@ -101,7 +101,3 @@ Rung L04 at 1e16 (the prior optimum), Muon LR grid [0.01, 0.02, 0.04, 0.08] (tun
 * Batch and LR scaling laws are not fitted (blog: fitted on selected rungs). Batch follows ~C^(1/3) from 0.5M tokens at 1e18; the Muon LR is tuned once at the smallest budget and transferred; the Adam-part LR is fixed. Small-rung / small-budget runs have few steps (see tables).
 * SPEC FLOPs convention (standard causal attention), not the blog's Fig. 8 convention (half-cost causal).
 * Data: the 70/20/5/5 mix and 32k tokenizer are built elsewhere; the BPE loader still needs the tokenizer's EOT id (`data.eot`) and byte lengths for bpb.
-
-## LR tuning result (2026-10-29)
-L04 at 1e16, one seed: BPE best Muon LR 0.02 (1.622 bpb; 0.01 → 1.706, 0.04 → 1.784); hnet best 0.01 (1.861);
-hnet_ws best 0.01 (1.820). The iso-FLOP specs use `--param best_mlr.bpe=0.02` for every arm (blog protocol).

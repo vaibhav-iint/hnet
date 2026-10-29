@@ -97,3 +97,5 @@ afterwards. Mechanisms must be instrumented and tested first; outcomes come last
 - Statistics tested on heavy-tailed / bimodal / constant inputs (rule 5).
 - New mechanism metric logged per step and plotted for the first 500 steps of a tiny run (rule 6).
 - Tiny probe run read *before* the sweep is launched (rule 8); forward-pass-unchanged test for training-only flags.
+- Generated files (`docs/LADDER.md`, `configs/ladder/**`, `configs/search/ladder_*`) are checked by tests against
+  their generator: never hand-edit them; notes go to `docs/ANALYSIS_LADDER.md` or the work log.

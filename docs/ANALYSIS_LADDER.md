@@ -66,3 +66,7 @@ within a budget ignored beyond the geometric mean (`flops_spread_dex` reported).
 
 Known gap: the trainer's in-training `eval.downstream` uses the GPT-2 scorer for token models; for BPE runs on `mix_v1`
 use `scripts/eval/downstream_bpb.py` (dataset tokenizer, end-of-text id 0) instead.
+
+## LR tuning result (2026-10-29)
+L04 at 1e16, one seed: BPE best Muon LR 0.02 (1.622 bpb; 0.01 → 1.706, 0.04 → 1.784); hnet best 0.01 (1.861);
+hnet_ws best 0.01 (1.820). The iso-FLOP specs use `--param best_mlr.bpe=0.02` for every arm (blog protocol).
