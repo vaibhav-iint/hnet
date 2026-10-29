@@ -888,3 +888,16 @@ def test_agent_command_failure_exit_code(tmp_path, monkeypatch):
     assert ag.main() == 4
     p = S.parse_text(ser.read_text())
     assert p.done == 4 and any("bad" in ln for ln in p.logs)
+
+
+def test_bucket_select_objects():
+    from infra.gcp import bucket as B
+    rels = ["metrics.jsonl", "ckpt/step_0000010/meta.json", "ckpt/step_0000010/model.pt",
+            "ckpt/step_0000020/meta.json", "ckpt/step_0000020/model.pt", "ckpt/step_0000030/model.pt"]
+    assert B.select_objects(rels, "latest") == ["metrics.jsonl", "ckpt/step_0000020/meta.json",
+                                                "ckpt/step_0000020/model.pt"]
+    assert B.select_objects(rels, "none") == ["metrics.jsonl"]
+    assert B.select_objects(rels, "all") == rels
+    with pytest.raises(ValueError):
+        B.select_objects(rels, "newest")
+    assert B.run_name("runs/tiny/x/") == "tiny/x" and B.bucket_of({"meta": {}}) is None

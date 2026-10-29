@@ -176,12 +176,24 @@ class FlopsEstimator:
 
 
 def _truncate_after(path: str, step: int):
+    """Keep records with ``step <= step`` (atomic rewrite). A final line cut short by a hard kill is dropped;
+    a malformed line anywhere else is an error."""
     with open(path) as f:
-        recs = [json.loads(line) for line in f if line.strip()]
-    with open(path, "w") as f:
+        lines = [line for line in f.read().split("\n") if line.strip()]
+    recs = []
+    for i, line in enumerate(lines):
+        try:
+            recs.append(json.loads(line))
+        except json.JSONDecodeError:
+            if i != len(lines) - 1:
+                raise ValueError(f"{path}: malformed record on line {i + 1}: {line[:200]!r}")
+            print(f"[train] {path}: dropping a truncated last record (killed mid-write)", flush=True)
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
         for r in recs:
             if r["step"] <= step:
                 f.write(json.dumps(r) + "\n")
+    os.replace(tmp, path)
 
 
 class MetricsLogger:

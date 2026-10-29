@@ -230,8 +230,13 @@ def parse_serial_response(out: str, err: str, start_at: int) -> dict:
 
 
 def guest_attributes(name: str, zone: str, path: str = "hnet/") -> dict:
-    out = run(["compute", "instances", "get-guest-attributes", name, f"--zone={zone}",
-               f"--query-path={path}"], timeout=120) or []
+    try:
+        out = run(["compute", "instances", "get-guest-attributes", name, f"--zone={zone}",
+                   f"--query-path={path}"], timeout=120) or []
+    except GcloudError as e:
+        if is_not_found(e):  # the guest has not written any attribute yet
+            return {}
+        raise
     return {f"{a.get('namespace')}/{a.get('key')}": a.get("value") for a in out}
 
 

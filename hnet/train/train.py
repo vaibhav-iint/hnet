@@ -1,4 +1,6 @@
-"""Trainer: ``python -m hnet.train.train --config run.yaml [--set a.b=c ...] [--dry-run]``.
+"""Trainer: ``python -m hnet.train.train --config run.yaml [--lr 3e-3 --seed 1 ...] [--set a.b=c ...] [--dry-run]``.
+
+Flags, precedence and ``--print-config``: :mod:`hnet.train.cli` (``--help`` lists every flag and its config key).
 
 Single GPU by default; under ``torchrun --nproc_per_node=K`` it uses DDP (NCCL on CUDA, gloo on CPU).
 See ``configs/README.md`` for every config key. Outline of one optimizer step:
@@ -166,24 +168,33 @@ class Trainer:
         self.tokens_local = 0.0  # this rank's tokens_eq
         self.loader_state = {}
         self.resumed_from = None
-        res = tc.get("resume")
-        if res and not dry_run:
-            path = ckpt.latest_checkpoint(self.out_dir) if res == "auto" else res
-            if path:
-                st = ckpt.load_checkpoint(path, self.model, self.opt, self.rank)
-                for g, (b, m) in zip(self.opt.param_groups, self.lr_cfg):
-                    g["base_lr"], g["lr_mult"] = b, m
-                meta, rs = st["meta"], st["rank_state"]
-                self.step = int(meta["step"])
-                if rs and int(meta.get("world_size", 1)) == self.world:
-                    self.bytes_local, self.tokens_local = rs.get("bytes_local", 0), rs.get("tokens_local", 0.0)
-                    self.loader_state = rs.get("loader", {})
-                else:  # world size changed: split global counters evenly
-                    self.bytes_local = int(meta.get("bytes_seen", 0)) // self.world
-                    self.tokens_local = float(meta.get("tokens_eq", 0.0)) / self.world
-                self.resumed_from = path
-                if self.is_main:
-                    print(f"[train] resumed from {path} at step {self.step}", flush=True)
+        self._log_state = None  # not-yet-logged metric accumulators restored from a checkpoint
+        path = None if dry_run else ckpt.resolve_resume(tc.get("resume"), self.out_dir)
+        if path:
+            with open(os.path.join(path, "meta.json")) as f:
+                saved_cfg = json.load(f).get("config") or {}
+            diffs = ckpt.config_mismatches(saved_cfg, cfg)
+            if diffs and tc.get("resume_strict", True):
+                raise ValueError(f"refusing to resume from {path}: the config differs from the checkpoint's in ways "
+                                 "that change the continuation (set train.resume_strict=false to accept):\n  "
+                                 + "\n  ".join(diffs))
+            if diffs and self.is_main:
+                print(f"[train] WARNING resuming with config changes (resume_strict=false): {diffs}", flush=True)
+            st = ckpt.load_checkpoint(path, self.model, self.opt, self.rank)
+            for g, (b, m) in zip(self.opt.param_groups, self.lr_cfg):
+                g["base_lr"], g["lr_mult"] = b, m
+            meta, rs = st["meta"], st["rank_state"]
+            self.step = int(meta["step"])
+            if rs and int(meta.get("world_size", 1)) == self.world:
+                self.bytes_local, self.tokens_local = rs.get("bytes_local", 0), rs.get("tokens_local", 0.0)
+                self.loader_state = rs.get("loader", {})
+                self._log_state = rs.get("log_state")
+            else:  # world size changed: split global counters evenly
+                self.bytes_local = int(meta.get("bytes_seen", 0)) // self.world
+                self.tokens_local = float(meta.get("tokens_eq", 0.0)) / self.world
+            self.resumed_from = path
+            if self.is_main:
+                print(f"[train] resumed from {path} at step {self.step}", flush=True)
         if self.resumed_from is None:
             torch.manual_seed(seed + 1000 * self.rank)  # per-rank stream for any stochastic op
 
@@ -283,12 +294,29 @@ class Trainer:
         meta = {"step": self.step, "bytes_seen": bytes_seen, "tokens_eq": tokens_eq, "world_size": self.world,
                 "config": self.cfg}
         rank_state = {"bytes_local": self.bytes_local, "tokens_local": self.tokens_local,
-                      "loader": self.loader.state_dict()}
+                      "loader": self.loader.state_dict(), "log_state": self._export_log_state()}
         path = ckpt.save_checkpoint(self.out_dir, self.step, self.raw, self.opt, rank_state, meta, self.rank,
                                     self.world, keep=keep)
         if self.is_main:
             ckpt.prune_checkpoints(self.out_dir, int(self.tc.get("ckpt_keep", 2)))
             print(f"[train] saved {path}", flush=True)
+
+    def _export_log_state(self) -> Optional[dict]:
+        """Metric sums since the last log step (so the first log record after a resume covers the same steps
+        as in an uninterrupted run). Only valid inside :meth:`train`."""
+        acc = getattr(self, "_acc", None)
+        if acc is None:
+            return None
+        return {"sums": {k: v.detach().cpu() for k, v in acc.sums.items()}, "counts": dict(acc.counts),
+                "host": dict(self._host_acc), "steps_since_log": self._steps_since_log}
+
+    def _write_diverged(self, rec: dict, n: int):
+        info = {"step": self.step, "loss": rec.get("loss"), "ce": rec.get("ce"), "consecutive_nonfinite_logs": n}
+        if self.is_main:
+            with open(os.path.join(self.out_dir, "diverged.json"), "w") as f:
+                json.dump(info, f)
+            print(f"[train] DIVERGED: non-finite loss at {n} consecutive log steps (step {self.step}); "
+                  f"stopping without checkpoint (train.stop_on_nonfinite). Wrote diverged.json", flush=True)
 
     # ------------------------------------------------------------------ eval
     @torch.no_grad()
@@ -396,7 +424,10 @@ class Trainer:
         ds_every = int((self.ec.get("downstream") or {}).get("every") or 0)
         ckpt_every = int(tc.get("ckpt_every") or 0)
         ckpt_steps = set(int(s) for s in (tc.get("ckpt_steps") or []))
+        ckpt_tokens = sorted(float(t) for t in (tc.get("ckpt_tokens") or []))
         ckpt_every_tok = float(tc.get("ckpt_every_tokens") or 0)
+        nonfinite_patience = int(tc.get("stop_on_nonfinite") or 0)
+        n_nonfinite = 0
         stop_at = tc.get("stop_at_step")
         end_step = self.total_steps if not stop_at else min(self.total_steps, int(stop_at))
         if self.dry_run:
@@ -418,12 +449,21 @@ class Trainer:
 
         pf = Prefetcher(self.loader, self.step, self.accum, pin=self.cuda, depth=int(self.dc.get("prefetch", 4)),
                         threads=int(self.dc.get("num_workers", 1)))
-        acc = StatAccumulator()  # ce_sum / aux on device, every step (adds only, no sync)
-        stats_acc = StatAccumulator()  # model stats + grad norms, log steps only
-        host_acc = {"n_targets": 0.0, "n_bytes": 0.0, "tokens": 0.0}  # host-side counts since last log
+        acc = self._acc = StatAccumulator()  # ce_sum / aux on device, every step (adds only, no sync)
+        stats_acc = StatAccumulator()  # model stats + grad norms, log steps only (empty between log steps)
+        host_acc = self._host_acc = {"n_targets": 0.0, "n_bytes": 0.0, "tokens": 0.0}  # host counts since last log
+        steps_since_log, step_time = 0, 0.0
+        if self._log_state:  # resumed between two log steps: continue the interrupted interval
+            ls = self._log_state
+            for k, v in ls["sums"].items():
+                acc.sums[k] = v.to(self.device)
+            acc.counts.update(ls["counts"])
+            host_acc.update(ls["host"])
+            steps_since_log = int(ls["steps_since_log"])
+            self._log_state = None
+        self._steps_since_log = steps_since_log
         t_start = time.time()
         t_log = time.perf_counter()
-        steps_since_log, step_time = 0, 0.0
         self.raw.train()
         if self.cuda:
             torch.cuda.reset_peak_memory_stats()
@@ -490,10 +530,17 @@ class Trainer:
                     steps_since_log = 0
                     acc.clear()
                     stats_acc.clear()
-                    host_acc = dict.fromkeys(host_acc, 0.0)
+                    for k in host_acc:
+                        host_acc[k] = 0.0
                     self.logger.log(rec)
                     if self.dry_run and self.is_main:
                         self._dry_run_report(rec)
+                    n_nonfinite = 0 if math.isfinite(rec["loss"]) else n_nonfinite + 1
+                    if nonfinite_patience and n_nonfinite >= nonfinite_patience and not self.dry_run:
+                        self._stop_reason = "diverged"
+                        self._write_diverged(rec, n_nonfinite)
+                        break
+                self._steps_since_log = steps_since_log
                 if self.dry_run:
                     continue
 
@@ -508,6 +555,8 @@ class Trainer:
                 if ckpt_every_tok:  # rank-local tokens x world ~ global tokens (no sync needed)
                     keep |= (math.floor(self.tokens_local * self.world / ckpt_every_tok)
                              > math.floor(tokens_before * self.world / ckpt_every_tok))
+                if ckpt_tokens:
+                    keep |= any(tokens_before * self.world < t <= self.tokens_local * self.world for t in ckpt_tokens)
                 regular = bool(ckpt_every) and self.step % ckpt_every == 0
                 at_end = self.step == end_step
                 if (keep or regular or stop) and not at_end:
@@ -516,7 +565,7 @@ class Trainer:
                     if self.is_main:
                         print(f"[train] stopping at step {self.step}: {self._stop_reason}", flush=True)
                     break
-            if not self.dry_run and self.step == end_step:
+            if not self.dry_run and self.step == end_step and self._stop_reason != "diverged":
                 finished = self.step >= self.total_steps
                 if finished and self.ec.get("at_end", True):
                     self.run_eval(final=True)
@@ -567,12 +616,13 @@ class Trainer:
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--config", required=True)
-    ap.add_argument("--set", nargs="*", default=[], action="extend", help="overrides a.b=c (yaml values)")
-    ap.add_argument("--dry-run", action="store_true", help="build everything, run 2 steps, print stats")
-    args = ap.parse_args(argv)
-    cfg = load_run_config(args.config, args.set)
+    from hnet.train import cli
+
+    args = cli.parse_args(argv, description=__doc__.split("\n")[0])
+    cfg = cli.compose(args)
+    if args.print_config:
+        print(cli.dump_config(cfg), end="", flush=True)
+        return cfg
     tr = Trainer(cfg, dry_run=args.dry_run)
     tr.train()
     if args.dry_run and tr.is_main:

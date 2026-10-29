@@ -7,7 +7,14 @@
 * ``KEEP``       marker for permanent checkpoints (never pruned).
 
 Writes go to ``.tmp_step_XXXXXXX`` and are renamed into place by rank 0 after every rank finished, so a
-directory named ``step_*`` is always complete.
+directory named ``step_*`` is always complete (a kill mid-save leaves only a ``.tmp_*`` dir, which is ignored and
+replaced by the next save).
+
+Resume guarantees (tested in tests/test_train_resume*.py): resuming from ``step_N`` reproduces the uninterrupted
+run exactly (bitwise on CPU): model + optimizer state (AdamW moments, Muon momentum buffers and step counters),
+LR schedule (a function of the step), data position (the loaders are a pure function of (seed, step, rank)),
+RNG streams, token/byte counters and the not-yet-logged metric accumulators. :func:`resolve_resume` maps
+``train.resume`` to a checkpoint; :func:`config_mismatches` lists config changes that would break exactness.
 """
 
 from __future__ import annotations
@@ -100,9 +107,69 @@ def save_checkpoint(out_dir: str, step: int, model, optimizer, rank_state: dict,
 
 def prune_checkpoints(out_dir: str, keep_last: int):
     """Delete rolling checkpoints beyond the newest ``keep_last`` (KEEP-marked ones are never deleted)."""
+    if keep_last < 1:
+        raise ValueError(f"train.ckpt_keep must be >= 1 (the newest checkpoint is the resume point), got {keep_last}")
     rolling = [(s, p) for s, p in list_checkpoints(out_dir) if not os.path.exists(os.path.join(p, "KEEP"))]
     for s, p in rolling[: max(0, len(rolling) - keep_last)]:
-        shutil.rmtree(p, ignore_errors=True)
+        shutil.rmtree(p)
+
+
+def resolve_resume(resume, out_dir: str) -> Optional[str]:
+    """``train.resume`` -> checkpoint dir or None (fresh start).
+
+    * ``auto``: newest ``<out_dir>/ckpt/step_*`` if any, else None;
+    * ``None`` / ``"none"`` / ``False``: None;
+    * a checkpoint dir (has ``meta.json``) or a run dir (its newest checkpoint). A path that does not exist or
+      holds no checkpoint is an error: an explicit resume request never silently starts from scratch.
+    """
+    if resume in (None, False, "none", "null", ""):
+        return None
+    if resume == "auto":
+        return latest_checkpoint(out_dir)
+    path = str(resume)
+    if os.path.exists(os.path.join(path, "meta.json")):
+        return path
+    if os.path.isdir(ckpt_dir(path)):
+        latest = latest_checkpoint(path)
+        if latest:
+            return latest
+    raise FileNotFoundError(f"train.resume={path!r}: not a checkpoint dir (no meta.json) and no "
+                            f"{ckpt_dir(path)}/step_* checkpoint inside")
+
+
+# Config entries that must match between a checkpoint and the resuming run for the continuation to be exact.
+# Data keys that only affect speed/placement (workers, prefetch, data root, micro-batch split) may change.
+RESUME_KEYS = ["model", "data", "train.seed", "train.optimizer", "train.lr", "train.betas", "train.eps",
+               "train.weight_decay", "train.wd_embeddings", "train.no_wd_1d", "train.lr_multiplier_override",
+               "train.muon", "train.schedule", "train.steps", "train.train_tokens", "train.train_bytes",
+               "train.grad_clip", "train.precision"]
+RESUME_DATA_FREE = {"num_workers", "prefetch", "root", "micro_batch"}
+
+
+def _norm(v):
+    return json.loads(json.dumps(v, default=str))
+
+
+def config_mismatches(saved: dict, current: dict) -> list:
+    """Human-readable differences on :data:`RESUME_KEYS` between the checkpoint's config and the current one."""
+    out = []
+    for key in RESUME_KEYS:
+        a, b = saved, current
+        for p in key.split("."):
+            a = a.get(p) if isinstance(a, dict) else None
+            b = b.get(p) if isinstance(b, dict) else None
+        a, b = _norm(a), _norm(b)
+        if key == "data" and isinstance(a, dict) and isinstance(b, dict):
+            a = {k: v for k, v in a.items() if k not in RESUME_DATA_FREE}
+            b = {k: v for k, v in b.items() if k not in RESUME_DATA_FREE}
+        if a != b:
+            if isinstance(a, dict) and isinstance(b, dict):
+                for k in sorted(set(a) | set(b)):
+                    if a.get(k) != b.get(k):
+                        out.append(f"{key}.{k}: checkpoint {a.get(k)!r} -> now {b.get(k)!r}")
+            else:
+                out.append(f"{key}: checkpoint {a!r} -> now {b!r}")
+    return out
 
 
 def load_checkpoint(path: str, model, optimizer, rank: int, map_location="cpu") -> dict:

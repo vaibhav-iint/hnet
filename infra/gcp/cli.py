@@ -1,4 +1,8 @@
-"""python -m infra.gcp <cmd> -- GCE GPU runner that needs only HTTPS (gcloud API calls; no SSH, no GCS).
+"""python -m infra.gcp <cmd> -- GCE GPU runner that needs only HTTPS (gcloud API calls; no SSH).
+
+Channels: serial console (live metrics, heartbeats, outcome; ~1 MB rolling buffer, readable only while
+the VM runs) and, when a bucket is configured (default), the bucket (complete run dirs, checkpoints, logs,
+data cache). Errors are never swallowed: gcloud failures raise with their stderr.
 
   launch   --name N --gpu l4|a100|t4|cpu [--count 1] (--spot | --on-demand) --max-hours H
            --cmd "<shell, run in the repo>" [--commit SHA] [--zone auto|Z1,Z2] [--disk-gb 100]
@@ -13,9 +17,9 @@
                                  --sync-every-min) plus newer lines from the serial console
   pull     N RUN [--ckpt latest|all|none] [--out DIR]   run dir incl. checkpoints from the bucket
   watch    N [--interval 60] [--teardown] [--timeout-min M]   sync until HNET_DONE and the VM stopped
-  resume   N [--max-hours H] [--rerun] [--cmd C] [--commit SHA]
-                                 start a stopped (preempted / capped) VM again; the run resumes.
-                                 --rerun/--cmd/--commit push a new job (startup-script metadata) first
+  resume   N [--max-hours H] [--rerun] [--cmd C] [--commit SHA] [--overlay P] [--bucket B] [--retries 10]
+                                 start a stopped (preempted / capped) VM again; the run resumes. Retries
+                                 zone stockouts. --rerun/--cmd/--commit/--overlay push a new job first
   stop     N                     stop a running VM (keeps the disk)
   teardown N | --all             delete (with disk) and verify gone; --all = every VM in this ledger
                                  (never VMs outside it, e.g. other people's or hx-*)
@@ -43,6 +47,7 @@ from pathlib import Path
 
 from infra.prime.state import State
 
+from . import bucket as B
 from . import config as C
 from . import gce
 from . import ledger as L
@@ -276,10 +281,11 @@ def _sync(rec: dict, out: str | None = None, quiet: bool = False) -> S.Parsed:
     p = S.parse_text(tr.read_raw())
     out_root = Path(out) if out else C.REPO_ROOT / "runs" / "gcp" / rec["name"]
     src = "serial"
-    g = _gcs_records(rec, quiet)
-    if g is not None and (g[0] or g[1]):
-        p.metrics = S.merge_sources(g[0], p.metrics)
-        p.evals = S.merge_sources(g[1], p.evals)
+    bucket = B.bucket_of(rec)
+    if bucket:
+        gm, ge = B.fetch_jsonl(bucket, rec["name"], C.state_dir() / "gcs" / rec["name"])
+        p.metrics = S.merge_sources(gm, p.metrics)
+        p.evals = S.merge_sources(ge, p.evals)
         src = "bucket+serial"
     dirs = S.reconstruct(p, out_root)
     if not quiet:
@@ -293,65 +299,14 @@ def _sync(rec: dict, out: str | None = None, quiet: bool = False) -> S.Parsed:
     return p
 
 
-def _bucket_of(rec: dict) -> str | None:
-    gcs = ((rec.get("meta") or {}).get("job") or {}).get("gcs") or {}
-    return gcs.get("bucket")
-
-
-def _gcs_records(rec: dict, quiet: bool = False) -> tuple[dict, dict] | None:
-    """(metrics, evals) keyed like serial run dirs ('runs/<run>') from gs://B/runs/<vm>/; None if no bucket."""
-    bucket = _bucket_of(rec)
-    if not bucket:
-        return None
-    base = f"gs://{bucket}/runs/{rec['name']}/"
-    objs = gce.storage_ls_sizes(base)
-    want = [u for u in objs if u.endswith(("/metrics.jsonl", "/eval.jsonl")) and "/_logs/" not in u]
-    cache = C.state_dir() / "gcs" / rec["name"]
-    metrics, evals = {}, {}
-    for u in want:
-        rel = u[len(base):]
-        dst = cache / rel
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        gce.storage_cp([u], str(dst), timeout=600)
-        run = "runs/" + rel.rsplit("/", 1)[0]
-        recs = S.read_jsonl_text(dst.read_text())
-        (metrics if rel.endswith("metrics.jsonl") else evals)[run] = recs
-    return metrics, evals
-
-
 def cmd_pull(a) -> int:
-    """Copy a run dir (checkpoints included) from the bucket: gs://B/runs/<vm>/<run>/ -> <out>."""
+    """Copy a run dir (checkpoints per --ckpt) from the bucket: gs://B/runs/<vm>/<run>/ -> <out>."""
     st = _state()
     rec = _rec(st, a.name)
-    bucket = a.bucket or _bucket_of(rec) or C.BUCKET
-    run = a.run.strip("/")
-    if run.startswith("runs/"):
-        run = run[5:]
-    src = f"gs://{bucket}/runs/{rec['name']}/{run}"
-    out = Path(a.out) if a.out else C.REPO_ROOT / "runs" / "gcp" / rec["name"] / run
-    out.mkdir(parents=True, exist_ok=True)
-    objs = gce.storage_ls_sizes(src)
-    if not objs:
-        _p(f"nothing under {src}/")
-        return 1
-    rels = [u[len(src) + 1:] for u in objs]
-    from .vm_agent import latest_complete_ckpt
-    if a.ckpt == "latest":
-        step = latest_complete_ckpt(rels)
-        keep = [r for r in rels if not r.startswith("ckpt/") or (step and r.startswith(f"ckpt/{step}/"))]
-    elif a.ckpt == "none":
-        keep = [r for r in rels if not r.startswith("ckpt/")]
-    else:
-        keep = rels
-    total = sum(objs[f"{src}/{r}"] for r in keep)
-    _p(f"pull {src}/ -> {out}: {len(keep)} objects, {total / 1e6:.1f} MB (ckpt={a.ckpt})")
-    by_dir: dict[str, list[str]] = {}
-    for r in keep:
-        by_dir.setdefault(str((out / r).parent), []).append(f"{src}/{r}")
-    for d, urls in by_dir.items():
-        Path(d).mkdir(parents=True, exist_ok=True)
-        gce.storage_cp(urls, d + "/", timeout=6 * 3600)
-    _p("done")
+    bucket = a.bucket or B.bucket_of(rec) or C.BUCKET
+    out = Path(a.out) if a.out else C.REPO_ROOT / "runs" / "gcp" / rec["name"] / B.run_name(a.run)
+    n, size = B.pull_run(bucket, rec["name"], a.run, out, a.ckpt)
+    _p(f"pulled {n} objects ({size / 1e6:.1f} MB, ckpt={a.ckpt}) -> {out}")
     return 0
 
 
@@ -382,7 +337,7 @@ def cmd_status(a) -> int:
         why = gce.last_stop_reason(rec["name"], rec["zone"])
         if why:
             _p(f"last stop: {why}")
-    if rec.get("status") in L.RUNNING:
+    if rec.get("status") == "RUNNING":  # guest attributes are served only by a running guest
         ga = gce.guest_attributes(rec["name"], rec["zone"])
         if ga:
             _p("guest attributes: " + json.dumps(ga))

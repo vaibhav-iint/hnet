@@ -43,8 +43,9 @@ class ToyBlock(nn.Module):
 
 
 class ToyLM(nn.Module):
-    def __init__(self, vocab=256, d=32, n_layers=2, aux_alpha=0.01):
+    def __init__(self, vocab=256, d=32, n_layers=2, aux_alpha=0.01, sleep_s=0.0):
         super().__init__()
+        self.sleep_s = sleep_s  # artificial delay per training forward (kill/resume tests need a slow run)
         self.emb = nn.Embedding(vocab, d)
         self.layers = nn.ModuleList(ToyBlock(d) for _ in range(n_layers))
         self.norm_f = nn.LayerNorm(d)
@@ -73,6 +74,10 @@ class ToyLM(nn.Module):
         return list(self.layers)
 
     def forward(self, input_ids, cu_seqlens=None, max_seqlen=None, labels=None, return_logits=True):
+        if self.sleep_s and self.training:
+            import time
+
+            time.sleep(self.sleep_s)
         flat = input_ids.reshape(-1)
         T = flat.numel()
         starts = torch.zeros(T, dtype=torch.bool, device=flat.device)
@@ -103,6 +108,7 @@ class ToyLM(nn.Module):
 
 def build(section: dict):
     vocab = int(section.get("vocab_size", 256))
-    model = ToyLM(vocab=vocab, d=int(section.get("d_model", 32)), n_layers=int(section.get("n_layers", 2)))
+    model = ToyLM(vocab=vocab, d=int(section.get("d_model", 32)), n_layers=int(section.get("n_layers", 2)),
+                  sleep_s=float(section.get("sleep_ms", 0)) / 1000.0)
     cfg = SimpleNamespace(vocab_size=vocab, lr_multiplier_n_gpt=4.6)
     return model, cfg

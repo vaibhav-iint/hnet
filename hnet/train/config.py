@@ -12,7 +12,13 @@ Composition rules
 * Paths are resolved relative to the including file's directory first, then to the current directory,
   then to the repository root. Includes nest.
 
-Overrides (``--set train.lr=3e-4``) are applied after composition with :func:`hnet.config.apply_overrides`.
+Model swap: ``load_run_config(path, model="configs/models/x.yaml")`` (trainer flag ``--model``) replaces the path
+of the ``model: {include: ...}`` section include(s) with ``x.yaml``; the run file's other ``model:`` keys (e.g.
+``lr_multiplier_n_gpt: data``) still apply on top. A run file without a ``model`` include is an error.
+
+Precedence (later wins), see :func:`load_run_config`: run file (+ includes, + model swap) < ``flags`` (typed
+``(key, value)`` pairs, e.g. from the trainer's first-class flags) < ``overrides`` (``a.b=c`` strings, applied
+left to right with :func:`hnet.config.apply_overrides`) < nothing: defaults only fill keys that are still missing.
 """
 
 from __future__ import annotations
@@ -48,35 +54,104 @@ def _resolve(path: str, rel_dir: Optional[str]) -> str:
     raise FileNotFoundError(f"include {path!r} not found (tried {cands})")
 
 
-def _load_file(path: str, _stack=()) -> dict:
+def _load_file(path: str, _stack=(), swaps: Optional[dict] = None) -> dict:
     path = os.path.abspath(path)
     assert path not in _stack, f"include cycle: {_stack + (path,)}"
     with open(path) as f:
         d = yaml.safe_load(f) or {}
-    return _expand(d, os.path.dirname(path), _stack + (path,), section=None)
+    return _expand(d, os.path.dirname(path), _stack + (path,), section=None, swaps=swaps)
 
 
-def _expand(d: Any, rel_dir: str, stack, section: Optional[str]) -> Any:
+def _expand(d: Any, rel_dir: str, stack, section: Optional[str], swaps: Optional[dict] = None) -> Any:
+    """``swaps``: {section: [abs path, n_used]}: a section-level include of that section is replaced by the path."""
     if not isinstance(d, dict):
         return d
     d = dict(d)
     inc = d.pop("include", None)
     base: dict = {}
     if inc is not None:
-        for p in [inc] if isinstance(inc, str) else list(inc):
-            sub = _load_file(_resolve(p, rel_dir), stack)
+        if section is not None and swaps and section in swaps:
+            paths = [swaps[section][0]]
+            swaps[section][1] += 1
+        else:
+            paths = [_resolve(p, rel_dir) for p in ([inc] if isinstance(inc, str) else list(inc))]
+        for p in paths:
+            sub = _load_file(p, stack, swaps)
             if section is not None and isinstance(sub.get(section), dict):
                 sub = sub[section]
             base = deep_merge(base, sub)
-    local = {k: (_expand(v, rel_dir, stack, section=k) if isinstance(v, dict) else v) for k, v in d.items()}
+    local = {k: (_expand(v, rel_dir, stack, section=k, swaps=swaps) if isinstance(v, dict) else v)
+             for k, v in d.items()}
     return deep_merge(base, local)
 
 
-def load_run_config(path: Optional[str] = None, overrides=None, base: Optional[dict] = None) -> dict:
-    """Compose a run config from a yaml path (or a dict ``base``) and ``a.b=c`` overrides."""
-    d = _load_file(path) if path else _expand(copy.deepcopy(base or {}), os.getcwd(), (), None)
+def set_key(d: dict, key: str, value) -> dict:
+    """``d[a][b][c] = value`` for ``key = "a.b.c"`` (creates intermediate dicts; value used as is)."""
+    node = d
+    parts = key.split(".")
+    for p in parts[:-1]:
+        nxt = node.setdefault(p, {})
+        if not isinstance(nxt, dict):
+            raise ValueError(f"cannot set {key!r}: {p!r} is {nxt!r}, not a mapping")
+        node = nxt
+    node[parts[-1]] = copy.deepcopy(value)
+    return d
+
+
+def get_key(d: dict, key: str, default=None):
+    node = d
+    for p in key.split("."):
+        if not isinstance(node, dict) or p not in node:
+            return default
+        node = node[p]
+    return node
+
+
+def override_key(ov: str) -> str:
+    key, sep, _ = ov.partition("=")
+    if not sep:
+        raise ValueError(f"override must look like key=value, got {ov!r}")
+    return key.strip()
+
+
+def check_override_conflicts(flags, overrides):
+    """A key set by a first-class flag and by ``--set`` (or one being a prefix of the other, e.g. ``--warmup``
+    vs ``--set train.schedule={...}``) must not disagree silently: raise unless the values are identical."""
+    flag_vals = dict(flags or [])
+    problems = []
+    for ov in overrides or []:
+        k = override_key(ov)
+        for fk, fv in flag_vals.items():
+            if k == fk:
+                val = apply_overrides({}, [ov])
+                if get_key(val, k) != fv:
+                    problems.append(f"{k}: flag value {fv!r} vs --set {ov!r}")
+            elif k.startswith(fk + ".") or fk.startswith(k + "."):
+                problems.append(f"--set {ov!r} overlaps the flag-set key {fk!r}")
+    if problems:
+        raise ValueError("conflicting flag and --set values (use one or the other):\n  " + "\n  ".join(problems))
+
+
+def load_run_config(path: Optional[str] = None, overrides=None, base: Optional[dict] = None,
+                    model: Optional[str] = None, flags=None) -> dict:
+    """Compose a run config. Order (later wins): yaml ``path`` with its includes (``model`` swaps the path of
+    the ``model:`` section include) or dict ``base`` (merged on top of ``path`` if both); ``flags``: typed
+    ``(dotted key, value)`` pairs; ``overrides``: ``a.b=c`` strings (YAML values) left to right; finally
+    defaults fill missing keys. Flags and overrides that disagree on a key raise (:func:`check_override_conflicts`).
+    """
+    swaps = None
+    if model is not None:
+        if not path:
+            raise ValueError("model= (--model) needs a run yaml whose model section uses include:")
+        swaps = {"model": [_resolve(model, None), 0]}
+    d = _load_file(path, swaps=swaps) if path else _expand(copy.deepcopy(base or {}), os.getcwd(), (), None)
+    if swaps is not None and swaps["model"][1] == 0:
+        raise ValueError(f"--model {model}: {path} has no `model: {{include: ...}}` section to swap")
     if base and path:
-        d = deep_merge(d, base)
+        d = deep_merge(d, _expand(copy.deepcopy(base), os.getcwd(), (), None))
+    check_override_conflicts(flags, overrides)
+    for k, v in flags or []:
+        set_key(d, k, v)
     apply_overrides(d, overrides)
     return fill_defaults(d)
 
@@ -129,9 +204,12 @@ DEFAULTS = {
         "ckpt_every": 1000,
         "ckpt_every_tokens": None,  # permanent checkpoints every N tokens_eq (data-multiplier runs)
         "ckpt_steps": [],  # permanent checkpoints at these steps
+        "ckpt_tokens": [],  # permanent checkpoints when tokens_eq first reaches each of these values
         "ckpt_keep": 2,  # rolling checkpoints kept
         "save_final": True,
-        "resume": "auto",  # auto | <ckpt dir> | null
+        "resume": "auto",  # auto | <ckpt dir> | <run dir> (its latest ckpt) | null
+        "resume_strict": True,  # refuse to resume if model/data/optimizer/schedule config differs from the ckpt's
+        "stop_on_nonfinite": 3,  # stop (diverged.json) after N consecutive non-finite logged losses; 0 = never
         "ddp_bucket_mb": 25,
         "check_signals_every": 10,  # DDP: steps between cross-rank stop-flag checks
         "device": None,  # default cuda if available
