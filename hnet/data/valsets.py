@@ -49,13 +49,18 @@ LN2 = math.log(2.0)
 SPEEDRUN_VAL_TOKENS = 10_485_760
 
 
-def complete_docs(tokens: np.ndarray, token_limit: int | None = None):
-    """(start, end) token spans [EOT, ..., last token] of docs that are complete inside tokens[:token_limit]."""
+def complete_docs(tokens: np.ndarray, token_limit: int | None = None, eot_id: int = S.EOT_ID,
+                  last_complete: bool = False):
+    """(start, end) token spans [EOT, ..., last token] of docs that are complete inside tokens[:token_limit].
+
+    ``last_complete``: the shard's last document is known to be complete (data-mix shards never split docs)."""
     n = len(tokens) if token_limit is None else min(len(tokens), token_limit)
-    eot = np.flatnonzero(np.asarray(tokens[:n]) == S.EOT_ID)
+    eot = np.flatnonzero(np.asarray(tokens[:n]) == eot_id)
     # a doc starting at eot[i] is complete iff the next EOT is inside the shard (eot[i+1] exists or tokens[n] is EOT)
     ends = list(eot[1:])
-    if n < len(tokens) and tokens[n] == S.EOT_ID:
+    if n < len(tokens) and tokens[n] == eot_id:
+        ends.append(n)
+    elif n == len(tokens) and last_complete and len(eot):
         ends.append(n)
     return [(int(a), int(b)) for a, b in zip(eot, ends)]
 
@@ -124,14 +129,19 @@ class ValSet:
 
     def __init__(self, name: str, n_bytes_target: int | None, token_shard, byte_seq_len: int = 8192,
                  token_seq_len: int = 1792, windows_per_batch: int = 8, start_doc: int = 0,
-                 token_limit: int | None = None):
+                 token_limit: int | None = None, tokenizer=None, last_complete: bool = False):
+        """``tokenizer``: the shard's tokenizer (hnet.data.tokenizer; default GPT-2). ``last_complete``: the
+        shard's last document is complete (true for data-mix shards)."""
+        from hnet.data.tokenizer import load_tokenizer
+
+        self.tok = load_tokenizer(tokenizer)
         self.name = name
         self.byte_seq_len, self.token_seq_len = int(byte_seq_len), int(token_seq_len)
         self.windows_per_batch = int(windows_per_batch)
         self.token_shard = str(token_shard)
         toks = S.read_token_shard(token_shard)
-        lens = S.gpt2_vocab_table()[2]
-        docs = complete_docs(toks, token_limit)[start_doc:]
+        lens = self.tok.table[2]
+        docs = complete_docs(toks, token_limit, self.tok.eot_id, last_complete)[start_doc:]
         self.docs, self._doc_tokens = [], []
         total = 0
         for a, b in docs:
@@ -153,17 +163,20 @@ class ValSet:
 
     # ------------------------------------------------------------------ segments
     def _segments(self):
-        lens = S.gpt2_vocab_table()[2]
+        from hnet.data.tokenizer import decode_with_table
+
+        table = self.tok.table
+        lens = table[2]
         tsegs, bsegs, tw = [], [], []
         for t in self._doc_tokens:
             bl = lens[t]
-            doc_bytes, _ = S.decode_tokens_to_stream(t)  # exact UTF-8 text of the doc (no EOT inside)
+            doc_bytes = decode_with_table(t, table)  # exact UTF-8 text of the doc (no EOT inside)
             cb = np.zeros(len(t) + 1, dtype=np.int64)
             np.cumsum(bl, out=cb[1:])
             for c, (a, b) in enumerate(chunk_doc(bl, self.token_seq_len, self.byte_seq_len)):
                 ct = t[a:b]
                 cbytes = doc_bytes[cb[a] : cb[b]].astype(np.int64)
-                tp = S.EOT_ID if c == 0 else int(t[a - 1])
+                tp = self.tok.eot_id if c == 0 else int(t[a - 1])
                 bp = BOS_ID if c == 0 else int(doc_bytes[cb[a] - 1])
                 tsegs.append(_Seg(np.concatenate([[tp], ct]), np.concatenate([ct, [IGNORE_INDEX]])))
                 bsegs.append(_Seg(np.concatenate([[bp], cbytes]), np.concatenate([cbytes, [IGNORE_INDEX]])))
@@ -226,9 +239,27 @@ def speedrun_valset(token_shard, **kw) -> ValSet:
     return ValSet("speedrun_fineweb_val", None, token_shard, token_limit=SPEEDRUN_VAL_TOKENS + 1, **kw)
 
 
-def standard_valset(dataset: str = "finewebedu10B", n_bytes_target: int = 10_000_000, root=None, **kw) -> ValSet:
+def standard_valset(dataset: str = "finewebedu10B", n_bytes_target: int | None = 10_000_000, root=None,
+                    subset: str | None = None, **kw) -> ValSet:
+    """The dataset's val set. Data mixes (hnet.data.mix): the combined val set (``subset=None`` or "mix"), or
+    one of the per-source / per-language / per-category sets (``subset="code.python"``, ``"heldout"``, ...);
+    a target larger than the set uses the whole set."""
+    from hnet.data import mix
     from hnet.data.download import dataset_dir, shard_name
 
+    if mix.is_mix(dataset, root):
+        from hnet.data.tokenizer import dataset_tokenizer
+
+        man = mix.load_manifest(dataset, root)
+        name = subset or "mix"
+        if name not in man["val_sets"]:
+            raise KeyError(f"{dataset} has no val set {name!r}; available: {sorted(man['val_sets'])}")
+        v = man["val_sets"][name]
+        target = None if n_bytes_target is None or n_bytes_target >= v["bytes"] else n_bytes_target
+        path = Path(dataset_dir(dataset, root)) / f"{v['stem']}.bin"
+        return ValSet(f"{dataset}:{name}", target, path, tokenizer=dataset_tokenizer(dataset, root),
+                      last_complete=True, **kw)
+    assert subset in (None, "standard"), f"{dataset} has no val subsets"
     path = Path(dataset_dir(dataset, root)) / shard_name(dataset, "val", 0)
     return ValSet(f"{dataset}_val_{n_bytes_target // 1_000_000}MB", n_bytes_target, path, **kw)
 

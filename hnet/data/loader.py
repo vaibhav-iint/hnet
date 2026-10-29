@@ -86,22 +86,23 @@ def _block_perm(seed: int, epoch: int, block: int, n: int) -> np.ndarray:
     return np.random.default_rng(ss).permutation(n)
 
 
-def segment_starts(x: np.ndarray, kind: str) -> np.ndarray:
+def segment_starts(x: np.ndarray, kind: str, eot_id: int = S.EOT_ID) -> np.ndarray:
     """Bool [n, L]: positions that start a segment (window starts + document starts)."""
     s = np.zeros(x.shape, dtype=bool)
     s[:, 0] = True
     if kind == "tokens":
-        s |= x == S.EOT_ID
+        s |= x == eot_id
     else:
         s |= x == BOS_ID
         s[:, 1:] |= x[:, :-1] == EOS_ID
     return s
 
 
-def make_labels(x: np.ndarray, nxt: np.ndarray, kind: str, cross_window_label: bool = True) -> np.ndarray:
+def make_labels(x: np.ndarray, nxt: np.ndarray, kind: str, cross_window_label: bool = True,
+                eot_id: int = S.EOT_ID) -> np.ndarray:
     lab = nxt.astype(np.int64)
     if kind == "tokens":
-        lab[nxt == S.EOT_ID] = IGNORE_INDEX
+        lab[nxt == eot_id] = IGNORE_INDEX
     else:
         lab[(x == EOS_ID) | (nxt == BOS_ID)] = IGNORE_INDEX
     if not cross_window_label:
@@ -150,8 +151,12 @@ class WindowLoader:
 
     def __init__(self, paths, kind: str, seq_len: int, n_windows: int = 1, rank: int = 0, world_size: int = 1,
                  seed: int = 0, shuffle_buffer: int = 0, cross_window_label: bool = True,
-                 pin_memory: bool | None = None, prefetch: int = 2, max_epochs: int | None = None):
+                 pin_memory: bool | None = None, prefetch: int = 2, max_epochs: int | None = None,
+                 eot_id: int = S.EOT_ID):
+        """``eot_id``: the token shards' document-start id (GPT-2 <|endoftext|> by default; a data mix's
+        tokenizer has its own, see hnet.data.tokenizer.dataset_tokenizer)."""
         assert 0 <= rank < world_size
+        self.eot_id = int(eot_id)
         self.stream = ConcatStream(paths, kind)
         self.kind = kind
         self.seq_len = int(seq_len)
@@ -199,8 +204,8 @@ class WindowLoader:
         n = self.n_windows if n_windows is None else n_windows
         buf = self.read_windows(self.window_ids(consumed, n)).astype(np.int64)
         x, nxt = buf[:, :-1], buf[:, 1:]
-        labels = make_labels(x, nxt, self.kind, self.cross_window_label)
-        starts = segment_starts(x, self.kind)
+        labels = make_labels(x, nxt, self.kind, self.cross_window_label, self.eot_id)
+        starts = segment_starts(x, self.kind, self.eot_id)
         return pack_windows(x, labels, starts, self.pin_memory)
 
     # ------------------------------------------------------------ iteration
@@ -276,17 +281,24 @@ class WindowLoader:
 _STATS_PATH = Path(__file__).with_name("bpt_stats.json")
 
 
-def load_bpt_stats(dataset: str | None = None) -> dict:
-    """Committed bytes/token stats (written by scripts/data/measure_bpt.py)."""
+def load_bpt_stats(dataset: str | None = None, root=None) -> dict:
+    """Bytes/token stats: a data mix's manifest.json (its own BPE, measured on its train shards), else the
+    committed GPT-2 stats (written by scripts/data/measure_bpt.py)."""
+    if dataset is not None:
+        from hnet.data import mix
+
+        if mix.is_mix(dataset, root):
+            return mix.load_manifest(dataset, root)["train"]
     d = json.loads(_STATS_PATH.read_text()) if _STATS_PATH.exists() else {}
     return d if dataset is None else d[dataset]
 
 
-def bytes_per_token(dataset: str = "finewebedu10B", stream: bool = False) -> float:
-    """Measured UTF-8 bytes per GPT-2 text token (EOT excluded). `stream=True` gives the ratio of byte-stream
-    positions to token-stream positions, ((bytes + BOS + EOS) / (tokens + EOT)), which is what equalizes
-    the documents seen per step between a byte and a token loader."""
-    st = load_bpt_stats(dataset)
+def bytes_per_token(dataset: str = "finewebedu10B", stream: bool = False, root=None) -> float:
+    """Measured UTF-8 bytes per text token (EOT excluded) of the dataset's tokenizer (GPT-2, or a data mix's
+    BPE). `stream=True` gives the ratio of byte-stream positions to token-stream positions,
+    ((bytes + BOS + EOS) / (tokens + EOT)), which is what equalizes the documents seen per step between a byte
+    and a token loader."""
+    st = load_bpt_stats(dataset, root)
     return float(st["stream_bytes_per_token"] if stream else st["bytes_per_token"])
 
 

@@ -1,0 +1,673 @@
+{
+ "options": {
+  "bytes_per_token": 4.3,
+  "vocab": 32768,
+  "dataset": "mix_v1",
+  "seq_tokens": 2048,
+  "rungs": [
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12
+  ],
+  "budgets": [
+   "1e16",
+   "1e17",
+   "1e18"
+  ],
+  "batch": {
+   "1e16": 64,
+   "1e17": 128,
+   "1e18": 256
+  },
+  "n_rungs": 5,
+  "tokens_per_param": 20.0,
+  "d_floor": 256,
+  "outer_tol": 0.01,
+  "total_tol": 0.01,
+  "chunk_vocab_share": 0.64,
+  "lr_grid": [
+   0.01,
+   0.02,
+   0.04,
+   0.08
+  ],
+  "adam_lr": 0.003,
+  "gcs_root": "gs://neat-dispatch-501718-a5-hnet/runs",
+  "micro_batch": {
+   "bpe": 16,
+   "hnet": 8
+  }
+ },
+ "seq_bytes": 8832,
+ "rungs": [
+  {
+   "name": "L03",
+   "L": 3,
+   "dims": {
+    "L": 3,
+    "D": 256,
+    "heads": 3,
+    "head_dim": 128,
+    "mlp": 896
+   },
+   "outer": {
+    "d0": 192,
+    "n_enc": 2,
+    "n_dec": 2,
+    "d_state": 144,
+    "cv_buckets": 25771,
+    "ng_buckets": 4831
+   },
+   "numbers": {
+    "bpe": {
+     "params": 20023040,
+     "backbone": 3245824,
+     "emb_head": 16777216,
+     "flops_per_token": 84053032.5,
+     "flops_per_byte": 19547216.860465117,
+     "emb_head_flops_per_byte": 11705034.418604651,
+     "head_share": 0.5988082345512044
+    },
+    "hnet": {
+     "params": 20015529,
+     "main": 3245888,
+     "outer": 1173097,
+     "tables": 15461376,
+     "byte_emb_head": 98304,
+     "flops_per_byte": 19474061.099513248,
+     "stage0_flops_per_byte": 11622252.697674418,
+     "main_flops_per_byte": 7851808.401838832,
+     "byte_head_flops_per_byte": 294912.0,
+     "outer_share": 0.5968068313170135,
+     "byte_head_share": 0.015143836639568276,
+     "flops_vs_bpe": -0.0037425154421767415,
+     "outer_vs_emb_head": -0.0070723176002502885,
+     "params_vs_bpe": -0.00037511786422039783
+    }
+   }
+  },
+  {
+   "name": "L04",
+   "L": 4,
+   "dims": {
+    "L": 4,
+    "D": 256,
+    "heads": 4,
+    "head_dim": 128,
+    "mlp": 896
+   },
+   "outer": {
+    "d0": 192,
+    "n_enc": 2,
+    "n_dec": 2,
+    "d_state": 144,
+    "cv_buckets": 25771,
+    "ng_buckets": 4831
+   },
+   "numbers": {
+    "bpe": {
+     "params": 21629184,
+     "backbone": 4851968,
+     "emb_head": 16777216,
+     "flops_per_token": 104770632.0,
+     "flops_per_byte": 24365263.255813956,
+     "emb_head_flops_per_byte": 11705034.418604651,
+     "head_share": 0.48039843837154667
+    },
+    "hnet": {
+     "params": 21621673,
+     "main": 4852032,
+     "outer": 1173097,
+     "tables": 15461376,
+     "byte_emb_head": 98304,
+     "flops_per_byte": 24299594.352623038,
+     "stage0_flops_per_byte": 11622252.697674418,
+     "main_flops_per_byte": 12677341.654948618,
+     "byte_head_flops_per_byte": 294912.0,
+     "outer_share": 0.47828998826146435,
+     "byte_head_share": 0.01213649889460667,
+     "flops_vs_bpe": -0.002695185457323057,
+     "outer_vs_emb_head": -0.0070723176002502885,
+     "params_vs_bpe": -0.00034726229154091737
+    }
+   }
+  },
+  {
+   "name": "L05",
+   "L": 5,
+   "dims": {
+    "L": 5,
+    "D": 384,
+    "heads": 5,
+    "head_dim": 128,
+    "mlp": 1408
+   },
+   "outer": {
+    "d0": 192,
+    "n_enc": 4,
+    "n_dec": 4,
+    "d_state": 80,
+    "cv_buckets": 38219,
+    "ng_buckets": 7159
+   },
+   "numbers": {
+    "bpe": {
+     "params": 38195328,
+     "backbone": 13029504,
+     "emb_head": 25165824,
+     "flops_per_token": 193249264.5,
+     "flops_per_byte": 44941689.41860465,
+     "emb_head_flops_per_byte": 17557551.627906978,
+     "head_share": 0.39067404574779124
+    },
+    "hnet": {
+     "params": 38185841,
+     "main": 13029696,
+     "outer": 2097713,
+     "tables": 22923264,
+     "byte_emb_head": 98304,
+     "flops_per_byte": 45010473.26608978,
+     "stage0_flops_per_byte": 17599596.69767442,
+     "main_flops_per_byte": 27410876.56841536,
+     "byte_head_flops_per_byte": 294912.0,
+     "outer_share": 0.39101114519792646,
+     "byte_head_share": 0.006552075074984433,
+     "flops_vs_bpe": 0.0015305131688410079,
+     "outer_vs_emb_head": 0.002394700050353915,
+     "params_vs_bpe": -0.0002483811632668642
+    }
+   }
+  },
+  {
+   "name": "L06",
+   "L": 6,
+   "dims": {
+    "L": 6,
+    "D": 512,
+    "heads": 6,
+    "head_dim": 128,
+    "mlp": 1792
+   },
+   "outer": {
+    "d0": 256,
+    "n_enc": 2,
+    "n_dec": 2,
+    "d_state": 256,
+    "cv_buckets": 38923,
+    "ng_buckets": 7297
+   },
+   "numbers": {
+    "bpe": {
+     "params": 59513344,
+     "backbone": 25958912,
+     "emb_head": 33554432,
+     "flops_per_token": 313405602.0,
+     "flops_per_byte": 72885023.72093023,
+     "emb_head_flops_per_byte": 23410068.837209303,
+     "head_share": 0.32119175712755765
+    },
+    "hnet": {
+     "params": 59504353,
+     "main": 25959168,
+     "outer": 2211809,
+     "tables": 31136768,
+     "byte_emb_head": 131072,
+     "flops_per_byte": 73044431.0492158,
+     "stage0_flops_per_byte": 23530972.325581394,
+     "main_flops_per_byte": 49513458.7236344,
+     "byte_head_flops_per_byte": 393216.0,
+     "outer_share": 0.3221460142488717,
+     "byte_head_share": 0.005383244065999492,
+     "flops_vs_bpe": 0.0021871067627818874,
+     "outer_vs_emb_head": 0.005164593458175659,
+     "params_vs_bpe": -0.00015107536219105544
+    }
+   }
+  },
+  {
+   "name": "L07",
+   "L": 7,
+   "dims": {
+    "L": 7,
+    "D": 512,
+    "heads": 7,
+    "head_dim": 128,
+    "mlp": 1792
+   },
+   "outer": {
+    "d0": 256,
+    "n_enc": 2,
+    "n_dec": 2,
+    "d_state": 256,
+    "cv_buckets": 38923,
+    "ng_buckets": 7297
+   },
+   "numbers": {
+    "bpe": {
+     "params": 65674752,
+     "backbone": 32120320,
+     "emb_head": 33554432,
+     "flops_per_token": 370952668.5,
+     "flops_per_byte": 86268062.44186047,
+     "emb_head_flops_per_byte": 23410068.837209303,
+     "head_share": 0.2713642589687962
+    },
+    "hnet": {
+     "params": 65665761,
+     "main": 32120576,
+     "outer": 2211809,
+     "tables": 31136768,
+     "byte_emb_head": 131072,
+     "flops_per_byte": 86441373.93455923,
+     "stage0_flops_per_byte": 23530972.325581394,
+     "main_flops_per_byte": 62910401.60897784,
+     "byte_head_flops_per_byte": 393216.0,
+     "outer_share": 0.27221886065109985,
+     "byte_head_share": 0.004548932786488166,
+     "flops_vs_bpe": 0.002008987889528191,
+     "outer_vs_emb_head": 0.005164593458175659,
+     "params_vs_bpe": -0.0001369019254157111
+    }
+   }
+  },
+  {
+   "name": "L08",
+   "L": 8,
+   "dims": {
+    "L": 8,
+    "D": 640,
+    "heads": 8,
+    "head_dim": 128,
+    "mlp": 2304
+   },
+   "outer": {
+    "d0": 320,
+    "n_enc": 3,
+    "n_dec": 2,
+    "d_state": 112,
+    "cv_buckets": 38069,
+    "ng_buckets": 7129
+   },
+   "numbers": {
+    "bpe": {
+     "params": 98314880,
+     "backbone": 56371840,
+     "emb_head": 41943040,
+     "flops_per_token": 565374240.0,
+     "flops_per_byte": 131482381.39534885,
+     "emb_head_flops_per_byte": 29262586.046511628,
+     "head_share": 0.22255899030702211
+    },
+    "hnet": {
+     "params": 98292311,
+     "main": 56372160,
+     "outer": 3602071,
+     "tables": 38051840,
+     "byte_emb_head": 163840,
+     "flops_per_byte": 131412777.27095728,
+     "stage0_flops_per_byte": 29124530.651162792,
+     "main_flops_per_byte": 102288246.61979449,
+     "byte_head_flops_per_byte": 491520.0,
+     "outer_share": 0.2216263232235898,
+     "byte_head_share": 0.0037402755668616994,
+     "flops_vs_bpe": -0.0005293798579923958,
+     "outer_vs_emb_head": -0.004717812538146959,
+     "params_vs_bpe": -0.00022955833338755838
+    }
+   }
+  },
+  {
+   "name": "L09",
+   "L": 9,
+   "dims": {
+    "L": 9,
+    "D": 640,
+    "heads": 9,
+    "head_dim": 128,
+    "mlp": 2304
+   },
+   "outer": {
+    "d0": 320,
+    "n_enc": 3,
+    "n_dec": 2,
+    "d_state": 112,
+    "cv_buckets": 38069,
+    "ng_buckets": 7129
+   },
+   "numbers": {
+    "bpe": {
+     "params": 108310400,
+     "backbone": 66367360,
+     "emb_head": 41943040,
+     "flops_per_token": 652257772.5,
+     "flops_per_byte": 151687854.06976745,
+     "emb_head_flops_per_byte": 29262586.046511628,
+     "head_share": 0.19291317835541774
+    },
+    "hnet": {
+     "params": 108287831,
+     "main": 66367680,
+     "outer": 3602071,
+     "tables": 38051840,
+     "byte_emb_head": 163840,
+     "flops_per_byte": 151636432.31422392,
+     "stage0_flops_per_byte": 29124530.651162792,
+     "main_flops_per_byte": 122511901.66306111,
+     "byte_head_flops_per_byte": 491520.0,
+     "outer_share": 0.1920681607096267,
+     "byte_head_share": 0.0032414373808364394,
+     "flops_vs_bpe": -0.00033899718510010945,
+     "outer_vs_emb_head": -0.004717812538146959,
+     "params_vs_bpe": -0.0002083733418027922
+    }
+   }
+  },
+  {
+   "name": "L10",
+   "L": 10,
+   "dims": {
+    "L": 10,
+    "D": 768,
+    "heads": 10,
+    "head_dim": 128,
+    "mlp": 2816
+   },
+   "outer": {
+    "d0": 352,
+    "n_enc": 2,
+    "n_dec": 2,
+    "d_state": 224,
+    "cv_buckets": 42019,
+    "ng_buckets": 7879
+   },
+   "numbers": {
+    "bpe": {
+     "params": 154550016,
+     "backbone": 104218368,
+     "emb_head": 50331648,
+     "flops_per_token": 934608834.0,
+     "flops_per_byte": 217350891.62790698,
+     "emb_head_flops_per_byte": 35115103.255813956,
+     "head_share": 0.16155950864894136
+    },
+    "hnet": {
+     "params": 154548213,
+     "main": 104218784,
+     "outer": 3803477,
+     "tables": 46221824,
+     "byte_emb_head": 180224,
+     "flops_per_byte": 217702547.8085451,
+     "stage0_flops_per_byte": 35359804.32558139,
+     "main_flops_per_byte": 182342743.48296374,
+     "byte_head_flops_per_byte": 540672.0,
+     "outer_share": 0.1624225562884913,
+     "byte_head_share": 0.0024835354727932952,
+     "flops_vs_bpe": 0.0016179191997065523,
+     "outer_vs_emb_head": 0.006968541940052919,
+     "params_vs_bpe": -1.1666126259135545e-05
+    }
+   }
+  },
+  {
+   "name": "L11",
+   "L": 11,
+   "dims": {
+    "L": 11,
+    "D": 768,
+    "heads": 11,
+    "head_dim": 128,
+    "mlp": 2816
+   },
+   "outer": {
+    "d0": 352,
+    "n_enc": 2,
+    "n_dec": 2,
+    "d_state": 224,
+    "cv_buckets": 42019,
+    "ng_buckets": 7879
+   },
+   "numbers": {
+    "bpe": {
+     "params": 169297152,
+     "backbone": 118965504,
+     "emb_head": 50331648,
+     "flops_per_token": 1056333856.5,
+     "flops_per_byte": 245659036.39534885,
+     "emb_head_flops_per_byte": 35115103.255813956,
+     "head_share": 0.14294244482544427
+    },
+    "hnet": {
+     "params": 169295349,
+     "main": 118965920,
+     "outer": 3803477,
+     "tables": 46221824,
+     "byte_emb_head": 180224,
+     "flops_per_byte": 246033153.14926982,
+     "stage0_flops_per_byte": 35359804.32558139,
+     "main_flops_per_byte": 210673348.82368845,
+     "byte_head_flops_per_byte": 540672.0,
+     "outer_share": 0.1437196730317413,
+     "byte_head_share": 0.002197557496131308,
+     "flops_vs_bpe": 0.001522910613875883,
+     "outer_vs_emb_head": 0.006968541940052919,
+     "params_vs_bpe": -1.0649913354754403e-05
+    }
+   }
+  },
+  {
+   "name": "L12",
+   "L": 12,
+   "dims": {
+    "L": 12,
+    "D": 896,
+    "heads": 12,
+    "head_dim": 128,
+    "mlp": 3200
+   },
+   "outer": {
+    "d0": 448,
+    "n_enc": 2,
+    "n_dec": 2,
+    "d_state": 96,
+    "cv_buckets": 37717,
+    "ng_buckets": 7079
+   },
+   "numbers": {
+    "bpe": {
+     "params": 228022144,
+     "backbone": 169301888,
+     "emb_head": 58720256,
+     "flops_per_token": 1419929736.0,
+     "flops_per_byte": 330216217.6744186,
+     "emb_head_flops_per_byte": 40967620.46511628,
+     "head_share": 0.12406301772104024
+    },
+    "hnet": {
+     "params": 228021001,
+     "main": 169302336,
+     "outer": 5465801,
+     "tables": 52822784,
+     "byte_emb_head": 229376,
+     "flops_per_byte": 329967623.9643051,
+     "stage0_flops_per_byte": 40565011.39534884,
+     "main_flops_per_byte": 289402612.56895626,
+     "byte_head_flops_per_byte": 688128.0,
+     "outer_share": 0.12293633814127486,
+     "byte_head_share": 0.0020854409645791176,
+     "flops_vs_bpe": -0.0007528210209185593,
+     "outer_vs_emb_head": -0.009827494621276744,
+     "params_vs_bpe": -5.01267105001979e-06
+    }
+   }
+  }
+ ],
+ "budgets": {
+  "1e16": [
+   {
+    "rung": "L03",
+    "steps": 908,
+    "batch_windows": 64,
+    "tokens": 119013376,
+    "bytes": 513245184,
+    "tokens_per_param": 36.666614086284405,
+    "flops_bpe": 1.000343516086272e+16,
+    "flops_hnet": 9994968072246920.0,
+    "optimum_prior": false
+   },
+   {
+    "rung": "L04",
+    "steps": 728,
+    "batch_windows": 64,
+    "tokens": 95420416,
+    "bytes": 411500544,
+    "tokens_per_param": 19.666332506727166,
+    "flops_bpe": 9997257290022912.0,
+    "flops_hnet": 9999296295083708.0,
+    "optimum_prior": true
+   },
+   {
+    "rung": "L05",
+    "steps": 395,
+    "batch_windows": 64,
+    "tokens": 51773440,
+    "bytes": 223272960,
+    "tokens_per_param": 3.9735541736661655,
+    "flops_bpe": 1.000517920063488e+16,
+    "flops_hnet": 1.0049621597120734e+16,
+    "optimum_prior": false
+   },
+   {
+    "rung": "L06",
+    "steps": 243,
+    "batch_windows": 64,
+    "tokens": 31850496,
+    "bytes": 137355264,
+    "tokens_per_param": 1.2269580481647304,
+    "flops_bpe": 9982123872878592.0,
+    "flops_hnet": 1.0033037110494832e+16,
+    "optimum_prior": false
+   }
+  ],
+  "1e17": [
+   {
+    "rung": "L05",
+    "steps": 1974,
+    "batch_windows": 128,
+    "tokens": 517472256,
+    "bytes": 2231599104,
+    "tokens_per_param": 39.71542247502284,
+    "flops_bpe": 1.0000113287115571e+17,
+    "flops_hnet": 1.004453318112219e+17,
+    "optimum_prior": false
+   },
+   {
+    "rung": "L06",
+    "steps": 1217,
+    "batch_windows": 128,
+    "tokens": 319029248,
+    "bytes": 1375813632,
+    "tokens_per_param": 12.289777321946312,
+    "flops_bpe": 9.99855535250473e+16,
+    "flops_hnet": 1.0049552397919515e+17,
+    "optimum_prior": true
+   },
+   {
+    "rung": "L07",
+    "steps": 1028,
+    "batch_windows": 128,
+    "tokens": 269484032,
+    "bytes": 1162149888,
+    "tokens_per_param": 8.389830238303977,
+    "flops_bpe": 9.99658207885394e+16,
+    "flops_hnet": 1.0045783303661413e+17,
+    "optimum_prior": false
+   },
+   {
+    "rung": "L08",
+    "steps": 675,
+    "batch_windows": 128,
+    "tokens": 176947200,
+    "bytes": 763084800,
+    "tokens_per_param": 3.1389289404071254,
+    "flops_bpe": 1.00041388720128e+17,
+    "flops_hnet": 1.0027909286125298e+17,
+    "optimum_prior": false
+   },
+   {
+    "rung": "L09",
+    "steps": 585,
+    "batch_windows": 128,
+    "tokens": 153354240,
+    "bytes": 661340160,
+    "tokens_per_param": 2.3106876633333013,
+    "flops_bpe": 1.000264949858304e+17,
+    "flops_hnet": 1.0028326240851802e+17,
+    "optimum_prior": false
+   }
+  ],
+  "1e18": [
+   {
+    "rung": "L07",
+    "steps": 5142,
+    "batch_windows": 256,
+    "tokens": 2695888896,
+    "bytes": 11626020864,
+    "tokens_per_param": 83.9309476368853,
+    "flops_bpe": 1.000047179950719e+18,
+    "flops_hnet": 1.0049692168760114e+18,
+    "optimum_prior": false
+   },
+   {
+    "rung": "L08",
+    "steps": 3374,
+    "batch_windows": 256,
+    "tokens": 1768947712,
+    "bytes": 7628587008,
+    "tokens_per_param": 31.379988873877455,
+    "flops_bpe": 1.0001174682717389e+18,
+    "flops_hnet": 1.0024938053744224e+18,
+    "optimum_prior": false
+   },
+   {
+    "rung": "L09",
+    "steps": 2924,
+    "batch_windows": 256,
+    "tokens": 1533018112,
+    "bytes": 6611140608,
+    "tokens_per_param": 23.098976846449823,
+    "flops_bpe": 9.999229789352755e+17,
+    "flops_hnet": 1.0024897753248091e+18,
+    "optimum_prior": true
+   },
+   {
+    "rung": "L10",
+    "steps": 2041,
+    "batch_windows": 256,
+    "tokens": 1070071808,
+    "bytes": 4614684672,
+    "tokens_per_param": 10.267593213511077,
+    "flops_bpe": 1.0000985647711519e+18,
+    "flops_hnet": 1.0046286104274404e+18,
+    "optimum_prior": false
+   },
+   {
+    "rung": "L11",
+    "steps": 1806,
+    "batch_windows": 256,
+    "tokens": 946864128,
+    "bytes": 4083351552,
+    "tokens_per_param": 7.959148628496543,
+    "flops_bpe": 1.0002046359117496e+18,
+    "flops_hnet": 1.0046398577555246e+18,
+    "optimum_prior": false
+   }
+  ]
+ }
+}

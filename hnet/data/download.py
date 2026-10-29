@@ -39,9 +39,13 @@ def data_root() -> Path:
     return Path(__file__).resolve().parents[2] / "data"
 
 
+def file_prefix(dataset: str) -> str:
+    """Shard file prefix: the HF repo's for modded-nanogpt datasets, the dataset name for data mixes."""
+    return DATASETS[dataset][1] if dataset in DATASETS else dataset
+
+
 def shard_name(dataset: str, split: str, i: int) -> str:
-    prefix = DATASETS[dataset][1]
-    return f"{prefix}_{split}_{i:06d}.bin"
+    return f"{file_prefix(dataset)}_{split}_{i:06d}.bin"
 
 
 def stream_order(dataset: str, n_train: int) -> list[str]:
@@ -60,13 +64,13 @@ def bytes_dir(dataset: str, root=None) -> Path:
 def token_paths(dataset: str, split: str, root=None, n=None) -> list[Path]:
     """Existing local token shards of a split, sorted (train: optionally the first n)."""
     d = dataset_dir(dataset, root)
-    paths = sorted(d.glob(f"{DATASETS[dataset][1]}_{split}_*.bin"))
+    paths = sorted(d.glob(f"{file_prefix(dataset)}_{split}_*.bin"))
     return paths[:n] if n is not None else paths
 
 
 def byte_shard_paths(dataset: str, split: str, root=None, n=None) -> list[Path]:
     d = bytes_dir(dataset, root)
-    paths = sorted(d.glob(f"{DATASETS[dataset][1]}_{split}_*.bytes.bin"))
+    paths = sorted(d.glob(f"{file_prefix(dataset)}_{split}_*.bytes.bin"))
     return paths[:n] if n is not None else paths
 
 

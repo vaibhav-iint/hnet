@@ -159,15 +159,20 @@ def test_outputs_stats_and_losses():
 def test_chunked_ce(monkeypatch):
     m = make(tiny_cfg())
     ids, labels = text_ids(50, 7), text_ids(50, 8)
+    labels[::5] = IGNORE_INDEX
     full = m(ids, labels=labels, return_logits=False)
-    full.ce_sum.backward()
-    g_full = m.lm_head.weight.grad.clone()
+    (2.5 * full.ce_sum).backward()
+    g_full = {n: p.grad.clone() for n, p in m.named_parameters() if p.grad is not None}
     m.zero_grad()
-    monkeypatch.setattr(lm_mod, "CE_CHUNK_ELEMENTS", 256 * 7)  # 7 rows per chunk
+    monkeypatch.setattr(lm_mod, "CE_CHUNK_ELEMENTS", 256 * 7)  # 7 rows per chunk: fused chunked linear + CE
     chunked = m(ids, labels=labels, return_logits=False)
-    chunked.ce_sum.backward()
+    (2.5 * chunked.ce_sum).backward()
     torch.testing.assert_close(chunked.ce_sum, full.ce_sum)
-    torch.testing.assert_close(m.lm_head.weight.grad, g_full)
+    for n, p in m.named_parameters():
+        if n in g_full:
+            torch.testing.assert_close(p.grad, g_full[n], msg=n)
+    with torch.no_grad():  # eval path (no gradients): plain chunk loop
+        torch.testing.assert_close(m(ids, labels=labels, return_logits=False).ce_sum, full.ce_sum)
 
 
 def test_init_stage_map_blocks():

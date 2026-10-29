@@ -35,7 +35,7 @@ from hnet.optim import build_optimizer, build_schedule, params_by_stage, set_lr
 from hnet.train import checkpoint as ckpt
 from hnet.train.config import dump_yaml, load_run_config, model_config_from_section
 from hnet.train.data import (GPT2_EOT, Prefetcher, build_train_loader, build_val_batches, data_kind,
-                             default_bytes_per_token)
+                             default_bytes_per_token, default_eot)
 from hnet.train.metrics import FlopsEstimator, MetricsLogger, StatAccumulator, grad_norms_by_stage, peak_flops
 
 LN2 = math.log(2.0)
@@ -160,7 +160,7 @@ class Trainer:
         self.kind = data_kind(dc, self.mcfg)
         self.seq_len = int(dc["seq_len"])
         self.bpt = default_bytes_per_token(dc, self.mcfg)
-        self.eot = int(dc.get("eot", GPT2_EOT))
+        self.eot = default_eot(dc) if self.kind == "tokens" else GPT2_EOT  # data mixes: their BPE's id
 
         # ---- batch arithmetic
         mb = int(dc["micro_batch"])

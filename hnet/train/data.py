@@ -300,15 +300,15 @@ class HNetDataLoader:
 
         self.kind, self.accum, self.world = kind, grad_accum, world_size
         self.mb = int(data_cfg["micro_batch"])
+        tok = dataset_tokenizer(data_cfg) if kind == "tokens" else None
         self.inner = WindowLoader(_shard_paths(data_cfg, kind), kind, int(data_cfg["seq_len"]), n_windows=self.mb,
                                   rank=rank, world_size=world_size, seed=seed,
                                   shuffle_buffer=int(data_cfg.get("shuffle_buffer", 0) or 0),
                                   cross_window_label=bool(data_cfg.get("cross_window_label", True)),
-                                  pin_memory=False, prefetch=0)
+                                  pin_memory=False, prefetch=0,
+                                  eot_id=default_eot(data_cfg) if kind == "tokens" else GPT2_EOT)
         if kind == "tokens":
-            from hnet.data.shards import token_byte_lengths
-
-            self._tbl = token_byte_lengths
+            self._tbl = tok.byte_lengths
 
     def get(self, step: int, micro: int) -> dict:
         b = self.inner.build((step * self.accum + micro) * self.world * self.mb)
@@ -330,12 +330,30 @@ class HNetDataLoader:
 
 
 def default_bytes_per_token(data_cfg: dict, model_cfg) -> float:
-    """Text bytes per GPT-2 text token: config, else WS-C's measured value, else model n_gpt, else 4.6."""
+    """Text bytes per text token of the dataset's tokenizer (GPT-2, or a data mix's BPE): config, else WS-C's
+    measured value (bpt_stats.json / the mix manifest), else model n_gpt, else 4.6."""
     if data_cfg.get("bytes_per_token"):
         return float(data_cfg["bytes_per_token"])
     if data_cfg.get("source") not in ("synthetic", "text"):
-        return float(_hnet_data().bytes_per_token(data_cfg.get("dataset", "finewebedu10B")))
+        return float(_hnet_data().bytes_per_token(data_cfg.get("dataset", "finewebedu10B"),
+                                                  root=data_cfg.get("root")))
     return float(getattr(model_cfg, "lr_multiplier_n_gpt", None) or 4.6)
+
+
+def dataset_tokenizer(data_cfg: dict):
+    """hnet.data tokenizer (EOT id, per-id byte lengths) of the configured dataset's token shards."""
+    from hnet.data.tokenizer import dataset_tokenizer as dt
+
+    return dt(data_cfg.get("dataset", "finewebedu10B"), data_cfg.get("root"))
+
+
+def default_eot(data_cfg: dict) -> int:
+    """Document-start token id: ``data.eot`` if set, else the dataset tokenizer's (GPT-2 50256; data mixes 0)."""
+    if data_cfg.get("eot") is not None:
+        return int(data_cfg["eot"])
+    if data_cfg.get("source", "hnet") in ("synthetic", "text"):
+        return GPT2_EOT
+    return int(dataset_tokenizer(data_cfg).eot_id)
 
 
 def build_val_batches(data_cfg: dict, eval_cfg: dict, kind: str, seed: int):
@@ -359,7 +377,11 @@ def build_val_batches(data_cfg: dict, eval_cfg: dict, kind: str, seed: int):
     ds = data_cfg.get("dataset", "finewebedu10B")
     vb = eval_cfg.get("val_bytes")
     if data_cfg.get("val_token_path"):  # explicit val token shard (e.g. hnet.data.synth fixtures)
-        vs = hd.ValSet("custom_val", int(vb) if vb else None, data_cfg["val_token_path"], **kw)
+        vs = hd.ValSet("custom_val", int(vb) if vb else None, data_cfg["val_token_path"],
+                       tokenizer=dataset_tokenizer(data_cfg), **kw)
+    elif which not in ("standard", "speedrun"):  # a data mix's named val set, e.g. eval.val: code.python
+        vs = hd.standard_valset(ds, n_bytes_target=int(vb) if vb else None, root=data_cfg.get("root"),
+                                subset=which, **kw)
     elif which == "speedrun":
         from hnet.data import download as D
 

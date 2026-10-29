@@ -1,0 +1,10 @@
+# hnet_L08 + the EXP-024 "prior" recipe extras (chunk vocabulary with next-chunk objective, byte n-gram tables,
+# 10% whitespace router curriculum): measures their throughput cost. Benchmark only.
+include: hnet_L08.yaml
+model:
+  dc:
+    chunk_vocab: [{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}]
+    router_prior_weight: 1.0
+    router_prior_frac: 0.1
+  ngram_embed: {ns: [3, 4, 5, 6, 7, 8], buckets: 12289}
+train: {out_dir: runs/bench/hnet_L08_full}

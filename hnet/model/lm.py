@@ -13,6 +13,7 @@ Each H-Net stage adds exactly one in its chunker (see ``SelectChunker``).
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
 
@@ -72,12 +73,77 @@ def _ce_sum(h: torch.Tensor, head: nn.Linear, labels: torch.Tensor) -> torch.Ten
     return F.cross_entropy(head(h).float(), labels, ignore_index=IGNORE_INDEX, reduction="sum")
 
 
+def _ce_chunk(logits: torch.Tensor, labels: torch.Tensor, grad: bool):
+    """(fp32 CE sum, d(CE sum)/d(logits) in logits' dtype or None) of one chunk of logits [n, V]."""
+    lf = logits.float()
+    lse = torch.logsumexp(lf, dim=-1)
+    valid = labels != IGNORE_INDEX
+    safe = torch.where(valid, labels, torch.zeros_like(labels))
+    tgt = lf.gather(1, safe[:, None]).squeeze(1)
+    loss = torch.where(valid, lse - tgt, torch.zeros_like(lse)).sum()
+    if not grad:
+        return loss, None
+    g = torch.exp(lf - lse[:, None])
+    g = g - F.one_hot(safe, lf.shape[1]).to(g.dtype)
+    g = g * valid[:, None].to(g.dtype)
+    return loss, g.to(logits.dtype)
+
+
+_ce_chunk_compiled = None
+
+
+def _ce_chunk_fn(device: torch.device):
+    """``_ce_chunk`` fused by torch.compile on CUDA (one pass over the logits instead of ~8); eager elsewhere."""
+    global _ce_chunk_compiled
+    if device.type != "cuda" or os.environ.get("HNET_CE_COMPILE", "1") != "1":
+        return _ce_chunk
+    if _ce_chunk_compiled is None:
+        _ce_chunk_compiled = torch.compile(_ce_chunk, dynamic=False)
+    return _ce_chunk_compiled
+
+
+class _ChunkedLinearCE(torch.autograd.Function):
+    """sum CE(h @ W^T, labels) over row chunks. Each chunk's gradient is computed in the forward pass and kept (grad
+    w.r.t. h: [T, D]; w.r.t. W: [V, D] fp32), so neither logits nor a recomputation (activation checkpointing) are
+    needed: the LM head costs exactly its forward + backward FLOPs. Matmuls run in h's dtype (bf16 under autocast,
+    as ``head(h)`` would), CE math in fp32."""
+
+    @staticmethod
+    def forward(ctx, h, weight, labels, rows: int):
+        cdt = h.dtype
+        w = weight.to(cdt)
+        need_h, need_w = ctx.needs_input_grad[0], ctx.needs_input_grad[1]
+        fn = _ce_chunk_fn(h.device)
+        total = torch.zeros((), dtype=torch.float32, device=h.device)
+        gh = torch.empty_like(h) if need_h else None
+        gw = torch.zeros(weight.shape, dtype=torch.float32, device=h.device) if need_w else None
+        for s in range(0, h.shape[0], rows):
+            hs, ys = h[s:s + rows], labels[s:s + rows]
+            loss, g = fn(hs @ w.T, ys, need_h or need_w)
+            total = total + loss
+            if need_h:
+                gh[s:s + rows] = g @ w
+            if need_w:
+                gw.add_(g.T @ hs)
+        ctx.save_for_backward(gh, gw)
+        ctx.weight_dtype = weight.dtype
+        return total
+
+    @staticmethod
+    def backward(ctx, go):
+        gh, gw = ctx.saved_tensors
+        return (None if gh is None else gh * go.to(gh.dtype),
+                None if gw is None else (gw * go).to(ctx.weight_dtype), None, None)
+
+
 def chunked_ce_sum(h: torch.Tensor, head: nn.Linear, labels: torch.Tensor) -> torch.Tensor:
-    """fp32 sum of CE(head(h), labels) holding at most ~CE_CHUNK_ELEMENTS logits at once (chunks are
-    recomputed in backward via activation checkpointing)."""
+    """fp32 sum of CE(head(h), labels) holding at most ~CE_CHUNK_ELEMENTS logits at once. With gradients, the
+    chunks' backward runs in the forward pass (:class:`_ChunkedLinearCE`: no stored logits, no recompute)."""
     rows = max(1, CE_CHUNK_ELEMENTS // head.out_features)
     if h.shape[0] <= rows:
         return _ce_sum(h, head, labels)
+    if head.bias is None and torch.is_grad_enabled() and (h.requires_grad or head.weight.requires_grad):
+        return _ChunkedLinearCE.apply(h, head.weight, labels, rows)
     total = h.new_zeros((), dtype=torch.float32)
     for hs, ys in zip(h.split(rows), labels.split(rows)):
         total = total + checkpoint(_ce_sum, hs, head, ys, use_reentrant=False)
