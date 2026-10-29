@@ -109,3 +109,24 @@ def test_model_trains_with_quantile_decision_and_ratio_loss_is_inert():
     out2 = m(ids, labels=ids)
     assert torch.isfinite(out2.loss)
     assert abs(float(out2.stats["compression/s0"]) - 3.0) < 0.3  # running stats from one batch: same data
+
+
+def test_robust_normalization_keeps_typical_confidences_away_from_half_under_outliers():
+    """EXP-018: a few huge scores inflated the std, pushed every other confidence to ~0.5 and the hierarchy was
+    never used. With median/MAD the bulk keeps its margins; the outliers saturate (clipped) on their own."""
+    torch.manual_seed(0)
+    ctx = _ctx([2000])
+    free = ctx.position_ids != 0
+    logit = torch.randn(2000)
+    logit[:20] = 300.0  # 1% outliers
+    for robust, lo in ((True, 0.25), (False, 0.0)):
+        dec = QuantileDecider(target_ratio=3.0, robust=robust).train()
+        r = dec(router_output(torch.sigmoid(logit), ctx, "end", logit=logit), ctx)
+        bulk = free.clone()
+        bulk[:20] = False
+        margin = float((r.p[bulk] - 0.5).abs().mean())
+        if robust:
+            assert margin > lo, margin
+        else:
+            assert margin < 0.05, margin  # the failure mode
+        assert int(r.boundary_mask[free].sum()) == round(int(free.sum()) / 3)

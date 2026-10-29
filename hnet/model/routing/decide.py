@@ -7,8 +7,8 @@ and "select nothing" (logbook, EXP-003).
 
 ``quantile`` (rank decisions on normalized scores): exactly the top 1/N positions of the batch, by router score,
 are selected, whatever the scale or offset of the scores. The score s (the router's logit, or logit(p) when the
-router has none) is standardized over the batch, z = (s - mean) / std, with the statistics in the graph (as in
-BatchNorm), and the confidence seen by the STE and the EMA dechunker is p' = sigmoid(temp (z - z_tau)) with z_tau
+router has none) is standardized over the batch, z = (s - median) / (1.4826 MAD) (robust; mean/std with
+``robust=False``), with the statistics in the graph (as in BatchNorm), and the confidence seen by the STE and the EMA dechunker is p' = sigmoid(temp (z - z_tau)) with z_tau
 midway between the k-th and (k+1)-th largest z: 0.5 exactly at the decision boundary. Running estimates of mean, std
 and z_tau serve eval, like BatchNorm statistics. Under this rule the ratio loss is an exact constant (F = 1/N),
 i.e. inert, and the router only has to learn the relative order of positions.
@@ -38,13 +38,16 @@ class QuantileDecider(nn.Module):
     """``temp`` sets the confidence margins (std of temp * z is temp); ``normalize=False`` keeps the raw score
     scale (the EXP-014 behaviour, apart from the rank selection), for ablation."""
 
-    def __init__(self, target_ratio: float, momentum: float = 0.99, temp: float = 2.0, normalize: bool = True):
+    def __init__(self, target_ratio: float, momentum: float = 0.99, temp: float = 2.0, normalize: bool = True,
+                 robust: bool = True, z_clip: float = 4.0):
         super().__init__()
         assert target_ratio > 1, target_ratio
         self.ratio = float(target_ratio)
         self.momentum = momentum
         self.temp = float(temp)
         self.normalize = bool(normalize)
+        self.robust = bool(robust)  # median / 1.4826 MAD instead of mean / std (EXP-018: heavy-tailed scores)
+        self.z_clip = float(z_clip)
         self.register_buffer("mu", torch.tensor(0.0))
         self.register_buffer("sigma", torch.tensor(1.0))
         self.register_buffer("z_tau", torch.tensor(0.0))
@@ -67,8 +70,13 @@ class QuantileDecider(nn.Module):
         n_free = int(free.sum())
         if self.training and n_free >= 2:
             sf = s[free]
-            if self.normalize:
-                mu, sigma = sf.mean(), sf.std() + EPS  # in the graph: the gradient loses its shift/scale components
+            if self.normalize and self.robust:
+                # in the graph: the gradient loses its shift/scale components. Robust: a few huge scores must not
+                # shrink everyone else's confidence toward 0.5 (EXP-018 seed 1: std 15, margins 0.10, hierarchy unused)
+                mu = sf.median()
+                sigma = 1.4826 * (sf - mu).abs().median() + EPS  # mu in the graph: keeps the shift/scale gradients exactly zero
+            elif self.normalize:
+                mu, sigma = sf.mean(), sf.std() + EPS
             else:
                 mu, sigma = s.new_zeros(()), s.new_ones(())
             z = (s - mu) / sigma
@@ -87,7 +95,10 @@ class QuantileDecider(nn.Module):
             z = (s - self.mu) / self.sigma
             z_tau = self.z_tau
             mask = (z > z_tau) & free
-        p2 = torch.sigmoid(self.temp * (z - z_tau.detach()))
+        zc = z - z_tau.detach()
+        if self.z_clip > 0:
+            zc = zc.clamp(-self.z_clip, self.z_clip)
+        p2 = torch.sigmoid(self.temp * zc)
         out = router_output(p2, ctx, r.semantics, logit=s, mask=mask)
         out.extra = dict(r.extra)
         with torch.no_grad():
