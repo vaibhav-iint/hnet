@@ -117,6 +117,9 @@ class DCConfig:
     #   is refereed by the optimizer's scale dynamics, not by usefulness. The norm sits before the STE (a per-position
     #   RMSNorm after it would cancel the STE's gradient to the router). Each norm adds d parameters, no counted FLOPs.
     fusion: str = "add"
+    # fusion_bypass_init: initial value of the bypass gain g_r under fusion="balanced" (0 = bypass closed at init; it
+    #   then opens at Adam's pace, <= lr per step per channel).
+    fusion_bypass_init: float = 0.0
     # chunk_ste: multiply the chunk vectors entering the main network by STE(selected_probs), so chunk-level losses
     #   (next-chunk CE, main_aux) reach the router directly instead of only through the decoder's use of the output.
     chunk_ste: bool = False

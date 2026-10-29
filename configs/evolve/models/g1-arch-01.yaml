@@ -1,5 +1,5 @@
 # g1-arch-01 (evolve generation 1, architecture track): hnet_ws_L03 + scale-balanced decoder input (dc.fusion: balanced).
-# Copy of configs/ladder/models/hnet_ws_L03.yaml (do not regenerate); the only change is the `fusion` line.
+# Copy of configs/ladder/models/hnet_ws_L03.yaml (do not regenerate); the only changes are the two `fusion` lines.
 # Params +384 (two RMSNorm gains at d0 192) vs hnet_ws_L03; FLOPs/byte unchanged (norms are not counted).
 model:
   type: hnet
@@ -33,6 +33,7 @@ model:
     router_prior_weight: 1.0
     router_prior_frac: 0.1
     fusion: balanced
+    fusion_bypass_init: 0.5
   ngram_embed:
     ns: [3, 4, 5, 6, 7, 8]
     buckets: 4817

@@ -72,6 +72,14 @@ def test_bypass_is_closed_at_init_including_the_bias():
     assert float(m_add(ids).stats["residual_rms/s0"]) > 0.0  # the bias the add fusion lets through
 
 
+def test_bypass_init_knob():
+    """dc.fusion_bypass_init sets g_r at init; the bypass then enters at that rms from step 0."""
+    ids = torch.randint(0, 256, (2, 300))
+    m = _model(fusion="balanced", fusion_bypass_init=0.5).eval()
+    assert torch.allclose(m.backbone.fuse_bypass.weight, torch.full_like(m.backbone.fuse_bypass.weight, 0.5))
+    assert abs(float(m(ids).stats["residual_rms/s0"]) - 0.5) < 1e-3
+
+
 def test_bypass_scale_is_set_by_its_gain_not_by_residual_proj():
     """The point of the mechanism: growing residual_proj (what Muon does to it in training) does not grow the
     bypass. Scaling its weight and bias by 10 leaves the forward pass unchanged; scaling g_r does change it."""

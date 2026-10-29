@@ -115,8 +115,8 @@ class HNet(nn.Module):
             self.fusion = cfg.dc.fusion
             if self.fusion == "balanced":  # scale-balanced decoder input (HNetConfig.dc.fusion)
                 self.fuse_hier = RMSNorm(d, eps=cfg.norm_eps)  # gain g_h, init 1
-                self.fuse_bypass = RMSNorm(d, eps=cfg.norm_eps)  # gain g_r, init 0: bypass closed at init
-                nn.init.zeros_(self.fuse_bypass.weight)
+                self.fuse_bypass = RMSNorm(d, eps=cfg.norm_eps)  # gain g_r (default init 0: bypass closed at init)
+                nn.init.constant_(self.fuse_bypass.weight, float(cfg.dc.fusion_bypass_init))
 
         d_prev = cfg.d_model[stage_idx - 1] if stage_idx > 0 else d
         self.pad_dimension = nn.Parameter(torch.zeros(d - d_prev)) if d > d_prev else None
