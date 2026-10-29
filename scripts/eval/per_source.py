@@ -3,6 +3,7 @@
 
     python scripts/eval/per_source.py --model runs/ladder/hnet_1e17_L8 --sources data/mix/val_sources.yaml
     python scripts/eval/per_source.py --model runs/ladder/bpe_1e17_L8  --source finewebedu=data/.../val.bytes.bin
+    python scripts/eval/per_source.py --model RUN --mix mix_v1          # every leaf val set of a data mix
     python scripts/eval/per_source.py --model RUN                       # default: FineWeb-Edu val (english)
 
 Writes ``<run>/per_source.json`` (or ``--out``): per source and per group, bpb (+ bootstrap CI over documents),
@@ -30,12 +31,15 @@ Protocol (identical text for every model; see docs/ANALYSIS_LADDER.md)
 ---------------------------------------------------------------------
 * Documents: in file order, valid UTF-8 only, until the source's ``max_bytes`` (whole documents) / ``max_docs``.
 * Windows: each document is cut greedily into windows at token boundaries of a fixed *split tokenizer*
-  (``--split-tokenizer``, default GPT-2) that are also UTF-8 character starts, with at most ``byte_seq_len - 1``
+  (``--split-tokenizer``; ``auto`` = the run's dataset tokenizer: the mix's in-corpus BPE for mix runs, GPT-2
+  for FineWeb runs, so the BPE and H-Net runs of one ladder get identical windows) that are also UTF-8 character
+  starts, with at most ``byte_seq_len - 1``
   bytes and ``token_seq_len - 1`` split tokens per window (the ``hnet.data.valsets`` protocol; defaults from the
   run's ``eval.val_byte_seq_len`` / ``eval.val_token_seq_len``). Window c is scored given a one-element prefix:
   BOS / <|endoftext|> for c = 0, else the last byte / token of window c-1 (context only, never scored).
 * Byte models: bits of every byte of the window. Token models: bits of every token of the window (the slice of
-  the document's tokens when the model's tokenizer is the split tokenizer, else the window text re-encoded); the
+  the document's tokens when the model's tokenizer is the split tokenizer, else the window text re-encoded; the
+  model tokenizer defaults to the run's dataset tokenizer, ``--tokenizer`` overrides); the
   bpb denominator is the window's UTF-8 bytes in both cases. No end-of-document target.
 * Compression (H-Net): positions entering each stage, counted from the routers' boundary masks in eval mode
   (running thresholds, so the ratio is free to vary per source). ``bytes_per_main_position`` = stage-0 positions
@@ -239,33 +243,59 @@ def load_source_docs(src: Source, default_max_bytes: Optional[int]) -> dict:
 
 # ====================================================================================================== tokenizers
 class Tokenizer:
-    """``gpt2`` / any tiktoken encoding name, or ``hf:<name or path>`` (fast tokenizer with offsets)."""
+    """``gpt2`` / any tiktoken encoding name; ``dataset:<name>`` (the token shards' tokenizer of a dataset, e.g. the
+    mix's in-corpus BPE, ``hnet.data.tokenizer.dataset_tokenizer``); a path to a ``tokenizers`` json; or
+    ``hf:<name or path>`` (transformers fast tokenizer, byte lengths from offsets)."""
 
     def __init__(self, spec: str = "gpt2"):
         self.spec = spec
+        self.tt = self.hf = self.info = None
         if spec.startswith("hf:"):
             from transformers import AutoTokenizer
 
             self.hf = AutoTokenizer.from_pretrained(spec[3:])
-            self.tt = None
             self.eot = self.hf.eos_token_id if self.hf.eos_token_id is not None else self.hf.bos_token_id
-        else:
-            import tiktoken
+        elif spec.startswith("dataset:") or spec.endswith(".json"):
+            from hnet.data.tokenizer import dataset_tokenizer, load_tokenizer
 
-            self.tt = tiktoken.get_encoding(spec)
-            self.hf = None
-            self.eot = self.tt.eot_token
+            self.info = (dataset_tokenizer(spec[len("dataset:"):]) if spec.startswith("dataset:")
+                         else load_tokenizer(spec))
+            if getattr(self.info, "name", None) == "gpt2":  # not a mix: GPT-2 via tiktoken
+                self.info = None
+                self._tiktoken("gpt2")
+            else:
+                self.eot = int(self.info.eot_id)
+        else:
+            self._tiktoken(spec)
+
+    def _tiktoken(self, name):
+        import tiktoken
+
+        self.tt = tiktoken.get_encoding(name)
+        self.eot = self.tt.eot_token
 
     def encode(self, text: str) -> List[int]:
         if self.tt is not None:
             return self.tt.encode_ordinary(text)
+        if self.info is not None:
+            return [int(t) for t in self.info.encode(text)]
         return self.hf.encode(text, add_special_tokens=False)
+
+    def token_bytes(self, t: int) -> bytes:
+        if self.tt is not None:
+            return self.tt.decode_single_token_bytes(t)
+        if self.info is not None:
+            return self.info.decode_bytes([t])
+        return self.hf.decode([t]).encode("utf-8")  # approximate for HF tokenizers
 
     def encode_with_lens(self, text: str):
         """-> (ids, UTF-8 byte length of each token; sums to len(text.encode()))."""
         if self.tt is not None:
             ids = self.tt.encode_ordinary(text)
             return ids, np.array([len(self.tt.decode_single_token_bytes(t)) for t in ids], dtype=np.int64)
+        if self.info is not None:
+            ids = self.encode(text)
+            return ids, np.asarray(self.info.byte_lengths(ids), dtype=np.int64)
         enc = self.hf(text, add_special_tokens=False, return_offsets_mapping=True)
         cb = np.zeros(len(text) + 1, dtype=np.int64)
         np.cumsum([len(ch.encode("utf-8")) for ch in text], out=cb[1:])
@@ -274,6 +304,47 @@ class Tokenizer:
         if len(ends):
             ends[-1] = cb[-1]
         return list(enc["input_ids"]), np.diff(np.concatenate([[0], ends]))
+
+    def tiktoken_like(self):
+        """Object with the tiktoken methods ``hnet.eval.scorers.TokenModelScorer`` uses."""
+        if self.tt is not None:
+            return self.tt
+        return _TiktokenAdapter(self)
+
+
+class _TiktokenAdapter:
+    def __init__(self, tok: Tokenizer):
+        self._t = tok
+        self.eot_token = tok.eot
+
+    def encode_ordinary(self, text):
+        return self._t.encode(text)
+
+    def decode_single_token_bytes(self, t):
+        return self._t.token_bytes(t)
+
+    def decode(self, ids):
+        return b"".join(self._t.token_bytes(t) for t in ids).decode("utf-8", errors="replace")
+
+
+def dataset_tokenizer_spec(meta_or_cfg: dict) -> str:
+    """Tokenizer spec of a run's token data: ``data.tokenizer`` if set, ``dataset:<name>`` for data mixes
+    (in-corpus BPE), else ``gpt2``."""
+    cfg = meta_or_cfg.get("config", meta_or_cfg) or {}
+    data = cfg.get("data") or {}
+    for sec in (data, cfg.get("model") or {}):
+        if sec.get("tokenizer"):
+            return str(sec["tokenizer"])
+    ds = data.get("dataset")
+    if ds:
+        try:
+            from hnet.data import mix
+
+            if mix.is_mix(ds):
+                return f"dataset:{ds}"
+        except Exception:
+            pass
+    return "gpt2"
 
 
 def make_windows(doc: bytes, ids, lens: np.ndarray, byte_seq_len: int, token_seq_len: int):
@@ -499,12 +570,31 @@ def run_seq_lens(meta: dict):
 
 
 def model_tokenizer_of(meta: dict) -> str:
-    cfg = meta.get("config") or {}
-    for sec in ("data", "model"):
-        t = (cfg.get(sec) or {}).get("tokenizer")
-        if t:
-            return t
-    return "gpt2"
+    return dataset_tokenizer_spec(meta)
+
+
+MIX_GROUPS = {"en": "english", "code": "code", "math": "math", "ml": "multilingual", "heldout": "code"}
+
+
+def mix_sources(dataset: str, root=None) -> List[Source]:
+    """One source per leaf val set of a built data mix (docs/DATA_MIX.md): English, each code language (held-out
+    languages flagged), math, each multilingual language; ``weight`` = the leaf's target share of the mix."""
+    from hnet.data import mix
+
+    man = mix.load_manifest(dataset, root)
+    d = mix.mix_dir(dataset, root)
+    out = []
+    for name, leaf in man["leaves"].items():
+        v = man["val_sets"].get(name)
+        if v is None:
+            continue
+        cat = leaf.get("category") or name.split(".")[0]
+        held = bool(leaf.get("heldout"))
+        out.append(Source(name=name, paths=[str(d / "bytes" / f"{v['stem']}.bytes.bin")],
+                          group=MIX_GROUPS.get(cat, cat), lang=name.split(".", 1)[1] if cat in ("code", "heldout")
+                          else None, held_out=held,
+                          weight=None if held else (leaf.get("train") or {}).get("target_share")))
+    return out
 
 
 def main(argv=None):
@@ -516,8 +606,11 @@ def main(argv=None):
     ap.add_argument("--max-bytes", type=int, default=1_000_000, help="per-source text bytes (whole docs)")
     ap.add_argument("--byte-seq-len", type=int, default=None)
     ap.add_argument("--token-seq-len", type=int, default=None)
-    ap.add_argument("--split-tokenizer", default="gpt2")
-    ap.add_argument("--tokenizer", default=None, help="BPE model tokenizer (default: config or gpt2)")
+    ap.add_argument("--mix", default=None, help="data mix name (e.g. mix_v1): one source per leaf val set")
+    ap.add_argument("--split-tokenizer", default="auto",
+                    help="tokenizer whose boundaries define the windows; auto = the run's dataset tokenizer "
+                         "(identical for the BPE and H-Net runs of one ladder)")
+    ap.add_argument("--tokenizer", default=None, help="BPE model tokenizer (default: the run's dataset tokenizer)")
     ap.add_argument("--batch-tokens", type=int, default=None)
     ap.add_argument("--device", default=None)
     ap.add_argument("--n-boot", type=int, default=200)
@@ -528,7 +621,8 @@ def main(argv=None):
     device = torch.device(a.device) if a.device else torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, mcfg, meta = load_run_checkpoint(a.model, device=device)
     kind = model_kind(mcfg)
-    sources = load_manifest(a.sources) if a.sources else []
+    sources = mix_sources(a.mix) if a.mix else []
+    sources += load_manifest(a.sources) if a.sources else []
     sources += [parse_source_arg(s) for s in a.source]
     if not sources:
         sources = [Source("finewebedu", [os.path.join(ROOT, DEFAULT_VAL)], group="english")]
@@ -536,9 +630,10 @@ def main(argv=None):
     bsl = a.byte_seq_len or bsl or 8192
     tsl = a.token_seq_len or tsl or 1792
     tok = a.tokenizer or model_tokenizer_of(meta)
-    res = evaluate_sources(model, kind, sources, device=device, model_tokenizer=tok,
-                           split_tokenizer=a.split_tokenizer, byte_seq_len=bsl, token_seq_len=tsl,
-                           max_bytes=a.max_bytes, batch_tokens=a.batch_tokens, n_boot=a.n_boot)
+    split = dataset_tokenizer_spec(meta) if a.split_tokenizer == "auto" else a.split_tokenizer
+    res = evaluate_sources(model, kind, sources, device=device, model_tokenizer=tok, split_tokenizer=split,
+                           byte_seq_len=bsl, token_seq_len=tsl, max_bytes=a.max_bytes, batch_tokens=a.batch_tokens,
+                           n_boot=a.n_boot)
     res["run"] = {"model": a.model, "checkpoint": meta.get("checkpoint"), "step": meta.get("step"), "kind": kind,
                   "bytes_seen": meta.get("bytes_seen")}
     ck = meta.get("checkpoint") or a.model

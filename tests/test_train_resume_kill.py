@@ -23,7 +23,7 @@ from hnet.train import checkpoint as ckpt
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STEPS = 40
-TIMING = {"step_time", "bytes_per_sec", "tokens_per_sec", "mfu", "mem_gb"}
+TIMING = {"step_time", "bytes_per_sec", "tokens_per_sec", "mfu", "mem_gb", "data_wait_frac"}
 
 
 def run_cfg(out, optimizer, ckpt_every, sleep_ms=10, ckpt_keep=1):

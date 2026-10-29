@@ -406,7 +406,7 @@ def fetch_source(spec: MixSpec, src: Source, needs: dict, root, reader, log=prin
         while fi < len(files):
             f = files[fi]
             n = state["n_rg"].get(str(fi)) or reader.num_row_groups(f)
-            if fi + 1 < len(files):
+            if fi + 1 < len(files) and rg >= n // 2:  # past half of this file: start fetching the next one
                 reader.prefetch(files[fi + 1])
             if rg >= n:
                 reader.release(f)

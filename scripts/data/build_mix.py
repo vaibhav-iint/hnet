@@ -5,8 +5,9 @@ byte shards + in-corpus BPE token shards + per-source val sets. See docs/DATA_MI
 Examples (from the repo root):
   # local end-to-end test build (~50 MB of train text, a few hundred MB of HF reads, streamed)
   python scripts/data/build_mix.py --preset small
-  # full build (~25 GB of train text) on a machine with fast internet: whole parquet files, deleted after use
-  python scripts/data/build_mix.py --preset full --fetch-mode download --fetch-workers 12 --workers 8
+  # full build (~25 GB of train text) on a machine with fast internet (big sources: whole parquet files, deleted
+  # after use; small ones streamed)
+  python scripts/data/build_mix.py --preset full --fetch-workers 14 --workers 8
   # (re)train the in-corpus tokenizer on the first 1 GB of the train stream, then build with it
   python scripts/data/build_mix.py --preset full --stages fetch,tokenizer,assemble --tokenizer-out configs/tokenizers/mix_v1_bpe32k.json
   # BPE-NP (no pretokenization, blog part II) tokenizer + a token-shard set built with it
@@ -67,7 +68,8 @@ def main():
     ap.add_argument("--val-group-bytes", type=float, default=None)
     ap.add_argument("--val-mix-bytes", type=float, default=None)
     ap.add_argument("--sources", default=None, help="fetch only these sources (comma list)")
-    ap.add_argument("--fetch-mode", default="stream", choices=["stream", "download"])
+    ap.add_argument("--fetch-mode", default="auto", choices=["auto", "stream", "download"],
+                    help="auto: download whole parquet files for sources with >= 2 GB of train quota, else stream")
     ap.add_argument("--fetch-workers", type=int, default=6, help="sources fetched concurrently")
     ap.add_argument("--keep-downloads", action="store_true", help="download mode: keep parquet files")
     ap.add_argument("--tokenizer", default=None, help="tokenizer json for assemble (default: the spec's)")
@@ -100,10 +102,14 @@ def main():
 
         cache = os.path.join(a.root or str(M.data_root()), "hf_cache")
 
-        def factory(src):
-            return ParquetReader(src.repo, src.revision, mode=a.fetch_mode, cache_dir=cache, keep=a.keep_downloads)
-
         needs = M.leaf_needs(spec, cfg)
+
+        def factory(src):
+            mode = a.fetch_mode
+            if mode == "auto":
+                mode = "download" if sum(needs[n][0] for n in src.leaves) >= 2e9 else "stream"
+            return ParquetReader(src.repo, src.revision, mode=mode, cache_dir=cache, keep=a.keep_downloads)
+
         print(f"[fetch] {spec.name} seed {spec.seed} -> {M.pool_dir(spec, a.root)}; quotas (MB train/val): "
               + ", ".join(f"{k}={v[0] / 1e6:.1f}/{v[1] / 1e6:.2f}" for k, v in needs.items()), flush=True)
         states = M.fetch(spec, cfg, a.root, factory, workers=a.fetch_workers,

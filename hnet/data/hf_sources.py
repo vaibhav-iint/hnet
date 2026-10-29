@@ -6,7 +6,8 @@ Two modes:
 * ``download``: ``hf_hub_download`` of whole files into ``cache_dir`` (resumable; uses hf_xet / hf_transfer when
                installed), the next file prefetched on a background thread, each file deleted once it has been
                consumed (``keep=False``). Best for full builds on a machine with fast internet.
-Both read the same rows in the same order, so the fetched documents do not depend on the mode.
+Both read the same rows in the same order, so the fetched documents do not depend on the mode
+(``scripts/data/build_mix.py --fetch-mode auto`` downloads sources with >= 2 GB of quota and streams the rest).
 Anonymous access works for every source of mix_v1 (none is gated); an ``HF_TOKEN`` in the environment (optional)
 only raises rate limits.
 """
@@ -136,6 +137,11 @@ class ParquetReader:
                     pass
 
     def close(self):
+        """Drop open files; in download mode also delete every downloaded file (unless keep=True). A resumed
+        fetch re-downloads the file it stopped in."""
         self._pf.clear()
         if self._pool is not None:
-            self._pool.shutdown(wait=False, cancel_futures=True)
+            self._pool.shutdown(wait=True, cancel_futures=True)
+            if not self.keep:
+                for f in list(self._dl):
+                    self.release(f)
