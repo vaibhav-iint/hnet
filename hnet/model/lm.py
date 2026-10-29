@@ -174,6 +174,25 @@ def lm_outputs(
     return out
 
 
+def logits_outputs(
+    logits: torch.Tensor,
+    labels: Optional[torch.Tensor],
+    return_logits: bool,
+    batch_shape: Optional[Tuple[int, int]],
+) -> CausalLMOutput:
+    """``lm_outputs`` for fully materialized logits [T, V] (heads with per-position corrections, e.g. the prefix
+    output dictionary; byte vocabularies only, so the logits are small)."""
+    out = CausalLMOutput()
+    if labels is not None:
+        labels = labels.reshape(-1)
+        out.ce_sum = F.cross_entropy(logits.float(), labels, ignore_index=IGNORE_INDEX, reduction="sum")
+        out.n_targets = (labels != IGNORE_INDEX).sum()
+        out.loss = out.ce_sum / out.n_targets.clamp(min=1)
+    if return_logits:
+        out.logits = logits.view(*batch_shape, -1) if batch_shape is not None else logits
+    return out
+
+
 class HNetForCausalLM(nn.Module):
     """Byte embeddings -> recursive ``HNet`` backbone -> lm_head (official parameter names)."""
 
@@ -203,6 +222,15 @@ class HNetForCausalLM(nn.Module):
             for n, _ in st.named_parameters():
                 if st.is_innermost or not n.startswith("main_network."):
                     self._param_stage[prefix + n] = st.stage_idx
+        # built under a forked RNG, so every other module's initialization is identical with and without it
+        self.prefix_head = None
+        if cfg.prefix_head:
+            from .prefix_head import PrefixHead
+
+            assert cfg.vocab_size == 256 and cfg.n_stages > 0, "prefix_head: byte vocabulary and a hierarchy"
+            assert self.backbone.routing_module.boundary_semantics == "end", "prefix_head needs 'end' semantics"
+            with torch.random.fork_rng(devices=[]):
+                self.prefix_head = PrefixHead(d0, **cfg.prefix_head)
 
     @property
     def n_stages(self) -> int:
@@ -231,7 +259,28 @@ class HNetForCausalLM(nn.Module):
                              max(st.chunk_vocab.max_len for st in vocab_stages))
             binfo = ByteInfo(bank, torch.arange(ids.numel(), device=ids.device))
         h, bpred = self.backbone(x, ctx, input_ids=ids, boundaries=boundaries, binfo=binfo)
-        out = lm_outputs(h, self.lm_head, labels, return_logits, batch_shape)
+        pstats = {}
+        if self.prefix_head is not None:  # rescore the top-k bytes against the trie of the learned chunks
+            ph = self.prefix_head
+            if binfo is not None and binfo.bank.shape[1] >= ph.max_len:
+                pbank = binfo.bank
+            else:
+                from .chunk_vocab import hash_bank
+
+                pbank = hash_bank(ids, ctx, 1, ph.max_len)
+            phash = ph.prefix_hash(pbank, bpred[0].boundary_mask)
+            base = self.lm_head(h).float()
+            logits, cand = ph(base, h, bpred[0].main_out, phash)
+            out = logits_outputs(logits, labels, return_logits, batch_shape)
+            with torch.no_grad():  # mechanism metrics: top-k coverage of the target, size of the correction
+                pstats["prefix_corr_rms"] = (logits - base).pow(2).sum(-1).div(ph.k).mean().sqrt()
+                if labels is not None:
+                    lab = labels.reshape(-1)
+                    ok = lab != IGNORE_INDEX
+                    hit = (cand == lab[:, None]).any(-1)
+                    pstats["prefix_topk_cov"] = (hit & ok).sum().float() / ok.sum().clamp(min=1)
+        else:
+            out = lm_outputs(h, self.lm_head, labels, return_logits, batch_shape)
         out.bpred = bpred
         aux_terms = self.backbone.aux_losses(bpred)
         out.aux_loss = self.config.dc.ratio_loss_alpha * sum(loss for loss, _ in aux_terms)
@@ -255,6 +304,7 @@ class HNetForCausalLM(nn.Module):
                     vocab_ce[st.stage_idx] = cv.pred_loss(r.inner_out, r.vocab_tgt)
                     out.aux_loss = out.aux_loss + cv.pred_weight * vocab_ce[st.stage_idx]
         stats = {"positions/s0": ids.new_full((), ids.numel(), dtype=torch.float32)}
+        stats.update(pstats)
         stats.update({f"chunk_vocab_ce/s{s}": v.detach() for s, v in vocab_ce.items()})
         if dc.router_prior_weight > 0 and self.training and bpred and bpred[0].logit is not None:
             prog = self.backbone.progress
@@ -307,6 +357,8 @@ class HNetForCausalLM(nn.Module):
         for st in self.backbone.stages():
             if getattr(st, "chunk_vocab", None) is not None:
                 st.chunk_vocab.reset_parameters()
+        if self.prefix_head is not None:
+            self.prefix_head.reset_parameters()
 
     def _router_consistency(self, logit: torch.Tensor, ids: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
         """Within-group variance of the byte-level router logit over positions in the batch that end in the same
@@ -384,7 +436,8 @@ class HNetForCausalLM(nn.Module):
         """Stage index owning parameter ``name`` (DDP ``module.`` / compile ``_orig_mod.`` prefixes allowed);
         embeddings and lm_head belong to stage 0."""
         name = name.replace("_orig_mod.", "").removeprefix("module.")
-        if name.startswith(("embeddings.", "ngram_embeddings.", "lm_head.", "main_aux_head.", "chunk_pred_head.")):
+        if name.startswith(("embeddings.", "ngram_embeddings.", "lm_head.", "main_aux_head.", "chunk_pred_head.",
+                            "prefix_head.")):
             return 0
         return self._param_stage[name]
 
