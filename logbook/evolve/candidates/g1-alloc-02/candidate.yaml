@@ -1,0 +1,16 @@
+id: g1-alloc-02
+parents: [hnet_ws]
+track: allocation
+hypothesis: >-
+  A BPE model's compute per position is pinned by its vocabulary (4.1 bytes/token); an H-Net's is not. Compressing to
+  8 bytes per chunk instead of 4.145 cuts the main network's positions by 0.48, and the freed FLOPs buy a
+  wider main network (D384 x 4 layers instead of D256 x 3) at identical training FLOPs per byte and parameter count. This is the
+  structural advantage learned chunking has over a fixed vocabulary (the blog's 2-stage model trains at ~7.6 bytes per
+  main position), and the 1e17 ladder shows the H-Net's main network is data-starved rather than capacity-starved only
+  at small budgets. Config only, no code.
+prediction: {fitness: "-0.05 vs hnet_ws, or worse if 8-byte chunks overload the byte decoder", mechanism: "chunks span multiple short words; per-byte loss at chunk starts rises, mid-chunk loss falls"}
+branch: main
+model: configs/evolve/models/g1-alloc-02.yaml
+set: []
+checks: {tests: "config only", fairness: "FLOPs/byte +0.03%, params 20.02M = BPE (hnet.flops)", grad_audit: none, smoke: "6 CPU steps, loss falls, compression on target"}
+author: orchestrator

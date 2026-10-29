@@ -1,0 +1,73 @@
+# g1-alloc-02: evolve g1 allocation candidate (orchestrator). Parent hnet_ws_L03. Compression 8 bytes/chunk instead
+# of 4.145 lets the main network grow to D384 x 4 layers (mlp 1536) at the same training FLOPs per byte
+# (+0.03%); chunk-vocabulary buckets shrink to keep params <= BPE (20.02M).
+model:
+  type: hnet
+  arch_layout:
+  - m2
+  - - T4
+  - m2
+  d_model:
+  - 192
+  - 384
+  d_intermediate:
+  - 0
+  - 1536
+  vocab_size: 256
+  tie_embeddings: false
+  ssm:
+    d_state: 160
+    d_conv: 4
+    expand: 2
+    headdim: 64
+    ngroups: 1
+    chunk_size: 256
+  attn:
+    num_heads:
+    - 3
+    - 3
+    num_kv_heads: null
+    head_dim:
+    - null
+    - 128
+    rotary_emb_dim:
+    - null
+    - null
+    rope_theta: 10000.0
+    window_size:
+    - -1
+    - -1
+    nope_every: 0
+  dc:
+    target_ratios:
+    - 8.0
+    ratio_loss_alpha: 0.03
+    router: end_mlp
+    router_kwargs: {}
+    decision: quantile
+    chunker: select
+    dechunker: ema
+    ste: true
+    aux_loss: ratio
+    aux_loss_scope: local
+    chunk_vocab:
+    - buckets: 9634
+      n_hash: 2
+      max_len: 16
+      pred_weight: 0.5
+      n_neg: 1024
+    router_prior_weight: 1.0
+    router_prior_frac: 0.1
+  ngram_embed:
+    ns:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    buckets: 4817
+  norm_eps: 1.0e-05
+  initializer_range: 0.02
+  lr_multiplier: auto
+  lr_multiplier_n_gpt: 4.145
