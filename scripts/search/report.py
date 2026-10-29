@@ -382,6 +382,7 @@ def fig_overview(sweep, path, best, title):
                     _draw(ax, seed_curve(sweep.select(arch, pt), f"compression/s{s}", "train", True, _bpp(s)),
                           colors[arch], None, ls=ls)
         ax.set_ylabel("Bytes per position (solid s0, dashed s1)")
+        ax.set_yscale("log")  # early-training router collapse reaches 100s; steady state is single digits
         ax.set_xlabel("Training bytes seen (M)")
         axes[0, col].legend(loc="upper right", fontsize=8)
     _clip_bpb(axes[:2])
@@ -468,6 +469,7 @@ def fig_compression(sweep, path, best, title):
         ax.set_xlabel("Training bytes seen (M)")
         if ci_ == 0:
             ax.set_ylabel("Bytes per position (solid s0, dashed s1)")
+        ax.set_yscale("log")  # early-training router collapse reaches 100s; steady state is single digits
         ax.legend(fontsize=8)
     fig.suptitle(title, x=0.01, ha="left", fontsize=12, fontweight="bold")
     fig.tight_layout(rect=(0, 0, 1, 0.93))
