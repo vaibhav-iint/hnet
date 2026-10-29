@@ -13,7 +13,9 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SWEEPS = ["exp006_close_gap_tiny", "exp008_hierarchy_use", "exp009_oracle_chunks", "exp010_dynamics_and_mixers",
-          "exp011_fixed_hourglass", "exp012_pool_chunker", "exp013_lr_allocation", "exp014_quantile_decision"]
+          "exp011_fixed_hourglass", "exp012_pool_chunker", "exp013_lr_allocation", "exp014_quantile_decision",
+          "exp017_chunk_vocab", "exp018_vocab_shapes", "exp019_local_router", "exp020_router_consistency",
+          "exp023_word_vocab_trimmed", "exp024_adoption_curriculum"]
 
 
 def realized_gflops(d: str):

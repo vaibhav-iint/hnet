@@ -819,3 +819,32 @@ seed across two deciders, so the bifurcation is in the router's initialization o
 data, not in the decision rule. Open question whether the tokenizer causes the non-adoption (morpheme chunks are
 less predictable, a weaker chunk-level signal) or both follow from the same early state; either way the fix is to
 steer the first ~300 steps (residual warmup `vp_rwarm`, pending; or a brief whitespace-prior on the router).
+
+### EXP-024: the tokenizer curriculum makes adoption reliable; H-Net matches BPE at equal FLOPs
+`prior` (vocabulary + next-chunk objective + n-gram tables + a 10%-of-training whitespace warm start on the router):
+**1.6337 / 1.6346 / 1.6364 → 1.635 ± 0.001 bpb**, BPE **1.634 ± 0.002**, same data, same training FLOPs (realized
+compute +0.3% of budget for every arm, `logbook/sweep_summary.py`). All three seeds adopt the hierarchy by step 250
+and the main network ends worth 0.56–0.60 bpb. `temp4` (sharper confidences) goes the other way: 1.723, hierarchy share
+0.02–0.21.
+
+Final checkpoint's tokenizer (`cs_exp024_prior_s0.json`), after 90% of training with no prior: 97% of boundaries on
+word boundaries, 99.3% of word boundaries hit, 99.8% of recurring words cut the same way, 25% singleton chunks (the
+whitespace tokenizer: 25%); the 3% of non-whitespace cuts are around punctuation and brackets. The router kept the
+word tokenizer it was pointed at and refined it; it did not drift back to character pairs or suffixes.
+
+### Where this leaves the project (honest-compute view, tiny scale, 50M token-eq)
+| model | val bpb | hierarchy's share |
+|---|---|---|
+| BPE (tiny_bpe_2m) | 1.634 ± 0.002 | — |
+| paper H-Net, 2-stage, as published (α 0.03) | 1.796 at **+11% compute**; ~1.87 ± 0.11 at budget (EXP-006) | 0.04 |
+| + fixed rank decider (EXP-017 `quant_fix`) | 1.799 ± 0.005 | 0.03 |
+| 1-stage ratio 6 + word-scale chunk vocabulary + next-chunk objective (EXP-023 `vp`) | 1.773 ± 0.071 (1.73 when adopted) | 0.5–0.7 |
+| + byte n-gram tables (EXP-023 `vp_ng`) | 1.682 ± 0.034 (1.66 when adopted) | 0.4 |
+| + whitespace curriculum (EXP-024 `prior`) | **1.635 ± 0.001** | 0.57 |
+
+The path from 1.80 to 1.635 was: (1) pin compression with rank decisions so comparisons are honest and routers cannot
+collapse; (2) notice that the paper's learned chunks are not types (half of them singletons) and that the gap is
+word identity; (3) give the chunks a vocabulary and a token-level objective; (4) move the chunk scale to words;
+(5) remove the adoption lottery with a 10% warm start. What is still open: the two-level hierarchy (the vocabulary at
+a (6,3) second level), scale (10M → 125M, more data), downstream tasks, and whether the warm start can be replaced by
+something that does not name whitespace (a surprise-based or consistency-based start).
