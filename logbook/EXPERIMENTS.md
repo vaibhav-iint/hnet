@@ -290,7 +290,11 @@ the segmentation matter (a chunk's identity is its token), which is what a learn
 ## EXP-018 · Where should the chunk vocabulary sit? (1-stage, word-scale chunks)
 
 *spec `exp018_vocab_shapes.yaml` · 1-stage H-Net (ratio 6, chunks ≈ words), end-of-chunk MLP router, rank decisions
-· arms `h1_quant` (no vocabulary), `h1_vocab_pred` (vocabulary + next-chunk prediction) · 3 seeds · status: running*
+· arms `h1_quant` (no vocabulary), `h1_vocab_pred` (vocabulary + next-chunk prediction) · 3 seeds · status: **done**:
+`h1_quant` 1.853 (1.854/1.861/1.845); `h1_vocab_pred` **1.720 / 1.863 / 1.737**, main-network contribution 0.75 /
+0.13 / 0.55 bpb (baseline 0.13–0.17). Two seeds: −0.13 / −0.11 bpb at identical FLOPs, best honest-compute H-Net so
+far; seed 1 did not adopt the hierarchy (heavy-tailed router scores → confidences ≈ 0.5 → residual path wins; fixed by
+the robust decider, EXP-021).*
 
 ## EXP-019 · A router that is a tokenizer: context-free boundary scores
 

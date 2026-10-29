@@ -756,3 +756,24 @@ predictor of the logit); relaunched as EXP-020 (second launch, same arms).
   (`dechunk_rms` 0.65–0.93 vs 1.4–1.6 while `residual_rms` is 2.1) and the decoder commits to the residual path: the
   same "residual wins the race" failure as in EXP-002, now with a measurable trigger. Fix: median/MAD standardization
   with clipped z (default of the rank decider, unit test reproduces the failure mode) → EXP-021.
+
+### EXP-017/018 finals (step 1763, honest compute, 3 seeds)
+| arm | val bpb | main-network contribution |
+|---|---|---|
+| EXP-017 `quant_fix` (2-stage, end_mlp, fixed rank decider) | 1.7944 / 1.8043 / 1.7982 → **1.799 ± 0.005** | 0.03–0.04 |
+| EXP-017 `vocab` (+ stage-0 chunk table) | 1.8015 / 1.7743 / 1.7770 → 1.784 ± 0.015 | 0.07–0.09 |
+| EXP-017 `vocab_pred_w1` | 1.895 / 1.857 / 1.834 → 1.862 | 0.005–0.05 |
+| EXP-018 `h1_quant` (1-stage, ratio 6, rank decider) | 1.854 / 1.861 / 1.845 → 1.853 | 0.13–0.17 |
+| EXP-018 `h1_vocab_pred` (word-scale chunks + table + next-chunk prediction) | **1.720 / 1.863 / 1.737** | **0.75 / 0.13 / 0.55** |
+
+- The fixed rank decider alone is worth as much as the paper router's 11% extra compute: 1.799 at budget vs 1.796
+  at +11% (EXP-008 `base`), and 0.02 better than the previous honest-compute best (`fixed_aux`, 1.821).
+- Word-scale learned chunks with a vocabulary and a chunk-level objective: −0.13 / −0.11 bpb vs the same model
+  without them, at identical FLOPs, and the main network goes from decorative (0.13) to carrying the model (0.75 bpb:
+  zeroing it gives 2.47). 1.72 equals the n-gram-table arms (1.714–1.722), which cheat the hierarchy by giving word
+  identity to the byte stage; here the hierarchy earns it. The gap to BPE (1.634) is 0.09 for the adopted seeds.
+- Seed 1 (1.863, contribution 0.13) is the heavy-tailed-scores failure diagnosed above; EXP-021 (robust decider,
+  plus an arm that adds the n-gram tables as well) is running.
+- Interpretation for learned tokenization: the paper's hierarchy was starved of *types*. Give the router's chunks an
+  identity (a table keyed by their content) and a token-level objective, and the second level has something to
+  learn; compression pinning (rank decisions) is what makes the comparison honest.
