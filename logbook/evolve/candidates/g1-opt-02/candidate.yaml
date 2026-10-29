@@ -1,0 +1,40 @@
+id: g1-opt-02
+parents: [hnet_ws]
+track: optimization
+hypothesis: >-
+  The bypass dominance (residual rms 5x the hierarchy's at the end of hnet_ws, 8x prior-free, 5-25x in every L04 run
+  above LR 0.01) is an optimizer artifact with nothing anchoring its scale, and it starves the hierarchy of gradient.
+  (1) Muon's update has spectral norm ~lr whatever the gradient's size, and the zero-init residual_proj sits in the
+  stage-0 Muon group (0.02 x 2.35 = 0.047, no weight decay). Measured on CPU with the benchmark schedule: its
+  spectral norm is 0.8 x sum(lr) at every step to 150 (2.93 at step 120, 3.90 at 150, still linear), with effective
+  rank ~150/192, i.e. Muon grows it as a near-isometry on the LR clock, independent of how useful it is. The
+  hierarchy's output scale, by contrast, is the main network's final RMSNorm gain on Adam at 0.003 (1.00 -> 1.04 in
+  150 steps). Nothing in the loss pulls the bypass back: the decoder is pre-norm, so the absolute scale of
+  out + residual is free and only the ratio matters. (2) That ratio is not harmless: every path from the dechunked
+  hierarchy to the loss runs through an RMSNorm of the decoder stream, so the byte-CE gradient reaching the main
+  network and the router's STE scales like 1/rms(stream) ~ 1/bypass_ratio, while the next-chunk loss (weight 0.5,
+  computed inside the main network, blind to tokenizer quality) is not attenuated. At ratio 5 the main network is
+  trained mostly by the auxiliary loss. Fix (optimizer-only): give residual_proj.weight its own Muon group with
+  decoupled weight decay wd = 0.5. Under orthogonalized updates the decay has a fixed point at spectral norm
+  ~1/wd, independent of the LR and schedule, so the bypass can still open (the decoder needs the current byte) but
+  plateaus near the hierarchy's scale instead of running away. CPU probe: spectral norm plateaus at 1.50 from step
+  ~125 (parent 3.90 and rising), bypass ratio 1.2 at step 150 (parent 2.8), train loss within noise of the parent
+  by step 130 (wd 1.0 caps at ratio 0.7 but costs ~0.05 bpb early, so 0.5 was chosen). This differs from EXP-027's
+  margin gate (which forced the hierarchy to carry load early and was neutral): it changes no forward computation
+  and leaves the opening time alone; it bounds the steady-state ratio.
+prediction:
+  fitness: 0.10              # parent hnet_ws +0.127 (1 seed): at least 0.025 better
+  falsified_if: "bypass_ratio is anchored as predicted (<= 2 at step 908) but fitness is within 0.02 of the parent's: bypass dominance is a symptom of an undecided/unhelpful hierarchy, not a cause; then drop bypass-scale explanations from the optimization track"
+  mechanism: "bypass_ratio <= 1.6 at step 300 (parent 3.83) and <= 2.0 at step 908 (parent 5.09); residual_proj spectral norm <= 2.0 at the end; hierarchy contribution (zero-main probe) larger than the parent's"
+branch: evolve/g1-opt-02
+model: configs/ladder/models/hnet_ws_L03.yaml
+set: [model.residual_proj_wd=0.5]
+applied_peak_lrs:   # benchmark spec values; printed by the trainer ("peak_lr_by_group"); only the wd of one matrix changes
+  parent: {muon/s0: "0.04702 wd 0 (incl. residual_proj)", muon/s1: 0.02, embed/s0: 0.007053, head/s0: 0.007053, other/s0: 0.007053, other/s1: 0.003}
+  candidate: {muon/s0: "0.04702 wd 0", muon/s0/residual: "0.04702 wd 0.5 (residual_proj.weight only)", muon/s1: 0.02, embed/s0: 0.007053, head/s0: 0.007053, other/s0: 0.007053, other/s1: 0.003}
+checks:
+  tests: pass             # tests/test_muon_residual_wd.py + test_optim_groups, test_speedrun_muon, test_model_hnet, test_invariances, test_flops (+ train_config, train_resume, search_fairness, model_official)
+  fairness: pass          # scripts/search/fairness.py on make_gen output (bpe, hnet_ws, g1_opt_02): no problems, params 20.01M, 0.02037 GFLOPs/byte
+  grad_audit: "n/a: optimizer-only change, no new loss term or gradient path"
+  smoke: pass             # logbook/evolve/candidates/g1-opt-02/checks.md
+  params_unchanged: 20010025
