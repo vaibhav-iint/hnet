@@ -11,3 +11,4 @@ wandb/
 *.safetensors
 *.bin
 logbook/figures/training_report.html
+.claude/worktrees/
