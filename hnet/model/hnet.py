@@ -134,7 +134,7 @@ class HNet(nn.Module):
             residual = self.residual_proj(h.float())
         r = self.routing_module(h, ctx, input_ids=input_ids, boundaries=boundaries[0] if boundaries else None)
         if self.decider is not None:
-            r = self.decider(r, ctx)
+            r = self.decider(r, ctx, progress=self.progress)
         x, ctx_inner = self.chunk_layer(h, r.boundary_mask, ctx)
         if self.chunk_ste:  # chunk-level losses (next-chunk CE, main_aux) reach the router through the chunk vectors
             x = x * STE.apply(r.selected_probs.index_select(0, ctx_inner.outer_index)).to(x.dtype)

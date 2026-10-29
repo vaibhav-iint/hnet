@@ -1,0 +1,40 @@
+id: g1-router-02
+parents: [hnet]
+track: router
+hypothesis: >-
+  Exploring rank decisions (prior-free; an annealed exploration schedule, not a curriculum toward any target). In
+  training, the k = n/N boundaries of each micro-batch are drawn by Gumbel-top-k on the router's standardized scores
+  (top k of z + tau*g, g ~ Gumbel(0,1)) instead of the deterministic top k; tau starts at 0.5 standardized units and
+  anneals linearly to 0 at 30% of training. Compression stays exact, the confidence p' and the running statistics are
+  computed from the clean scores, so a noise-selected position is a tentative boundary (p' < 0.5: the EMA dechunker
+  gives its chunk little weight) whose confidence the STE / EMA gradients then push up (useful) or down (useless).
+  Insight: the only counterfactual credit the router receives is the EMA dechunker's "fresh chunk vs stale chunk"
+  gradient, and it exists only at SELECTED positions; with deterministic rank decisions a router that has drifted into
+  the suffix basin (cuts before the space) never places a boundary after a space, so it never measures that such a
+  boundary would be worth more. Measured facts: the hierarchy's gain is 2.4x per byte (6x at word starts) larger in
+  the word basin, so those boundaries earn a large EMA credit when tried; the basin is chosen while the router is
+  undecided (L03 prior-free: p_mid 0.61 at step 300) and then never left (EXP-018/023: the same seed lands in the same
+  basin under two different deciders, i.e. nothing in training moves it between basins). Because z is standardized,
+  the noise only reorders positions near the threshold: exploration concentrates on undecided positions (~29% of an
+  undecided router's boundaries move at tau 0.5; < 2% of a decided bimodal router's; unit tests). Zero FLOPs, zero
+  parameters, exact compression, eval forward unchanged.
+prediction:
+  fitness: 0.15            # >= 0.03 better than hnet (+0.183); the seed spread no larger than hnet_ws's
+  mechanism: >-
+    explore_swap/s0 falls from ~0.3 at step 0 to < 0.1 by step 150 (the router decides where exploration happens);
+    p_mid/s0 at step 300 <= 0.4 (hnet 0.61); bypass_ratio at the end <= 6.5 (hnet 8.2); score_std stays < 10 (no
+    heavy tails); chunk_vocab_ce at the end within 0.05 of hnet's (exploration must not cost the vocabulary).
+  falsified_if: fitness >= hnet's (+0.18) or p_mid at step 300 >= 0.55 or explore_swap still > 0.2 at step 200
+branch: evolve/g1-router-02
+set: ['model.dc.decision_kwargs={explore: 0.5, explore_frac: 0.3}']
+cost: zero FLOPs (one uniform draw and a second top-k over the micro-batch's positions per step), zero parameters.
+interactions: >-
+  Orthogonal to g1-router-01 (a directional teacher) and stackable: exploration supplies the credit at untried
+  positions, the teacher supplies a direction. Uses decision_kwargs, so a run file that sets other decider options
+  must merge the keys.
+checks:
+  tests: pass                # tests/test_decision_explore.py + test_model_hnet / test_invariances / test_flops
+  fairness: pass             # logbook/evolve/candidates/g1-router-02/fairness.txt
+  grad_audit: logbook/evolve/candidates/g1-router-02/grad_audit.txt
+  smoke: pass                # logbook/evolve/candidates/g1-router-02/smoke.txt
+  probe: logbook/evolve/candidates/g1-router-02/probe_grad.txt   # where the router gradient lands, with / without exploration
