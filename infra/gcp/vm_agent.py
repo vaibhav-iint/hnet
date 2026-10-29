@@ -148,8 +148,8 @@ def guest_attr(key: str, value: str) -> None:
 
 
 def gpu_stats() -> dict:
-    if not shutil.which("nvidia-smi"):
-        return {}
+    if not shutil.which("nvidia-smi") or not os.path.exists("/dev/nvidia0"):
+        return {}  # CPU machine (the GPU image ships nvidia-smi, which exits 9 without a device)
     out = subprocess.run(["nvidia-smi", "--query-gpu=utilization.gpu,memory.used,memory.total",
                           "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=30,
                          check=True).stdout
