@@ -227,8 +227,11 @@ class HNetForCausalLM(nn.Module):
                 st.chunk_vocab.reset_parameters()
 
     def _router_consistency(self, logit: torch.Tensor, ids: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
-        """Mean squared deviation of the byte-level router logit from the mean logit of all positions in the batch
-        that end in the same ``router_consistency_n`` bytes (positions too close to a segment start are skipped)."""
+        """Within-group variance of the byte-level router logit over positions in the batch that end in the same
+        ``router_consistency_n`` bytes, divided by the total variance of the logit (1 - R^2 of the n-gram as a
+        predictor of the logit). Scale-free: under rank decisions the forward pass does not depend on the logit scale,
+        so an unnormalized penalty is satisfied by shrinking all logits (EXP-020, first launch). Positions too close
+        to a segment start are skipped."""
         n = self.config.dc.router_consistency_n
         h, valid = HashNgramEmbedding.hashes(ids, ctx.position_ids, n, salt=424242 + n)
         B = 1 << 20
@@ -238,8 +241,9 @@ class HNetForCausalLM(nn.Module):
         tot = torch.zeros(B, device=lg.device, dtype=lg.dtype).index_add_(0, idx, lg * valid)
         cnt = torch.zeros(B, device=lg.device, dtype=lg.dtype).index_add_(0, idx, ones)
         mean = tot / cnt.clamp(min=1)
-        dev = (lg - mean[idx]) ** 2 * valid
-        return dev.sum() / ones.sum().clamp(min=1)
+        dev = ((lg - mean[idx]) ** 2 * valid).sum()
+        total = (((lg - (lg * valid).sum() / ones.sum().clamp(min=1)) ** 2) * valid).sum()
+        return dev / (total + 1e-6)
 
     def _chunk_pred_loss(self, bpred, ids: torch.Tensor, labels: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
         """Mean CE of predicting, from the innermost main network's output at each innermost position, the k bytes

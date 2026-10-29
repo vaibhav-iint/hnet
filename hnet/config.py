@@ -70,9 +70,10 @@ class DCConfig:
     # chunk_vocab: a hashed vocabulary for the learned chunks (model/chunk_vocab.py), dict or per-stage list:
     #   {buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 4096}; null = off. Needs "end" routers.
     chunk_vocab: Any = None
-    # router_consistency_weight: penalty on the variance of the stage-0 router's logit across positions that share the
-    #   same last router_consistency_n bytes (a tokenizer is a function of the string, not of the context); see the
-    #   logbook: the contextual routers start out 92% consistent and training destroys it.
+    # router_consistency_weight: penalty on the share of the stage-0 router logit's variance that is NOT explained by
+    #   the last router_consistency_n bytes (within-group / total variance, scale-free; a tokenizer is a function of the
+    #   string, not of the context); see the logbook: contextual routers start out 92% consistent and training
+    #   destroys it.
     router_consistency_weight: float = 0.0
     router_consistency_n: int = 4
     chunker: Any = "select"  # keep vectors at boundaries (paper default); "pool" = learned summary over the chunk

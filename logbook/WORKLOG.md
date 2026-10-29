@@ -727,3 +727,11 @@ Direct answer (new, `dc.router_consistency_weight`): a **self-consistency regula
 the variance of its logit across all positions in the batch that end in the same `n` = 4 bytes (hashed group means
 via `index_add`, differentiable, negligible cost). The router keeps its context, but is pulled to agree with itself:
 the same string → the same decision, which is what gives the hierarchy types to work with.
+
+### EXP-020 first launch invalid: an unnormalized consistency penalty is satisfied by shrinking the logits
+`cons1_s0` metrics: `router_consistency/s0` falls to 0.000 while `score_std/s0` falls 1.2 → 0.15 (the baseline's
+rises to 3.9). Under rank decisions on normalized scores the forward pass is invariant to the logit scale, so the
+cheapest way to zero a within-group variance is to make every logit (nearly) the same constant: the penalty bound
+nothing. Lesson (same family as the EXP-014 drift, mirrored): once decisions are scale-free, every auxiliary term on
+the router must be scale-free too. Fix: penalty = within-group variance / total variance (1 − R² of the 4-gram as a
+predictor of the logit); relaunched as EXP-020 (second launch, same arms).

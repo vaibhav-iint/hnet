@@ -19,7 +19,7 @@ def _model(weight=1.0, n=4):
     return m
 
 
-def test_penalty_is_the_within_group_variance_of_the_logit():
+def test_penalty_is_the_unexplained_share_of_the_logit_variance():
     m = _model(n=2)
     ids = torch.tensor([0, 5, 6, 5, 6, 5, 6, 9])  # "56" ends at positions 2, 4, 6; others are singletons
     ctx = SeqCtx.from_cu_seqlens(torch.tensor([0, 8], dtype=torch.int32))
@@ -27,8 +27,11 @@ def test_penalty_is_the_within_group_variance_of_the_logit():
     pen = m._router_consistency(logit, ids, ctx)
     g56 = torch.tensor([2.0, 5.0, 8.0])  # "56" ends at 2, 4, 6; "65" ends at 3, 5 (1.5, 2.0); position 0 (BOS) invalid
     g65 = torch.tensor([1.5, 2.0])
-    expect = (((g56 - g56.mean()) ** 2).sum() + ((g65 - g65.mean()) ** 2).sum()) / 7  # singletons contribute 0
-    assert abs(float(pen) - float(expect)) < 1e-6
+    within = ((g56 - g56.mean()) ** 2).sum() + ((g65 - g65.mean()) ** 2).sum()  # singletons contribute 0
+    v = logit[1:]
+    total = ((v - v.mean()) ** 2).sum()
+    assert abs(float(pen) - float(within / total)) < 1e-5
+    assert abs(float(m._router_consistency(logit * 100, ids, ctx)) - float(pen)) < 1e-5  # scale-free
 
 
 def test_penalty_is_zero_when_the_router_is_a_function_of_the_last_n_bytes():
