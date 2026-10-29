@@ -1,0 +1,4 @@
+# The ~50 MB local test build of mix_v1 (scripts/data/build_mix.py --preset small). See mix_v1.yaml.
+include: mix_v1.yaml
+data:
+  dataset: mix_v1_small

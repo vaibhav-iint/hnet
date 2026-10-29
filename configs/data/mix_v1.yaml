@@ -1,0 +1,11 @@
+# Data section for runs on the mix_v1 data mix (docs/DATA_MIX.md). Use from a run file as a section include:
+#   data: {include: ../data/mix_v1.yaml, seq_len: 8192, micro_batch: 4, batch_bytes: 2097152}
+# Token (BPE) models must use the mix's tokenizer vocabulary: model: {include: ..., vocab_size: 32768}.
+# Byte and token models read the same documents in the same order (aligned shards); bytes/token, the token
+# models' document-start id and the val sets come from <data root>/mix_v1/manifest.json.
+data:
+  source: hnet
+  dataset: mix_v1
+  shuffle_buffer: 0        # the shards are already interleaved so every prefix has the mixture's byte shares
+eval:
+  val: standard            # the combined val set; or a named one: en | code | math | ml | heldout | code.python | ...
