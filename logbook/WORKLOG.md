@@ -993,3 +993,17 @@ gain measurement above this settles the diagnosis: the problem is not *when* the
 *which* tokenizer the router falls into, and only an objective that scores usefulness (EXP-028) addresses that.
 Operational: `hx-exp025-muon-1of4` (bpe_muon 0.025) shut itself down after a mid-install preemption; deleted and
 recreated in europe-west4-a (runs resume from the bucket checkpoints).
+
+### Ladder 1e16 done (L03-L06, one seed, BPE's Muon LR 0.02 for every arm, 10 MB mix_v1 val)
+| rung (D) | BPE | H-Net prior-free | H-Net warm start | gap prior-free | gap warm start |
+|---|---|---|---|---|---|
+| L03 | 1.695 | 1.879 | 1.823 | +0.18 | +0.13 |
+| L04 (256) | **1.622** | 1.907 | 1.864 | +0.29 | +0.24 |
+| L05 | 1.756 | 1.985 | 1.939 | +0.23 | +0.18 |
+| L06 | 1.841 | 2.083 | 2.035 | +0.24 | +0.19 |
+At 1e16 FLOPs the BPE iso-FLOP optimum is L04 and both H-Nets are best at L03 (the smallest rung): at this budget
+the H-Net wants a smaller model and more bytes, the opposite of the blog's claim that it is the more data-hungry
+architecture's compute that scales better. The gap is 0.18-0.29 bpb prior-free and 0.13-0.24 with the warm start, at
+equal FLOPs and data; the bypass dominates (rms 5× the hierarchy's) in every prior-free run. One seed each; the L04
+BPE run is byte-identical to the LR-sweep run (reproducible pipeline). Caveat: BPE's LR transferred to the H-Nets
+costs them ~0.04 (their own optimum is 0.01). → 1e17 rungs next (decided after checking the cost table).
