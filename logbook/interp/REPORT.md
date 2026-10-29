@@ -154,7 +154,7 @@ work log without re-measurement. Definitions used throughout:
 | "The bifurcation is in the router's initialization or the first few hundred steps of data" (WORKLOG, EXP-023 stats) | **sharpened: it is the initialization** | data order is seed-independent (`shuffle_buffer: 0`); arms with the same parameter layout have bit-identical step-0 routers per seed (`init_basin.json`); the worst seed is the same in 3/3 arms of the no-n-gram layout and the full seed order s2 < s1 < s0 is the same in 5/5 prior-free arms of the n-gram layout (chance 1/9 and 1/1296; `seed_rankings.json`). Decider, temperature, residual warmup, chunk STE and margin gate never changed which seed loses; only the whitespace prior did |
 | "The suffix seed learned a morphological tokenizer" (WORKLOG, EXP-018 stats) | **re-described** | the suffix basin is a *predicted-word-end* tokenizer: 57–64% of its boundaries are on the last letter of a word, 27–35% inside words, 0–4% on whitespace; its score separates "next byte is a non-letter" from "next byte is a letter" with AUC 0.75–0.80 [M, Part B]. The router cannot see the next byte (end semantics), so it fires where a word is likely to end (after `s`, `d`, `ing`, `ed`, `ly`); the suffix vocabulary is a side effect of guessing the space |
 | "Bypass rms 5–40× the hierarchy's = dead hierarchy" (CLAUDE.md, `alerts()`) | **refuted for Muon, weak for AdamW** | EXP-025 prior_muon 0.025: R = 0.13, contribution 0.38, bpb 1.630 (the best tiny H-Net). Under Muon the bypass rms is ∝ LR (r = 0.96, n = 28); AdamW: Spearman(R, contribution) = 0.45 (n = 111) |
-| "The bypass dominates in every prior-free ladder run, so the race is the normal state" (WORKLOG, ladder 1e16) | see Part B, ladder | |
+| "The bypass dominates in every prior-free ladder run, so the race is the normal state" (WORKLOG, ladder 1e16; "the race may be a small-scale artefact") | **right outcome, wrong evidence and mechanism** | L03/L04 prior-free hierarchies carry 0.03–0.04 bits because their routers are in the suffix/sub-word basin (≤ 8% of cuts on whitespace); the warm-start ones carry 0.24–0.27 bits at the same R (0.20–0.22 vs 0.12–0.14). The race is not a small-scale artefact: it is decided the same way at L03/L04 |
 | "Every H-Net peaks at 1.5e-3 and degrades above it because of the stage-1 limit cycle" (EXPERIMENTS EXP-003, WORKLOG) | **not supported** | H-Nets are flat within seed noise from 1e-3 to 6e-3 (end_mlp 1.820 / 1.815 / 1.860 / 1.817; paper best at 1e-3); limit cycles exist but cost little because stage 1 is barely used |
 | "H-Net matches BPE at equal FLOPs" (EXP-024 headline) | **true only against untuned BPE** | BPE at its own best LR (6e-3, still improving at the grid edge) is 1.564 ± 0.001 vs 1.634 at 1.5e-3; the warm-start H-Net was never LR-swept under AdamW. Tuned gap ≥ 0.066 bpb (EXP-025 Muon prior 1.630) |
 | "EXP-002: all 18 runs done" (EXPERIMENTS) | **wrong** | `paper_s1`, `end_linear_s0/s1` stopped at step 500–630 (runs.csv); the "paper router 1.78–1.80" range is one finished seed |
@@ -237,38 +237,26 @@ adoption = final contribution ≥ 0.3 bpb.
   project (1.630 / 1.635 / 1.630 bpb) with a hierarchy worth 0.36–0.40 bpb. Across AdamW tiny runs R_final and the
   contribution are only moderately related (Spearman 0.45, n = 111 finished runs). An rms ratio compares a normalized signal with
   an unnormalized one; it says which optimizer ran, not which path the decoder reads. Use the ablation.
-* The ladder never logged the zero-main probe, so the work log's "the bypass dominates (rms 5×) in every prior-free
-  run" at 1e16 is a statement about Muon at LR 0.02, not (yet) evidence of a dead hierarchy (tested in Part B).
+* The ladder never logged the zero-main probe, so "the bypass dominates (rms 5×) in every prior-free run" (WORKLOG,
+  ladder 1e16) was a statement about Muon at LR 0.02. The checkpoints (Part B, ladder) show the prior-free ladder
+  hierarchies are indeed dead, but because their routers are in the losing basin; the warm-start ones are alive at
+  the same R.
 
 ### A4. Other metric-level findings
 
-* **The H-Net does not degrade at high AdamW LR; it fails to improve while BPE does** ([M], EXP-003, 3 seeds):
-  BPE 1.830 / 1.690 / 1.635 / 1.581 / **1.564** at 5e-4 / 1e-3 / 1.5e-3 / 3e-3 / 6e-3 (still improving at the edge);
-  end_mlp 1.859 / 1.820 / 1.815 (n = 2) / 1.860 (n = 2) / 1.817; paper 1.885 / **1.807** / 1.901 (one 2.10 outlier) /
-  1.823 / 1.834. The stage-1 limit cycles at ≥ 3e-3 are real (6–15 compression-collapse records per run) but cost
-  little bpb because stage 1 is barely used. "Every H-Net peaks at 1.5e-3 and degrades above" (EXPERIMENTS.md) is not
-  what the data shows: paper/cosine peak at 1e-3 and all H-Nets are flat within seed noise from 1e-3 to 6e-3.
-* **The BPE reference of the parity claim is at an untuned LR.** EXP-024 `prior` (1.635) matches BPE at 1.5e-3
-  (1.634) but BPE at 6e-3 is 1.564 ± 0.001 (n = 3, EXP-003). The tuned gap at tiny scale is ≥ 0.07 bpb, the warm-start
-  H-Net was never LR-swept under AdamW, and EXP-025 Muon prior (1.630) is still 0.066 behind tuned BPE.
-* **A universal train-bpb bump at step 360** in nearly every run (all experiments, all arms) is a data-order event
-  (the same window order everywhere), not a model event; it should be masked in alerts.
-* **Grad-norm spikes rarely precede collapses**: 10 of 187 loss/compression events had a > 5× grad spike in the 100
-  steps before. Exception: EXP-025 Muon 0.05, where the stage-0 grad norm reaches 225–380 at steps 340–410 in two
-  seeds (stage-1 norm stays < 0.7), train bpb jumps 2.05 → 4.5 and seed 0's hierarchy never comes back
-  (contribution 0.01); seed 2 had a smaller spike at step 330 and kept 0.25.
-* **Muon removes the adoption-race dip** ([M], `phase_timelines.png` row 4): with Muon the hierarchy rms stays at
-  ≥ 1.47 through step 200 and the margin stays ≥ 0.26 in steps 100–500 (3 seeds at 0.025), versus a dip to 0.9 with
-  a margin trough of 0.28–0.31 for the AdamW `prior` and 0.6–0.7 / 0.11–0.14 for prior-free AdamW. With Muon the main-network gradient
-  share also never crashes at step 30 (0.3 vs 0.03).
-* **The quantile decider pins F, not G**: G − F at the end is 0.069 (median, 96 rank-decider runs) vs 0.019 for the
-  threshold router (143 runs); the ratio loss is exactly 1.000 under rank decisions, as designed, so G is free.
-* **EXP-020's scale-free consistency penalty was gamed by heavy tails** ([M] metrics, [I] mechanism): `cons10` ends
-  with margin 0.014–0.071 (EXP-017 `quant_fix`: 0.33) and raw-score std 6.8–11.5 (vs 2.8–3.3). Within-group /
-  total variance can be lowered by inflating the total variance with a few extreme groups; the trimmed
-  standardization then squeezes the bulk of positions to p' ≈ 0.5. The "neutral" verdict hid an undecided router.
-* **EXP-014**: tau reaches 1.000 at stage 0 or stage 1 in all 9 runs, between steps 20 and 270 (stage 0: 8 runs, median 175); a
-  `tau ≥ 0.999` assertion would have stopped every run before step 300.
+* **LR (EXP-003, 3 seeds) [M].** BPE 1.830 / 1.690 / 1.635 / 1.581 / **1.564** at 5e-4 … 6e-3 (still improving at the
+  edge); end_mlp 1.859 / 1.820 / 1.815 / 1.860 / 1.817; paper 1.885 / **1.807** / 1.901 (one 2.10 outlier) / 1.823 /
+  1.834. The stage-1 limit cycles at ≥ 3e-3 are real (6–15 compression-collapse records per run) but cost little bpb,
+  because stage 1 is barely used. The H-Nets do not degrade at high LR; they fail to improve while BPE does.
+* **A train-bpb bump at step 360 in nearly every run** of every experiment is a data-order event (same window order
+  everywhere), not a model event; mask it in alerts.
+* **Grad-norm spikes rarely precede collapses**: 10 of 187 loss/compression events had a > 5× spike in the preceding
+  100 steps. Exception: EXP-025 Muon 0.05 (stage-0 grad norm 225–380 at steps 340–410, stage 1 < 0.7).
+* **Muon removes the adoption dip** (`phase_timelines.png` row 4): hierarchy rms ≥ 1.47 through step 200, margin ≥ 0.26
+  in steps 100–500, and no step-30 crash of the main-network gradient share (0.3 vs 0.03 under AdamW). With AdamW the
+  prior gives a dip to 0.9 and a margin trough of 0.28–0.31; prior-free 0.6–0.7 and 0.11–0.14.
+* **The rank decider pins F, not G**: G − F ends at 0.069 (median of 96 rank-decider runs) vs 0.019 for threshold
+  routers (143); the ratio loss is exactly 1.000 under rank decisions, so G is free, as designed.
 
 ### A5. The first 400 steps under the microscope: the decoder never "switched away" from an informative hierarchy
 
@@ -432,10 +420,13 @@ mean, which removes its information but keeps its scale; "zero" = the trainer's 
    seed at step 500 carries 0.082 bits of information (0.166 by the zero probe). **The zero-main probe overstates the
    information carried by the hierarchy by about 2× in every checkpoint** (word finals 0.375 vs 0.752, 0.248 vs 0.413;
    prior 0.356 vs 0.568). [M]
-3. **The chunk table is used only in the word basin** (`vocab_ablation.json`, 6-doc smoke test; full run in the
-   data file): replacing the table output by zeros costs 0.48 bpb in h1_vocab_pred s0 (more than mean-replacing the
-   whole hierarchy, 0.40: the main network depends on it) and 0.009 bpb in s1. With 88% consistency and 40%
-   singletons the suffix chunks are not types a table can store. [M]
+3. **The chunk table is used only in the word basin, and only without n-gram tables** (`vocab_ablation.json`, 24
+   docs, table output zeroed at inference): h1_vocab_pred s0 (word) +0.445 bpb — more than mean-replacing the whole
+   hierarchy (+0.391): the main network depends on it; vp s0 @1000 (word) +0.161; suffix seeds +0.008 / +0.009; with
+   n-gram tables the word-basin models barely use it (vp_ng s2 +0.014, prior s0 +0.034, while their hierarchies carry
+   0.25–0.36 bits). With 88% consistency and 40% singletons suffix chunks are not types a table can store; with n-gram
+   tables the hierarchy's value comes from elsewhere. The work log's "the chunk table gives the hierarchy word
+   identity" holds for the no-n-gram layout only. [M]
 4. **Where the hierarchy helps (word seed, final, bits per predicted byte, info):** punctuation 1.65, newline 1.19,
    first letter of a word 0.52, last letter 0.45, space 0.26, word-internal 0.24; by position in the word it decays
    from 0.35 (letter 0) to 0.09 (letter 4+) at step 1000. Suffix seed: ≤ 0.12 everywhere, ~0 at punctuation, newline
@@ -468,7 +459,7 @@ mean, which removes its information but keeps its scale; "zero" = the trainer's 
 
 * **Progress [M].** `local` 1.814 / 1.812 / 1.812 — the most seed-stable 2-stage arm in the project (sd 0.001 vs 0.005
   for the contextual router at equal mean); its score std stays ≤ 5.4. Part B shows that even the contextual end_mlp
-  router is 95–100% a function of the last 4 bytes (4-gram R² of its score), so context-freedom costs little; what it
+  router is 90–100% a function of the last 4 bytes (4-gram R² of its score, 20 checkpoints), so context-freedom costs little; what it
   buys is that the score distribution cannot grow heavy tails.
 
 ### EXP-020 · Router self-consistency penalty
@@ -573,3 +564,25 @@ word-basin checkpoints 84–86% of positions sit in one narrow mode (`router_his
   eval (one line of code, it identifies the basin); set the ladder H-Net's ratio so that whitespace can fill the
   budget (≈ 6 on English-heavy mixes) or let the extra boundaries come from a principled rule (next-byte entropy).
 
+## Files
+
+| path | what |
+|---|---|
+| `scripts/interp/run_all.py` | entry point (`--quick`: smoke test into `logbook/interp/quick/`; `--skip-ckpt`: metrics only) |
+| `scripts/interp/common.py` | run enumeration (runs.csv + live mirrors, settings from each run's config.yaml), loaders |
+| `scripts/interp/phases.py` | events, phase timings, snapshots, cross-run statistics → `data/phases_runs.json`, `data/phases_summary.json`, `figures/phase_timelines.png`, `phase_events.png`, `bypass_scale_vs_lr.png`, `early_predictors.png` |
+| `scripts/interp/predictability.py` | step-resolved within-arm correlation / AUC → `data/predictability.json`, `figures/predictability_vs_step.png` |
+| `scripts/interp/seed_rankings.py` | seed order per arm and layout family → `data/seed_rankings.json` |
+| `scripts/interp/init_basin.py` | step-0 router statistics per run's exact init → `data/init_basin.json` |
+| `scripts/interp/acts.py` | capture / path-ablation / logit-lens / attention-profile wrapper around the outer H-Net stage |
+| `scripts/interp/analyze_ckpt.py`, `run_ckpts.py` | per-checkpoint analysis (router, tokenizer, paths, probes, attention) → `data/ckpt/*.json` |
+| `scripts/interp/figures_ckpt.py` | `data/ckpt_summary.json`, `figures/router_hist_by_class.png`, `probe_accuracy.png`, `decoder_path_ablation.png` |
+| `scripts/interp/early_dynamics.py` | dense steps 1–400 → `data/early_dynamics.json`, `figures/early_dynamics.png` |
+| `scripts/interp/cka.py` | cross-checkpoint linear CKA, boundary Jaccard → `data/cka.json`, `figures/cka.png` |
+| `scripts/interp/bpe_compare.py` | token-aligned H-Net vs BPE → `data/bpe_compare.json`, `figures/bpe_gap.png` |
+| `scripts/interp/vocab_ablation.py` | chunk-table ablation → `data/vocab_ablation.json` |
+
+Not analysed at checkpoint level (no local weights or skipped for time): EXP-017/019/020/025/026/027 (metrics only),
+EXP-009 (checkpoint files without weights), EXP-002 `paper_s0`/`end_mlp_s1` at step 1000, `end_cosine_shift`,
+`paper_nosmooth`, EXP-013 `lr6_nomult`, EXP-006 `hnet1_ng` (in `run_ckpts.py`; rerun fills them). Ladder checkpoints
+were evaluated on FineWeb-Edu documents only, not on the code / multilingual parts of mix_v1.
