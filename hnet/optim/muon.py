@@ -147,26 +147,34 @@ class MuonAdamW(torch.optim.Optimizer):
         return loss
 
     def _muon_step(self, group):
+        """Same update as one Newton-Schulz per matrix, but matrices of equal shape are orthogonalized together as
+        one batch ([n, rows, cols] bmm) and the elementwise parts use foreach ops: a few dozen kernel launches per
+        shape instead of ~20 per matrix (the optimizer step is launch-bound for small models)."""
         lr, wd, momentum = group["lr"], group["weight_decay"], self._muon_momentum(group)
+        by_shape: dict = {}
         for p in group["params"]:
             if p.grad is None:
                 continue
             state = self.state[p]
             if "momentum_buffer" not in state:
                 state["momentum_buffer"] = torch.zeros_like(p.grad)
-            buf = state["momentum_buffer"]
-            buf.lerp_(p.grad, 1 - momentum)
-            g = p.grad.lerp(buf, momentum) if group["nesterov"] else buf
-            update = zeropower_via_newtonschulz5(g, steps=group["ns_steps"])
-            scale = max(1.0, p.size(0) / p.size(1)) ** 0.5
+            by_shape.setdefault((tuple(p.shape), p.dtype, p.device), []).append(p)
+        for (shape, _, _), ps in by_shape.items():
+            grads = [p.grad for p in ps]
+            bufs = [self.state[p]["momentum_buffer"] for p in ps]
+            torch._foreach_lerp_(bufs, grads, 1 - momentum)
+            gs = torch._foreach_lerp(grads, bufs, momentum) if group["nesterov"] else bufs
+            updates = zeropower_via_newtonschulz5(torch.stack(gs), steps=group["ns_steps"]).unbind(0)
+            scale = max(1.0, shape[0] / shape[1]) ** 0.5
             if wd:
-                p.mul_(1 - lr * wd)
-            p.add_(update.to(p.dtype), alpha=-lr * scale)
+                torch._foreach_mul_(ps, 1 - lr * wd)
+            torch._foreach_add_(ps, [u.to(ps[0].dtype) for u in updates], alpha=-lr * scale)
         group["step"] += 1
 
     def _adam_step(self, group):
         lr, wd, eps = group["lr"], group["weight_decay"], group["eps"]
         beta1, beta2 = group["betas"]
+        by_step: dict = {}  # params with the same step count share bias corrections (one foreach batch)
         for p in group["params"]:
             if p.grad is None:
                 continue
@@ -176,14 +184,20 @@ class MuonAdamW(torch.optim.Optimizer):
                 state["exp_avg"] = torch.zeros_like(p, memory_format=torch.preserve_format)
                 state["exp_avg_sq"] = torch.zeros_like(p, memory_format=torch.preserve_format)
             state["step"] += 1
-            t = state["step"]
-            m, v = state["exp_avg"], state["exp_avg_sq"]
-            m.lerp_(p.grad, 1 - beta1)
-            v.mul_(beta2).addcmul_(p.grad, p.grad, value=1 - beta2)
-            denom = (v / (1 - beta2**t)).sqrt_().add_(eps)
+            by_step.setdefault((state["step"], p.device, p.dtype), []).append(p)
+        for (t, _, _), ps in by_step.items():
+            grads = [p.grad for p in ps]
+            m = [self.state[p]["exp_avg"] for p in ps]
+            v = [self.state[p]["exp_avg_sq"] for p in ps]
+            torch._foreach_lerp_(m, grads, 1 - beta1)
+            torch._foreach_mul_(v, beta2)
+            torch._foreach_addcmul_(v, grads, grads, value=1 - beta2)
+            denom = torch._foreach_div(v, 1 - beta2**t)
+            torch._foreach_sqrt_(denom)
+            torch._foreach_add_(denom, eps)
             if wd:
-                p.mul_(1 - lr * wd)
-            p.addcdiv_(m, denom, value=-lr / (1 - beta1**t))
+                torch._foreach_mul_(ps, 1 - lr * wd)
+            torch._foreach_addcdiv_(ps, m, denom, value=-lr / (1 - beta1**t))
 
 
 def _is_router(name: str) -> bool:

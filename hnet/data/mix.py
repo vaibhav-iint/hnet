@@ -13,7 +13,7 @@ Pipeline (``scripts/data/build_mix.py``; spec: ``configs/data/<mix>.spec.yaml``;
              build is a prefix of a bigger one and the pools can be shared between builds.
 2. tokenizer (optional) train the in-corpus BPE on the first ``tokenizer_sample_bytes`` of the train stream.
 3. assemble  The train stream interleaves the leaves' train documents so that *every prefix* has the mixture's
-             byte shares: documents are merged in order of (bytes of the leaf already emitted) / (leaf share),
+             byte shares: documents are merged in order of (leaf bytes before the doc's midpoint) / (leaf share),
              i.e. the leaf furthest behind its share goes next. Train documents equal (exact text) to any
              val-assigned document are dropped. The stream is cut into shards of ~``shard_bytes`` text bytes
              (documents are never split), each written twice over exactly the same documents:
@@ -557,7 +557,7 @@ def interleave(lens: list, weights: list, total: float | None):
         np.cumsum(ln[:-1], out=excl[1:])
         li.append(np.full(len(ln), i, np.int64))
         pos.append(np.arange(len(ln), dtype=np.int64))
-        key.append(excl / w)
+        key.append((excl + 0.5 * ln) / w)  # a doc's midpoint: a long doc waits until half of it is "due"
     if not li:
         return np.zeros(0, np.int64), np.zeros(0, np.int64)
     li, pos, key = np.concatenate(li), np.concatenate(pos), np.concatenate(key)

@@ -52,14 +52,10 @@ class ByteInfo:
 
 def hash_bank(ids: torch.Tensor, ctx: SeqCtx, n_hash: int, max_len: int) -> torch.Tensor:
     """[n_hash, max_len, T]: hash k of the n bytes ending at t, for n = 1..max_len (n-1 = row index)."""
-    rows = []
-    for k in range(n_hash):
-        per_n = []
-        for n in range(1, max_len + 1):
-            h, _ = HashNgramEmbedding.hashes(ids, ctx.position_ids, n, salt=(k + 1) * 104729 + n * 7919)
-            per_n.append(h)
-        rows.append(torch.stack(per_n))
-    return torch.stack(rows)
+    ns = [n for _ in range(n_hash) for n in range(1, max_len + 1)]
+    salts = [(k + 1) * 104729 + n * 7919 for k in range(n_hash) for n in range(1, max_len + 1)]
+    h, _ = HashNgramEmbedding.multi_hashes(ids, ctx.position_ids, ns, salts)
+    return h.view(n_hash, max_len, -1)
 
 
 class ChunkVocab(nn.Module):

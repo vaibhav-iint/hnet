@@ -67,3 +67,19 @@ def test_trains():
     (out.loss + out.aux_loss).backward()
     g = model.ngram_embeddings.tables[0].weight.grad
     assert g is not None and g.abs().sum() > 0
+
+
+def test_multi_hashes_bit_identical_to_per_n_hashes():
+    from hnet.model.ctx import SeqCtx
+    from hnet.model.ngram import HashNgramEmbedding
+
+    torch.manual_seed(0)
+    for T in (1, 5, 300):
+        ids = torch.randint(0, 256, (T,))
+        cu = torch.tensor([0, T // 2, T] if T > 2 else [0, T], dtype=torch.int32)
+        pos = SeqCtx.from_cu_seqlens(cu).position_ids
+        ns, salts = [3, 8, 2, 5, 1, 16], [11, 22, 33, 44, 55, 66]  # unsorted n, n > T, n = 1
+        H, V = HashNgramEmbedding.multi_hashes(ids, pos, ns, salts)
+        for i, (n, s) in enumerate(zip(ns, salts)):
+            h, v = HashNgramEmbedding.hashes(ids, pos, n, s)
+            assert torch.equal(H[i], h) and torch.equal(V[i], v), (T, n)
