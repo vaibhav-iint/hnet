@@ -286,3 +286,18 @@ objective for the main network, 1024 candidates, +1.6% FLOPs, weight 0.5 / 1.0) 
 Hypothesis: the gap to BPE is word identity, which BPE stores in a FLOP-free table and the H-Net must compute; and the
 main network gets no word-level training signal. A hashed vocabulary over the router's chunks gives both, and makes
 the segmentation matter (a chunk's identity is its token), which is what a learned tokenizer needs to be trained on.
+
+## EXP-018 · Where should the chunk vocabulary sit? (1-stage, word-scale chunks)
+
+*spec `exp018_vocab_shapes.yaml` · 1-stage H-Net (ratio 6, chunks ≈ words), end-of-chunk MLP router, rank decisions
+· arms `h1_quant` (no vocabulary), `h1_vocab_pred` (vocabulary + next-chunk prediction) · 3 seeds · status: running*
+
+## EXP-019 · A router that is a tokenizer: context-free boundary scores
+
+*spec `exp019_local_router.yaml` · `hnet/model/routing/local.py` (`local_mlp`: logit from the last 8 bytes only, so
+the same string is always cut the same way) + rank decisions · arms `local`, `local_vocab`, `local_vocab_pred`
+(same vocabulary arms as EXP-017, which uses the contextual end_mlp router) · 3 seeds · status: running*
+
+Motivation: `chunk_stats` on trained routers (work log): stage-1 chunks are 48–55% singletons and recurring words
+are segmented consistently only 23–53% of the time. Prediction: `local*` arms score far higher on consistency; if
+the vocabulary then helps more than in EXP-017, consistency is the missing ingredient of learned tokenization.
