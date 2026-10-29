@@ -71,7 +71,20 @@ def make_param_groups_fn(model_cfg, train_cfg: dict):
     return fn
 
 
+def _with_model_optim_knobs(model_cfg, train_cfg: dict) -> dict:
+    """H-Net-only optimizer knobs kept in the model config (like ``lr_multiplier``) -> the optimizer section."""
+    rwd = getattr(model_cfg, "residual_proj_wd", None)
+    if rwd is None:
+        return train_cfg
+    assert train_cfg.get("optimizer", "adamw") == "muon", "model.residual_proj_wd needs train.optimizer=muon"
+    sec = dict(train_cfg.get("muon") or {})
+    assert sec.get("residual_wd") in (None, rwd), "model.residual_proj_wd and train.muon.residual_wd disagree"
+    sec["residual_wd"] = float(rwd)
+    return {**train_cfg, "muon": sec}
+
+
 def build_optimizer(model, model_cfg, train_cfg: dict):
+    train_cfg = _with_model_optim_knobs(model_cfg, train_cfg)
     name = train_cfg.get("optimizer", "adamw")
     pg_fn = make_param_groups_fn(model_cfg, train_cfg)
     if name == "muon":

@@ -173,6 +173,10 @@ class HNetConfig:
     # Hashed byte n-gram embeddings added to the byte embedding (hnet.model.ngram; BLT-style): {"ns": [3, ..., 8],
     # "buckets": int or one per n}. Empty = off. Parameter-rich and FLOP-free (lookups, like the BPE embedding).
     ngram_embed: dict = field(default_factory=dict)
+    # Optimizer-only (Muon), next to lr_multiplier because it is an H-Net-only LR-allocation knob: decoupled weight
+    # decay of the residual bypass matrices (``residual_proj.weight``), fed to ``train.muon.residual_wd`` by
+    # hnet.optim.build_optimizer. None = off (default). Spectral-norm fixed point ~1/wd; see hnet/optim/muon.py.
+    residual_proj_wd: Optional[float] = None
 
     def attn_res_for_stage(self, s: int) -> int:
         return int(_per_stage(self.attn_res, self.n_stages + 1, "attn_res")[s])

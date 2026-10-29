@@ -461,6 +461,10 @@ class Trainer:
         info = {"params": n_params, "params_by_stage": {s: sum(p.numel() for p in ps)
                                                         for s, ps in self.stage_params.items()},
                 "lr_multipliers": {int(g.get("stage", 0)): round(g["lr_mult"], 4) for g in self.opt.param_groups},
+                # peak LR actually applied per optimizer group (base_lr x lr_mult; the schedule multiplies it)
+                "peak_lr_by_group": [f"{g.get('kind', 'all')}/s{g.get('stage', 0)}/wd{g.get('weight_decay', 0):g}"
+                                     f"{'/' + g['role'] if g.get('role') else ''}: {g['base_lr'] * g['lr_mult']:.4g}"
+                                     for g in self.opt.param_groups],
                 "kind": self.kind, "seq_len": self.seq_len, "windows_per_step": self.windows_per_step,
                 "micro_batch": int(self.dc["micro_batch"]), "grad_accum": self.accum, "world_size": self.world,
                 "total_steps": self.total_steps, "est_tokens_eq_per_step": self.est_tokens_per_step}
