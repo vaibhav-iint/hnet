@@ -82,21 +82,49 @@ def _flex_fn():
     return _compiled_flex
 
 
-def packed_block_mask(mask_mod, H, T: int, device: torch.device):
+def packed_block_mask(mask_mod, H, T: int, device: torch.device, block: int = 128, max_elems: int = 1 << 23):
     """BlockMask for a packed length-T sequence whose ``mask_mod`` indexes per-position tensors (segment ids etc.).
 
-    Built eagerly (a [H or 1, T, T] bool grid): the inductor-compiled ``create_block_mask(_compile=True)`` with
-    closures over per-step tensors caused CUDA illegal memory accesses in EXP-002. Indices are clamped to T - 1 (and
-    out-of-range pairs masked) so a ``mask_mod`` never reads past its index tensors, including when flex evaluates the
-    padded tail of a partial block. The bound is a tensor, not a Python int, so a new T does not recompile flex.
+    Built without ``create_block_mask``: its inductor-compiled path (``_compile=True``) caused CUDA illegal memory
+    accesses on per-step packed lengths (EXP-002), and its eager path materializes [H, T, T] intermediates (int64 for
+    index lookups: >1 GiB at T ~ 12k). Here the block-level partial/full maps are evaluated in row chunks of at most
+    ``max_elems`` pairs by broadcasting ``mask_mod`` over (h, q, kv) index tensors, so a ``mask_mod`` must use only
+    broadcasting tensor ops (true for vmap-style masks). Indices are clamped to T - 1 and out-of-range pairs masked,
+    so a ``mask_mod`` never reads past its per-position tensors (flex also evaluates it on a partial tail block). The
+    bound is a tensor, not a Python int, so a new T does not recompile flex.
     """
+    from torch.nn.attention.flex_attention import BlockMask
+
     last = torch.tensor(T - 1, device=device)
 
     def bounded(b, h, q_idx, kv_idx):
         inside = (q_idx <= last) & (kv_idx <= last)
         return mask_mod(b, h, torch.minimum(q_idx, last), torch.minimum(kv_idx, last)) & inside
 
-    return create_block_mask(bounded, None, H, T, T, device=device)
+    nb = -(-T // block)
+    Tp, Hn = nb * block, H or 1
+    rows = max(block, (max_elems // (Hn * Tp)) // block * block)
+    b0 = torch.zeros((), dtype=torch.long, device=device)
+    h = torch.arange(Hn, device=device).view(Hn, 1, 1)
+    kv = torch.arange(Tp, device=device).view(1, 1, Tp)
+    any_parts, all_parts = [], []
+    for a in range(0, Tp, rows):
+        q = torch.arange(a, min(a + rows, Tp), device=device).view(1, -1, 1)
+        m = bounded(b0, h, q, kv).expand(Hn, q.shape[1], Tp).reshape(Hn, -1, block, nb, block)
+        any_parts.append(m.any(dim=4).any(dim=2))
+        all_parts.append(m.all(dim=4).all(dim=2))
+    full = torch.cat(all_parts, dim=1)  # [Hn, nb, nb]
+    partial = torch.cat(any_parts, dim=1) & ~full
+
+    def ordered(blocks):  # flex layout: per q block, the count and the indices of the kv blocks (selected first)
+        num = blocks.sum(-1, dtype=torch.int32)
+        idx = torch.argsort(blocks.to(torch.int8), dim=-1, descending=True, stable=True).to(torch.int32)
+        return num[None], idx[None]
+
+    kv_num, kv_idx = ordered(partial)
+    full_num, full_idx = ordered(full)
+    return BlockMask.from_kv_blocks(kv_num, kv_idx, full_num, full_idx, BLOCK_SIZE=block, mask_mod=bounded,
+                                    seq_lengths=(T, T))
 
 
 def _block_mask(ctx: SeqCtx, window: int, device: torch.device):
