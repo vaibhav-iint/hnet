@@ -4,7 +4,7 @@
 # the variance of the stage-0 boundary logit across positions that end in the same 4 bytes (hashed group means).
 # Arms: weight 1 and 10 (`cons1`, `cons10`), and weight 10 with the chunk vocabulary + next-chunk objective
 # (`cons10_vocab_pred`; baselines: EXP-017 `quant_fix` and `vocab_pred`). 2-stage (3,3), end_mlp router, rank
-# decisions, lr 1.5e-3, EXP-002 budget.
+# decisions, lr 1.5e-3, EXP-002 budget. Second launch: the penalty is the unexplained variance share (scale-free).
 name: exp020_router_consistency
 out_root: runs/search/exp020_router_consistency
 gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp020_router_consistency
