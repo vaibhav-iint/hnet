@@ -260,6 +260,7 @@ class Spec:
     def jobs(self, only=None, shard: Optional[Tuple[int, int]] = None, allow_missing: bool = False) -> List[Job]:
         """Ordered jobs (see module docstring). ``only``: run names to keep (applied after sharding, so shard
         membership never depends on ``only``)."""
+        self.subst({k: self.raw.get(k) for k in ("set", "grid", "runs")})  # all unset params in one error
         miss = self.missing_files()
         if miss and not allow_missing:
             lines = "\n".join(f"  {p}  (run {r})" for r, p in miss)
