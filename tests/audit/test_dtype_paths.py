@@ -28,7 +28,6 @@ def _cfg():
         attn=dict(num_heads=[2, 4], rotary_emb_dim=[8, 8]), dc=dict(target_ratios=[4.0])))
 
 
-@pytest.mark.xfail(strict=True, raises=RuntimeError, reason="AUDIT B3: residual_proj cast to bf16 but fed fp32")
 def test_model_cast_to_bf16_still_runs():
     """FAILS: RuntimeError 'mat1 and mat2 must have the same dtype' in residual_proj."""
     torch.manual_seed(0)
@@ -39,7 +38,6 @@ def test_model_cast_to_bf16_still_runs():
         m(torch.randint(0, 254, (40,)))
 
 
-@pytest.mark.xfail(strict=True, reason="AUDIT B2: learned-router logits computed in bf16 under autocast")
 def test_learned_router_scores_are_not_bf16_quantized_under_autocast():
     """FAILS (precision, low severity): logits are exactly bf16-representable under autocast."""
     torch.manual_seed(0)

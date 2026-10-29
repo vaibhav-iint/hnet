@@ -60,7 +60,8 @@ class EndLinearRouter(nn.Module):
         _init_head(self.proj, 0.0, 1.0, init_scale, target_ratio)
 
     def forward(self, h: torch.Tensor, ctx: SeqCtx, **_) -> RouterOutput:
-        logit = self.proj(h).squeeze(-1).float()
+        with torch.autocast(device_type=h.device.type, enabled=False):  # fp32 scores: rank decisions need them
+            logit = self.proj(h.float()).squeeze(-1)
         return router_output(torch.sigmoid(logit), ctx, self.boundary_semantics, logit=logit)
 
 
@@ -87,5 +88,6 @@ class EndMLPRouter(nn.Module):
         _init_head(self.fc2, _SILU_MEAN, _SILU_STD, init_scale, target_ratio)
 
     def forward(self, h: torch.Tensor, ctx: SeqCtx, **_) -> RouterOutput:
-        logit = self.fc2(F.silu(self.fc1(h))).squeeze(-1).float()
+        with torch.autocast(device_type=h.device.type, enabled=False):  # fp32 scores (audit B2: bf16 left ~800 distinct
+            logit = self.fc2(F.silu(self.fc1(h.float()))).squeeze(-1)  # values per 32k-byte batch for the rank decider)
         return router_output(torch.sigmoid(logit), ctx, self.boundary_semantics, logit=logit)

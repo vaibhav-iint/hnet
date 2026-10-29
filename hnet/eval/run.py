@@ -55,6 +55,9 @@ def load_run_checkpoint(path: str, device="cpu", dtype=torch.float32):
     state = torch.load(os.path.join(ck, "model.pt"), map_location="cpu", weights_only=True)
     model.load_state_dict(state, strict=True)
     model = model.to(device=device, dtype=dtype).eval()
+    for m in model.modules():  # residual_proj stays fp32 (as in training and the official model; audit B3)
+        if hasattr(m, "residual_proj"):
+            m.residual_proj.float()
     meta["checkpoint"] = ck
     return model, mcfg, meta
 

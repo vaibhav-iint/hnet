@@ -380,11 +380,6 @@ class HNetForCausalLM(nn.Module):
         for st in self.backbone.stages():
             st.progress = float(progress)
 
-    def set_progress(self, progress: float):
-        """Training progress in [0, 1] (called by the trainer before each step); drives dc.residual_warmup."""
-        for st in self.backbone.stages():
-            st.progress = float(progress)
-
     def stage_of_param(self, name: str) -> int:
         """Stage index owning parameter ``name`` (DDP ``module.`` / compile ``_orig_mod.`` prefixes allowed);
         embeddings and lm_head belong to stage 0."""

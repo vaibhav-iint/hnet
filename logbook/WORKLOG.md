@@ -1042,3 +1042,19 @@ ramp per ATDC arXiv 2605.30080); evaluation protocol (per source, 2 seeds per fr
 cheap one-factor-at-a-time bridge from EXP-024 (BPE parity) to the 1e16 L04 rung (-0.24): six factors change between
 them (steps 1763->728, batch 131k->545k bytes, AdamW->Muon+auto multipliers, FineWeb-Edu->mix, ratio 6->4.145,
 GPT-2 50k -> in-corpus 32k baseline).
+
+### Implementation audit (docs/IMPL_AUDIT.md, tests/audit/): the paper path is correct; two small fixes
+An independent audit transcribed the official dynamic-chunking code (goombalab/hnet) into a CPU test and compared our
+default model against it: forward pass and every parameter's gradient agree to 6e-8 (fp32, 1- and 2-stage, packed
+batch with a 1-byte segment). Data and eval are correct: byte and BPE models score identical text, BPE bpb = token
+NLL in bits / UTF-8 bytes of the same text, train and val disjoint, same documents in the same order. The residual
+projection's live bias is as in the official code (only the weight is zero-initialized). Findings:
+- B1 (may change results, tiny scale only): equal-FLOPs pairs are equal at the *target* compression; the paper's
+  threshold router realizes 2.6-2.9 instead of 3 at stage 0, so EXP-002-era H-Nets ran 7-12% over BPE's FLOPs (favours
+  the H-Net; "trails BPE" results are conservative). The ladder and rank-decider runs are exact (within 0.5%).
+- B2 fixed: learned end routers computed their score in bf16 under autocast (~800 distinct values per 32k-byte batch
+  for the rank decider). Now fp32 (`hnet/model/routing/end.py`). Effect on past runs judged negligible (one tie at the
+  cut on the checked checkpoint), but runs from now on are not bit-identical to earlier ones in bf16.
+- B3 fixed: casting a whole H-Net to bf16 crashed in residual_proj (eval only). B4: duplicate `set_progress` removed.
+- Deviations that may matter (not bugs): no weight decay on norms / A_log / D / dt_bias (official decays them); the
+  rank decider's batch coupling and eval-time running threshold; the paper's AdamW LR multipliers applied under Muon.

@@ -131,7 +131,7 @@ class HNet(nn.Module):
 
         h = self.encoder(h, ctx)
         with _no_autocast(h.device):
-            residual = self.residual_proj(h.float())
+            residual = self.residual_proj(h.to(self.residual_proj.weight.dtype)).float()  # fp32 in training
         r = self.routing_module(h, ctx, input_ids=input_ids, boundaries=boundaries[0] if boundaries else None)
         if self.decider is not None:
             r = self.decider(r, ctx)
