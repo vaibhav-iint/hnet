@@ -1007,3 +1007,11 @@ architecture's compute that scales better. The gap is 0.18-0.29 bpb prior-free a
 equal FLOPs and data; the bypass dominates (rms 5× the hierarchy's) in every prior-free run. One seed each; the L04
 BPE run is byte-identical to the LR-sweep run (reproducible pipeline). Caveat: BPE's LR transferred to the H-Nets
 costs them ~0.04 (their own optimum is 0.01). → 1e17 rungs next (decided after checking the cost table).
+
+### Correction: EXP-027 is neutral, not negative
+The "negative" readout above used per-seed values of runs that were still at step 1500 as if final (the report's
+step column showed the sweep maximum, not the seed's). Finals: `cste` 1.778 / 1.661 / 1.640 (1.693), `cste_rgate`
+1.742 / 1.679 / 1.648 (1.690), `rgate` 1.746 / 1.699 / running, against `vp_ng` 1.682: same mean, same lottery.
+The conclusion stands (the interventions change the mechanism, not the tokenizer the seed falls into) but the
+magnitude claim was wrong. `training_report.py` now prints interim seeds with their step and leaves them out of the
+mean. The EXPERIMENTS.md entry is corrected.

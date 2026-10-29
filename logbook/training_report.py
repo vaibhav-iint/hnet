@@ -112,6 +112,10 @@ def arm_summary(arm, runs, total):
     """One table row."""
     vals = [r["evals"][-1]["val/bpb"] for r in runs if r["evals"]]
     steps = [r["evals"][-1]["step"] for r in runs if r["evals"]]
+    # per-seed values that are not at the sweep's final step are interim: shown with their step, kept out of the mean
+    final = [r["evals"][-1]["val/bpb"] for r in runs if r["evals"] and (total is None or r["evals"][-1]["step"] >= total)]
+    seed_txt = " ".join(f"{r['evals'][-1]['val/bpb']:.3f}" + ("" if total is None or r["evals"][-1]["step"] >= total
+                        else f"@{r['evals'][-1]['step']}") for r in runs if r["evals"])
     zm = [r["evals"][-1].get("val/zero_main_s0_bpb") for r in runs if r["evals"]]
     zm = [z for z in zm if isinstance(z, (int, float))]
     tb = [_ema([x["bpb"] for x in r["metrics"]])[-1] for r in runs if r["metrics"]]
@@ -122,9 +126,11 @@ def arm_summary(arm, runs, total):
         "arm": arm, "seeds": len(runs), "done": sum(r["done"] for r in runs),
         "step": max(r["step"] for r in runs), "total": total,
         "eval_step": max(steps) if steps else None,
-        "val": statistics.mean(vals) if vals else None,
-        "val_sd": statistics.stdev(vals) if len(vals) > 1 else None,
+        "val": statistics.mean(final) if final else (statistics.mean(vals) if vals else None),
+        "val_sd": statistics.stdev(final) if len(final) > 1 else None,
+        "val_final": bool(final),
         "val_seeds": vals,
+        "seed_txt": seed_txt,
         "zero_main": statistics.mean(zm) if zm else None,
         "train": statistics.mean(tb) if tb else None,
         "bytes_per_sec": statistics.mean(bps) if bps else None,
@@ -175,7 +181,7 @@ def table_md(rows):
     for r in rows:
         tot = f"/{r['total']}" if r["total"] else ""
         sd = f" ± {r['val_sd']:.3f}" if r["val_sd"] is not None else ""
-        seeds = " ".join(f"{v:.3f}" for v in r["val_seeds"])
+        seeds = r["seed_txt"]
         kbs = _fmt(r["bytes_per_sec"] / 1e3 if r["bytes_per_sec"] else None, 0)
         lines.append(f"| {r['arm']} | {r['done']}/{r['seeds']} | {r['step']}{tot} | {_fmt(r['val'])}{sd}"
                      f"{' @' + str(r['eval_step']) if r['eval_step'] and r['eval_step'] != r['step'] else ''} | {seeds}"
@@ -190,7 +196,7 @@ def table_html(rows):
         tot = f"/{r['total']}" if r["total"] else ""
         sd = f" ± {r['val_sd']:.3f}" if r["val_sd"] is not None else ""
         at = f" <small>@{r['eval_step']}</small>" if r["eval_step"] and r["eval_step"] != r["step"] else ""
-        seeds = " ".join(f"{v:.3f}" for v in r["val_seeds"])
+        seeds = r["seed_txt"]
         kbs = _fmt(r["bytes_per_sec"] / 1e3 if r["bytes_per_sec"] else None, 0)
         state = "done" if r["done"] == r["seeds"] else ("run" if r["step"] else "wait")
         al = "".join(f"<span class='pill warn'>{html.escape(a)}</span>" for a in r["alerts"]) or "–"
@@ -320,7 +326,7 @@ def tldr(all_rows):
                 out.append(f"  - alert `{r['arm']}`: {', '.join(r['alerts'])}")
             if r["val_sd"] is not None and r["val_sd"] > 0.03:
                 out.append(f"  - seeds of `{r['arm']}` disagree (sd {r['val_sd']:.3f}): a bifurcation, not noise "
-                           f"(CLAUDE.md rule 7); per seed {' '.join(f'{v:.3f}' for v in r['val_seeds'])}")
+                           f"(CLAUDE.md rule 7); per seed {r['seed_txt']}")
     return out
 
 

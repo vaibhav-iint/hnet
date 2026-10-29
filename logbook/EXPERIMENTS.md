@@ -369,23 +369,24 @@ adopted) · arms: `cste` = `dc.chunk_ste` (the chunk vectors entering the main n
 so the next-chunk loss trains the router directly, independent of the decoder's adoption); `rgate` =
 `dc.residual_gate=margin` (the residual bypass into the decoder is scaled by the router's mean margin 2·mean|p−0.5|, so
 it opens only once the tokenizer is decided); `cste_rgate` = both · 3 seeds · 2 L4 spot VMs, worst case $2.22 ·
-status: **done for seeds 0-1, seed 2 running** (VM recreated after preemption)*
+status: **done** (rgate seed 2 finishing)*
 
 Hypothesis (work log, "Deep dive: the adoption race"): the bypass opens at steps 60–130 while the router is undecided,
 the decoder switches to it, the router loses its only gradient and drifts into a random basin. Either arm should remove
 the seed lottery without the whitespace prior; the reference is `vp_ng` (1.682 mean, one seed not adopted) and EXP-024
 `prior` (1.635 with the prior). Tests: `tests/test_adoption_options.py`, step-0 audit `hnet/analysis/grad_audit.py`.
 
-| arm | val bpb (s0 / s1 / s2) | zero-main (s0 / s1) | main-network contribution |
+| arm | val bpb (s0 / s1 / s2) | mean | zero-main (s0 / s1 / s2) |
 |---|---|---|---|
-| `cste` | 1.778 / 1.868 / – | 1.919 / – | 0.14 |
-| `cste_rgate` | 1.742 / 1.882 / – | 2.039 / – | 0.30 |
-| `rgate` | 1.923 / 1.699 / – | 2.140 / – | 0.22 |
-| EXP-023 `vp_ng` (reference, no intervention) | 1.720 / 1.669 / 1.656 | | 0.09 / 0.41 / 0.42 |
+| `cste` | 1.778 / 1.661 / 1.640 | 1.693 ± 0.074 | 2.02 (s0) |
+| `cste_rgate` | 1.742 / 1.679 / 1.648 | 1.690 ± 0.048 | 2.08 (s0) |
+| `rgate` | 1.746 / 1.699 / (running) | 1.723 (2 seeds) | 2.23 (s0) |
+| EXP-023 `vp_ng` (reference, no intervention) | 1.720 / 1.669 / 1.656 | 1.682 ± 0.034 | |
 
-- **Negative.** Neither giving the router the next-chunk gradient (`cste`) nor gating the bypass by the router's
-  margin (`rgate`) removes the seed lottery: every arm has one seed near 1.70-1.78 and one near 1.87-1.92, and the
-  means are 0.13-0.15 bpb *worse* than the untouched reference. The gate does what it was built to do (the hierarchy
-  is load-bearing from step 0: contribution 0.3-0.4 bpb at step 500 vs 0.03-0.10 for the reference) and that does not
-  help: a load-bearing hierarchy with a suffix tokenizer is just a worse model. The race is a symptom; the router's
-  objective is the disease (→ EXP-028, the gain objective).
+- **Neutral.** All three arms land on the reference's mean within 0.01-0.04 and keep its seed spread (best seed
+  1.640-1.648, worst 1.74-1.78): neither giving the router the next-chunk gradient (`cste`) nor gating the bypass by
+  the router's margin (`rgate`) removes the lottery. The gate does what it was built to do (the hierarchy carries
+  0.3-0.4 bpb from step 500 vs 0.03-0.10 for the reference) and the final loss does not move: forcing early adoption
+  of whichever tokenizer the seed fell into is not progress. The race is a symptom; the router's objective is the
+  disease (→ EXP-028, the gain objective). An earlier interim readout of this experiment (seeds at step 1500 read as
+  finals) said "0.13-0.15 worse"; that was wrong and is corrected here (the report now marks interim seeds).
