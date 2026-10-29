@@ -371,3 +371,18 @@ def test_manifest_is_json_serializable(built):
     man = json.loads(p.read_text())
     assert man["format"] == M.MIX_FORMAT and man["tokenizer"]["eot_id"] == 0
     assert M.is_mix(CFG["dataset"], built["root"]) and not M.is_mix("finewebedu10B")
+
+
+def test_unbuilt_mix_v1_uses_committed_tokenizer_and_stats(tmp_path):
+    from hnet.data.loader import bytes_per_token
+    from hnet.data.tokenizer import dataset_tokenizer
+    from hnet.train.data import default_bytes_per_token, default_eot
+
+    tok = dataset_tokenizer("mix_v1", root=tmp_path)  # nothing built under this root
+    assert tok.eot_id == 0 and tok.vocab_size == 32768 and tok.pretokenize
+    assert default_eot({"dataset": "mix_v1", "root": str(tmp_path)}) == 0
+    assert 3.5 < bytes_per_token("mix_v1", root=tmp_path) < 5.0
+    assert default_bytes_per_token({"dataset": "mix_v1", "root": str(tmp_path)}, None) == \
+        bytes_per_token("mix_v1", root=tmp_path)
+    t = "def f(x):\n    return x  # 中文 <|endoftext|>"
+    assert tok.decode_bytes(tok.encode(t)) == t.encode()

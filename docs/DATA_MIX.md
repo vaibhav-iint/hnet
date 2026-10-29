@@ -143,26 +143,38 @@ root or delete that source's pool).
 
 ## Using it in runs
 
-The data section (`configs/data/mix_v1.yaml`, or `mix_v1_small.yaml`):
+A run selects the mix with `data.dataset: mix_v1` (+ `data.source: hnet`, the default), most simply through the
+section include `configs/data/mix_v1.yaml` (`mix_v1_small.yaml` for the local build). The **model** decides the
+stream: `vocab_size: 256` (H-Net / byte Transformer) reads the byte shards, `vocab_size: 32768` (BPE) reads the
+token shards (or force it with `data.kind: bytes|tokens`). Both read the same documents in the same order.
 
 ```yaml
 # byte / H-Net run
 include: _core.yaml
 model: {include: ../models/hnet1_small.yaml, lr_multiplier_n_gpt: data}
 data: {include: ../data/mix_v1.yaml, seq_len: 8192, micro_batch: 4, batch_bytes: 2097152}
-# BPE run: same data section; the model's vocab must be the mix tokenizer's
+---
+# BPE run: same data section; the model's vocab must be the mix tokenizer's (32768 = 32k incl. <|endoftext|>)
+include: _core_bpe.yaml
 model: {include: ../models/bpe_small.yaml, vocab_size: 32768}
-data: {include: ../data/mix_v1.yaml, seq_len: <matched>, batch_tokens: ...}
+data: {include: ../data/mix_v1.yaml, seq_len: 1920, micro_batch: 8, batch_tokens: 491520}
 ```
 
-* The token loader's document-start id (0), the per-token byte counts (`n_bytes`, bpb) and `bytes_per_token`
-  (tokens_eq, `lr_multiplier_n_gpt: data`) come from the mix's manifest/tokenizer automatically
-  (`hnet.data.tokenizer.dataset_tokenizer`, `hnet.data.loader.bytes_per_token`).
-* Matched windows: `hnet.data.loader.matched_token_seq_len(8192, dataset="mix_v1")` (uses the measured stream
-  bytes/token of the mix instead of GPT-2's 4.62).
+* Token models: the document-start / end-of-text id (`<|endoftext|>` = **0**, not GPT-2's 50256) and the per-token
+  UTF-8 byte lengths used for `n_bytes` and bits-per-byte come from the mix's tokenizer automatically
+  (`hnet.data.tokenizer.dataset_tokenizer`: the build's `tokenizer.json`, or the spec's committed
+  `configs/tokenizers/mix_v1_bpe32k.json` when the mix is not built locally). `data.eot` still overrides the id.
+  Code paths: `hnet.train.data.HNetDataLoader` (WindowLoader `eot_id`, byte lengths), `default_eot`,
+  `Trainer.eot` (eval guard), `ValSet(tokenizer=...)`.
+* `bytes_per_token` (tokens_eq of byte runs, `lr_multiplier_n_gpt: data`, `scripts/search/fairness.py`): the built
+  mix's `manifest.json`, else the committed `hnet/data/bpt_stats.json` entry `mix_v1` (4.145, measured on the
+  small build; refresh it from the full build's manifest).
+* Matched windows: `hnet.data.loader.matched_token_seq_len(8192, dataset="mix_v1")` = 1920 tokens (stream
+  bytes/token 4.14, vs 1792 for GPT-2 on FineWeb-Edu).
 * Validation: `eval.val: standard` = the combined set; any named set works too (`eval.val: code.python`,
   `heldout`, ...). For all sets at once on a checkpoint: `hnet.data.mix.mix_valsets("mix_v1")` returns
-  `{name: ValSet}` (same text for byte and token models, as for FineWeb-Edu).
+  `{name: ValSet}` (same text for byte and token models, as for FineWeb-Edu); `hnet.eval.run --suite bpb
+  --valset mix_v1` uses the combined set.
 * `data.n_train_shards` limits a run to the first shards, which still have the full mixture.
 
 ## Bytes per token (small build, `mix_v1_small`, 32k in-corpus BPE)
@@ -220,3 +232,10 @@ slightly more on English, far fewer on code and non-English text.
 
 The blog's 128k in-corpus tokenizer gets 4.57 overall (fineweb-edu 4.95, code 2.88–4.79, math 3.69–3.86,
 multilingual 3.75–5.43); a 32k vocabulary compresses less.
+
+**BPE-NP** (`--no-pretokenize`): a 32k NP tokenizer trained on only the first 20 MB (NP training is much slower
+and memory-hungrier than with pretokenization: 470 s here for 20 MB vs 317 s for 500 MB with it) gets 4.79
+bytes/token on the combined val set vs 4.17 for BPE (en 5.14 vs 4.49, code 4.13 vs 3.55, math 4.20 vs 3.69, ml
+3.17 vs 3.25, held-out code 3.48 vs 3.14); the blog's 128k NP gets 6.03 vs 4.57. For the BPE-NP ladder, train
+it on a larger sample (`--tokenizer-sample-bytes 2e8` or more) on the GPU box. Not committed.
+

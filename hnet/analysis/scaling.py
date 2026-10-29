@@ -48,6 +48,7 @@ import glob
 import json
 import math
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
@@ -167,7 +168,10 @@ def default_arch(model_section: dict) -> str:
 def load_run(path: str, arch: Optional[str] = None, param_key: str = "params",
              per_source: Optional[str] = None, downstream: Optional[str] = None) -> Run:
     """Read a trainer run directory (config.yaml, metrics.jsonl, eval.jsonl, done.json [, per_source.json,
-    downstream_bpb.json, ladder.json]). ``ladder.json`` may override any of flops/params/budget/arch/seed/D."""
+    downstream_bpb.json, sweep_job.json, ladder.json]). Architecture label: ladder.json > ``arch`` > the sweep arm
+    (sweep_job.json ``arch``) > model.type (dense -> bpe). Budget: ladder.json > sweep point ``budget`` > the spec
+    name (``ladder_1e17_L05`` -> 1e17) > clustering in ``assign_budgets``. ``ladder.json`` may override any of
+    flops/params/budget/arch/seed/D."""
     import yaml
 
     cfg = {}
@@ -209,21 +213,25 @@ def load_run(path: str, arch: Optional[str] = None, param_key: str = "params",
         metrics.update(metrics_from_downstream(ds))
         info["down_source"] = f"downstream_bpb.json (boundary={ds.get('boundary')})"
     seed = cfg.get("train", {}).get("seed")
-    budget = None
+    budget = job_arch = None
     sj = os.path.join(path, "sweep_job.json")
     if os.path.exists(sj):
         with open(sj) as f:
             job = json.load(f)
         pt = job.get("point") or {}
         budget = pt.get("budget") or pt.get("flops_budget") or pt.get("flops")
+        if budget is None:  # scripts/ladder/make_ladder.py specs are named ladder_<C>_L<depth>
+            mt = re.search(r"(?:^|_)(\d+(?:\.\d+)?e[+-]?\d+)(?:_|$)", str(job.get("spec", "")))
+            budget = float(mt.group(1)) if mt else None
         seed = job.get("seed", seed)
+        job_arch = job.get("arch")  # the sweep arm (bpe / hnet / hnet_ws / ...)
     over = {}
     lj = os.path.join(path, "ladder.json")
     if os.path.exists(lj):
         with open(lj) as f:
             over = json.load(f)
     N = {"params": params, "params_nonembed": params_ne}.get(param_key, params)
-    run = Run(name=os.path.relpath(path), arch=over.get("arch") or arch or default_arch(msec),
+    run = Run(name=os.path.relpath(path), arch=over.get("arch") or arch or job_arch or default_arch(msec),
               flops=over.get("flops", flops), params=over.get("params", N), D=over.get("D", D),
               seed=over.get("seed", seed), budget=over.get("budget", budget), metrics=metrics, info=info,
               path=path, done=os.path.exists(os.path.join(path, "done.json")))
@@ -746,9 +754,16 @@ def fit_loss_to_loss(runs: List[Run], x_metric: str = "val", y_metric: str = "do
     res = {"x": x_metric, "y": y_metric, "points": {a: v for a, v in pts.items()},
            "laws": {a: (g.to_dict() if g else None) for a, g in laws.items()}, "notes": notes}
     for a, g in laws.items():
+        xs = [p[0] for p in pts[a]]
+        spread = (max(xs) / min(xs) - 1) if xs and min(xs) > 0 else 0.0
         if g is None:
-            notes.append(f"{a}: {len(pts[a])} run(s) with both '{x_metric}' and '{y_metric}' "
-                         "(loss-to-loss law needs >= 2 runs with distinct validation losses)")
+            why = ("needs >= 2 runs with distinct validation losses" if len(set(xs)) < 2 else
+                   "fitted exponent <= 0: downstream loss does not increase with validation loss across these runs")
+            notes.append(f"{a}: {len(pts[a])} run(s) with both '{x_metric}' and '{y_metric}': "
+                         f"no loss-to-loss law ({why})")
+        elif spread < 0.02:
+            notes.append(f"{a}: validation losses span only {spread:.2%} (e.g. seeds of one configuration): the "
+                         "loss-to-loss law is unconstrained; use all runs of the iso-FLOP sweeps")
     vl = (val_fit or {}).get("_laws", {})
     vf = (val_fit or {}).get("_fronts", {})
     if laws[ref] is None or laws[new] is None:

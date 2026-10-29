@@ -257,3 +257,34 @@ def test_downstream_gold_only_matches_full_scoring(kind, hnet_model, dense_model
     # identical bytes for byte and token models (same prompt and boundary convention)
     hs = gold["tasks"]["hellaswag"]["n_bytes"]
     assert hs == sum(len((" " + r["endings"][int(r["label"])]).encode()) for r in _hs_rows())
+
+
+# ============================================================================================ in-corpus BPE (data mix)
+MIX_TOK = os.path.join(ROOT, "configs", "tokenizers", "mix_v1_bpe32k.json")
+
+
+@pytest.mark.skipif(not os.path.exists(MIX_TOK), reason="mix tokenizer not present")
+def test_mix_tokenizer_per_source_and_boundary(sources):
+    pytest.importorskip("tokenizers")
+    tok = PS.Tokenizer(MIX_TOK)
+    assert tok.eot == 0
+    text = "def f(x):\n    return x  # héllo 日本"
+    ids, lens = tok.encode_with_lens(text)
+    assert lens.sum() == len(text.encode()) and b"".join(tok.token_bytes(t) for t in ids) == text.encode()
+    m = hmodel.build_model(DenseConfig(**{**DENSE, "vocab_size": 32768}))
+    m.init_weights()
+    res = PS.evaluate_sources(m.eval(), "token", sources, device="cpu", model_tokenizer=MIX_TOK,
+                              split_tokenizer=MIX_TOK, byte_seq_len=128, token_seq_len=40, max_bytes=None,
+                              batch_tokens=512, n_boot=0)
+    loaded = [PS.load_source_docs(s, None)["docs"] for s in sources]
+    segs, _ = PS.build_segments(loaded, "token", tok, tok, 128, 40)
+    assert segs[0].ids[0] == 0  # documents start with the mix's <|endoftext|> (id 0)
+    sc = TokenModelScorer(m, device="cpu", batch_tokens=1, tokenizer=tok.tiktoken_like())
+    ref = sc.score_sequences([s.ids for s in segs], [len(s.ids) - 1 for s in segs])
+    assert sum(r["bits"] for r in res["sources"].values()) == pytest.approx(
+        sum(-lp / math.log(2) for lp, _ in ref), rel=2e-4)
+    # canonical boundary with the in-corpus tokenizer (Llama-3 pretokenization)
+    cs = DS.CanonicalTokenScorer(m, device="cpu", tokenizer=tok.tiktoken_like())
+    ctx, cont, nb = cs.encode_pair("The quick bro", "wn fox")
+    assert ctx[0] == 0 and ctx[1:] + cont == tok.encode("The quick brown fox") and nb == 6
+    assert b"".join(tok.token_bytes(t) for t in cont).endswith(b"wn fox")

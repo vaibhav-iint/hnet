@@ -254,3 +254,18 @@ def test_smoke_existing_tiny_runs_single_budget(tmp_path):
     assert r["multiplier"] is None and len(r["matched_budget_gap"]) == 1
     assert 1.5 < r["frontier"]["bpe"][0]["L"] < 1.8 and 1.5 < r["frontier"]["hnet"][0]["L"] < 1.8
     assert os.path.exists(tmp_path / "ladder_loss_vs_compute.png")
+
+
+def test_load_run_reads_ladder_sweep_job(tmp_path):
+    """scripts/ladder specs: budget from the spec name, architecture label from the sweep arm."""
+    r = SC.Run("x", "hnet", 1.0e17, 3e7, 2e9, 0, None, {"val": 1.2, "down:avg": 1.5, "src:python": 2.0})
+    d = tmp_path / "1e17" / "L05" / "hnet_ws_s1"
+    _write_run_dir(str(d), r, "hnet", {"python": {"group": "code", "lang": "python", "held_out": False,
+                                                  "bpp": {"bpe": 3.5, "hnet": 4.2}}})
+    os.remove(d / "ladder.json")
+    json.dump({"spec": "ladder_1e17_L05", "name": "hnet_ws", "arch": "hnet_ws", "seed": 1},
+              open(d / "sweep_job.json", "w"))
+    run = SC.load_run(str(d))
+    assert run.arch == "hnet_ws" and run.budget == 1e17 and run.seed == 1
+    assert run.flops == pytest.approx(1e17) and run.D == pytest.approx(2e9)
+    assert SC.load_run(str(d), arch="hnet").arch == "hnet"

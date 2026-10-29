@@ -65,6 +65,19 @@ PALOMA_LIKE = [
 ]
 
 
+def per_source_module():
+    """scripts/eval/per_source.py as a module (tokenizers, per-source protocol)."""
+    if "per_source" in sys.modules:
+        return sys.modules["per_source"]
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("per_source", os.path.join(ROOT, "scripts", "eval", "per_source.py"))
+    ps = importlib.util.module_from_spec(spec)
+    sys.modules["per_source"] = ps
+    spec.loader.exec_module(ps)
+    return ps
+
+
 # ====================================================================================================== boundary
 class CanonicalBoundaryMixin:
     """``encode_pair`` that scores the canonical tokenization of context + continuation (see module docstring)."""
@@ -201,7 +214,7 @@ def evaluate_downstream(scorer, tasks=None, limit: Optional[int] = None, subset_
 
 
 # ====================================================================================================== CLI
-def load_downstream_scorer(spec: str, boundary: str, device=None, dtype=None):
+def load_downstream_scorer(spec: str, boundary: str, device=None, dtype=None, tokenizer: Optional[str] = None):
     from hnet.eval.run import load_run_checkpoint, model_kind
 
     device = torch.device(device) if device else torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -214,7 +227,12 @@ def load_downstream_scorer(spec: str, boundary: str, device=None, dtype=None):
     if kind == "byte":
         sc = ByteModelScorer(model, device=device)
     else:
-        sc = CanonicalTokenScorer(model, boundary=boundary, device=device, add_bos=True)
+        # the run's own tokenizer: the mix's in-corpus BPE for mix runs (EOT id 0), GPT-2 for FineWeb runs
+        ps = per_source_module()
+        tok_spec = tokenizer or ps.dataset_tokenizer_spec(meta)
+        tok = ps.Tokenizer(tok_spec).tiktoken_like()
+        sc = CanonicalTokenScorer(model, boundary=boundary, device=device, add_bos=True, tokenizer=tok)
+        sc.tokenizer_spec = tok_spec
     info = {"type": "run", "name": spec, "kind": kind, "checkpoint": meta["checkpoint"], "step": meta.get("step")}
     return sc, info, model, meta
 
@@ -233,13 +251,16 @@ def main(argv=None):
     ap.add_argument("--domain-max-bytes", type=int, default=None)
     ap.add_argument("--n-boot", type=int, default=1000)
     ap.add_argument("--device", default=None)
+    ap.add_argument("--tokenizer", default=None, help="BPE run tokenizer (default: the run's dataset tokenizer)")
     ap.add_argument("--out", default=None, help="default: <run>/downstream_bpb.json")
     ap.add_argument("--progress", action="store_true")
     a = ap.parse_args(argv)
     t0 = time.time()
-    sc, info, model, meta = load_downstream_scorer(a.model, a.boundary, a.device)
+    sc, info, model, meta = load_downstream_scorer(a.model, a.boundary, a.device, tokenizer=a.tokenizer)
+    info["tokenizer"] = getattr(sc, "tokenizer_spec", None)
     res = {"model": a.model, "info": info, "boundary": a.boundary if info["kind"] == "token" else "exact (bytes)",
-           "limit": a.limit, "subset_seed": a.subset_seed if (a.limit and a.subset_seed >= 0) else None, "gold_only": not a.all_choices}
+           "limit": a.limit, "subset_seed": a.subset_seed if (a.limit and a.subset_seed >= 0) else None,
+           "gold_only": not a.all_choices}
     res.update(evaluate_downstream(sc, a.tasks.split(",") if a.tasks else None, a.limit, a.subset_seed, a.n_boot,
                                    all_choices=a.all_choices, progress=a.progress))
     if hasattr(sc, "boundary_stats"):
@@ -248,13 +269,7 @@ def main(argv=None):
         if model is None:
             print("[downstream_bpb] --domains needs a run checkpoint (per_source.py); skipped", file=sys.stderr)
         else:
-            import importlib.util
-
-            spec = importlib.util.spec_from_file_location("per_source", os.path.join(ROOT, "scripts", "eval",
-                                                                                      "per_source.py"))
-            ps = importlib.util.module_from_spec(spec)
-            sys.modules["per_source"] = ps
-            spec.loader.exec_module(ps)
+            ps = per_source_module()
             if a.domains == "paloma_like":
                 import tempfile
 
@@ -266,7 +281,8 @@ def main(argv=None):
                 sources = ps.load_manifest(a.domains)
             bsl, tsl = ps.run_seq_lens(meta)
             dom = ps.evaluate_sources(model, info["kind"], sources, device=sc.device,
-                                      model_tokenizer=ps.model_tokenizer_of(meta), byte_seq_len=bsl or 8192,
+                                      model_tokenizer=a.tokenizer or ps.model_tokenizer_of(meta),
+                                      split_tokenizer=ps.dataset_tokenizer_spec(meta), byte_seq_len=bsl or 8192,
                                       token_seq_len=tsl or 1792, max_bytes=a.domain_max_bytes or 1_000_000)
             vals = [s["bpb"] for s in dom["sources"].values() if s.get("bpb") is not None]
             dom["average_bpb"] = float(np.mean(vals)) if vals else None
