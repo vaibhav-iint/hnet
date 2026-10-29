@@ -338,3 +338,25 @@ chunk vocabulary (2 × 65536 × 96) + next-chunk objective (w 0.5, 1024 candidat
 - `vp_ng`: the adopted seeds are 0.02–0.035 bpb from BPE at identical training FLOPs, with a learned word tokenizer
   and a main network that carries 0.42 bpb. The two parameter-side memories are complementary: n-gram tables give
   the byte stage local identity, the chunk table gives the hierarchy word identity.
+
+## EXP-024 · Reliable adoption: a whitespace tokenizer curriculum (H-Net matches BPE at equal FLOPs)
+
+*spec `exp024_adoption_curriculum.yaml` · best configuration (`vp_ng`: 1-stage ratio 6, end_mlp router, trimmed rank
+decisions, chunk vocabulary 2 × 65536 × 96 + next-chunk objective, byte n-gram tables) · arms: `prior` = for the first
+10% of steps the router's logit is also trained (BCE, weight 1 → 0) toward "a chunk ends at every whitespace byte",
+then released; `temp4` = confidence temperature 4 · 3 seeds · status: **done***
+
+| arm | val bpb (s0 / s1 / s2) | mean | main-network contribution |
+|---|---|---|---|
+| **`prior`** | **1.6337 / 1.6346 / 1.6364** | **1.635 ± 0.001** | 0.56 / 0.57 / 0.60 |
+| `temp4` | 1.753 / 1.713 / 1.704 | 1.723 | 0.02 / 0.14 / 0.21 |
+| EXP-023 `vp_ng` (no curriculum) | 1.720 / 1.669 / 1.656 | 1.682 | 0.09 / 0.41 / 0.42 |
+| BPE (EXP-006, same FLOPs, same data, 3 seeds) | | 1.634 ± 0.002 | |
+
+- With the curriculum every seed adopts the hierarchy early (main-network contribution 0.14–0.16 by step 250, 0.3+
+  by 750) and the three runs end within 0.003 bpb of each other, **at BPE's bits per byte** at identical training
+  FLOPs (fairness gate: configured and realized compute within 1%; realized compression pinned at 6.0 by the rank
+  decider). Without the curriculum two of three seeds reach 1.66–1.67 and one stays at 1.72.
+- The curriculum is BPE's own pre-tokenization used as a 10%-of-training warm start, not a constraint: the router
+  is free afterwards (chunk statistics of the final checkpoint in the work log).
+- A sharper confidence temperature does the opposite: it lowers the hierarchy's share and ends 0.04 behind `vp_ng`.
