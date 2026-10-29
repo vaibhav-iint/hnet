@@ -60,7 +60,7 @@ def test_identity_init_equals_the_plain_dechunker(dechunker):
     assert torch.equal(l0, l4)
     for n, g in g0.items():
         assert (g is None and g4[n] is None) or torch.allclose(g, g4[n], rtol=1e-4, atol=1e-7), n
-    assert float(g4["backbone.slot_proj"].abs().sum()) > 0
+    assert float(g4["backbone.dechunk_layer.slot_proj"].abs().sum()) > 0
 
 
 def test_each_byte_reads_the_slot_of_its_offset():
@@ -71,7 +71,7 @@ def test_each_byte_reads_the_slot_of_its_offset():
     D = m.backbone.d_model
     with torch.no_grad():
         for k in range(K):
-            m.backbone.slot_proj[k * D:(k + 1) * D] = torch.eye(D) * (k + 2.0)
+            m.backbone.dechunk_layer.slot_proj[k * D:(k + 1) * D] = torch.eye(D) * (k + 2.0)
     seen = {}
     hook = m.backbone.decoder.register_forward_pre_hook(lambda mod, args: seen.__setitem__("h", args[0].detach()))
     ids = torch.randint(0, 256, (1, 400))
@@ -98,7 +98,7 @@ def test_gradient_paths():
     out = m(ids, labels=ids)
     named = dict(m.named_parameters())
     groups = {
-        "slots": [named["backbone.slot_proj"]],
+        "slots": [named["backbone.dechunk_layer.slot_proj"]],
         "router": [p for n, p in named.items() if "routing_module" in n],
         "main": [p for n, p in named.items() if n.startswith("backbone.main_network.")],
         "encoder": [p for n, p in named.items() if n.startswith("backbone.encoder.")],
