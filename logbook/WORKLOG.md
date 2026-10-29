@@ -609,3 +609,23 @@ compression (last 10 logged steps):
   what the hierarchy can do when it gets positions and training signal, which is the point of the next sweep.
 - Policy from here: H-Net arms use rank (quantile) decisions, which pin compression exactly, or α ≥ 1; every
   summary reports realized FLOPs vs budget and flags > 2%.
+
+### Interim readouts of EXP-008/010/011 (honest-compute view; `logbook/sweep_summary.py`)
+| arm | val bpb | realized compute | main-network contribution |
+|---|---|---|---|
+| paper router, strong ratio loss (α 1) | 1.810 ± 0.012 (2 seeds) | +0.8% | 0.065 |
+| paper router, residual path-drop 0.3 | 1.846 | **+31%** | 0.053 |
+| paper router, entropy penalty | 1.921 | +6.6% | 0.000 |
+| fixed pooling, identity-init residual | 1.862 | +0.2% | 0.000 |
+| fixed pooling (zero-init residual) | 1.823 | +0.2% | 0.059 |
+
+- Path-drop makes the decoder lean on the hierarchy, which makes the LM loss's pull on the router *stronger*: the
+  model answers by selecting 31% more positions. Any fix that makes the hierarchy useful inflates compression unless
+  compression is pinned (quantile decisions, EXP-014/015/016).
+- Identity-init residual: the bypass is strong from step 0 and the decoder never uses the hierarchy (contribution
+  0.000, worse than zero-init). Zero-init starves the hierarchy early; identity-init starves it for good. The
+  hierarchy needs a window where it is necessary but not noise: residual warmup (EXP-011 `fixed_rwarm`, pending).
+- Entropy penalty: kills the stage-1 hierarchy outright (contribution 0.000) even where it does not collapse
+  compression. Dropped from further use.
+- New intervention (EXP-016): chunk-level multi-byte prediction, a head on the innermost main network's output
+  predicting the next chunk's first k bytes, bypassing dechunker, residual and decoder.
