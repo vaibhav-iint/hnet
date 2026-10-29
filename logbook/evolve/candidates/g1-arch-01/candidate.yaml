@@ -1,0 +1,40 @@
+id: g1-arch-01
+parents: [hnet_ws]
+track: architecture
+hypothesis: >-
+  Scale-balanced decoder input: both paths into the byte decoder are RMS-normalized and get gains trained by the same
+  optimizer, so Muon's scale growth no longer referees the bypass race (flag dc.fusion=balanced). The decoder of the stage-0 network reads
+  h = dechunk(z)*STE(c) + residual_proj(h_enc). In the 1e16 L03 ladder runs the hierarchy term's rms is pinned at
+  1.0-1.2 for all 908 steps (it is the main network's final RMSNorm output, whose gain trains under Adam at 0.003),
+  while the bypass rms grows monotonically 0.05 -> 0.8 (step 70) -> 2.4 (130) -> 6.1 / 8.3 (908, hnet_ws / hnet) and
+  its growth slows exactly when the WSD schedule decays the LR. residual_proj is a Muon matrix at 0.02 x 2.35 (stage-0
+  multiplier); Muon takes a fixed-spectral-norm step every update, so its scale grows ~linearly with the summed LR
+  whatever the gradient says. The "bypass 5-40x the hierarchy" fact, and its growth with LR in the LR sweeps, is
+  therefore at least partly an optimizer-scale artefact: the race between the two paths into the decoder is refereed by
+  how fast each path's scale can grow, not by usefulness. The candidate RMS-normalizes both paths and gives each a
+  per-channel gain (g_h init 1, g_r init 0.5 via dc.fusion_bypass_init) trained by the same optimizer (Adam, same LR),
+  so neither path has a scale advantage and the decoder weighs them by what they predict; residual_proj stays a Muon
+  matrix but now only sets the bypass's direction. g_r starts at 0.5, not 0: with g_r = 0 the bypass opens only at
+  Adam's pace (<= lr per step per channel) and the smoke run lost ~0.3 bpb at step 40 to that (a residual warmup in
+  disguise, a different and already-tested mechanism); at 0.5 it was level with the control. The norm on the
+  hierarchy path sits before the STE because a per-position RMSNorm after it cancels the STE's gradient to the
+  router (test). +384 params, no counted FLOPs.
+prediction:
+  fitness: 0.09          # hnet_ws is +0.127 (1 seed): predict >= 0.03 better
+  mechanism: >-
+    bypass_ratio (residual_rms/dechunk_rms, both measured after the gains) <= 2.5 at step 300 and at step 908
+    (hnet_ws: 3.8 / 5.1), and it no longer tracks the LR schedule (hnet_ws's ratio grows monotonically while the LR is
+    high); p_margin/s0 >= hnet_ws's at step 300 (0.26). Falsifier: ratio <= 2.5 but val bpb not better than hnet_ws
+    by >= 0.01 means the scale asymmetry was a symptom, not the cause of the underused hierarchy. Smoke (tiny, 40
+    steps, vs the flag-off control): bpb last-5 mean 3.539 vs 3.579, bypass ratio 0.72 vs 1.27 at step 40.
+branch: evolve/g1-arch-01
+model: configs/evolve/models/g1-arch-01.yaml
+set: []
+checks:
+  tests: pass
+  fairness: pass
+  grad_audit: logbook/evolve/candidates/g1-arch-01/grad_audit.txt
+  smoke: pass
+  default_forward: logbook/evolve/candidates/g1-arch-01/default_forward.txt
+  smoke_log: logbook/evolve/candidates/g1-arch-01/smoke.txt
+  fairness_report: logbook/evolve/candidates/g1-arch-01/fairness.txt

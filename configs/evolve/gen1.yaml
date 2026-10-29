@@ -1,0 +1,122 @@
+# evolve generation 1 (scripts/evolve/make_gen.py; benchmark: configs/search/ladder_1e16_L03.yaml)
+name: evolve_g1
+out_root: runs/search/evolve_g1
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/evolve_g1
+seeds:
+- 1
+- 2
+params:
+  best_mlr:
+    bpe: 0.02
+  adam_lr: 0.003
+params_note: best_mlr.bpe = BPE's best Muon LR from ladder_lr_1e16 (report/best_params.yaml); adam_lr = Adam-part LR (embeddings,
+  heads, norms), fixed, not tuned yet
+fairness: strict
+set:
+- train.optimizer=muon
+- train.muon.lr=${best_mlr.bpe}
+- train.muon.lr_embed=${adam_lr}
+- train.muon.lr_head=${adam_lr}
+- train.muon.lr_other=${adam_lr}
+- train.muon.momentum_warmup_steps=90
+- eval.every=90
+- train.ckpt_every=227
+runs:
+- name: bpe
+  config: configs/ladder/runs/ladder_bpe.yaml
+  model: configs/ladder/models/bpe_L03.yaml
+  set:
+  - data.micro_batch=16
+  - data.batch_tokens=131072
+  - train.train_tokens=119013376
+- name: hnet
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/ladder/models/hnet_L03.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: hnet_ws
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/ladder/models/hnet_ws_L03.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g1_alloc_01
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g1-alloc-01.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g1_alloc_02
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g1-alloc-02.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g1_mem_01
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g1-mem-01.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g1_mem_02
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g1-mem-02.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g1_opt_01
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/ladder/models/hnet_ws_L03.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+  - model.lr_multiplier_kinds=[embed,head,other]
+- name: g1_opt_02
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/ladder/models/hnet_ws_L03.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+  - model.residual_proj_wd=0.5
+- name: g1_router_01
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/ladder/models/hnet_L03.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+  - model.dc.router_surprise_weight=1.0
+  - model.dc.router_surprise_frac=0.3
+- name: g1_router_02
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/ladder/models/hnet_L03.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+  - 'model.dc.decision_kwargs={explore: 0.5, explore_frac: 0.3}'
+report:
+  baseline: bpe
+  labels:
+    bpe: 'control: bpe'
+    hnet: 'control: hnet'
+    hnet_ws: 'control: hnet_ws'
+    g1_alloc_01: A BPE model's compute per position is pinned by its vocabulary (4
+    g1_alloc_02: A BPE model's compute per position is pinned by its vocabulary (4
+    g1_mem_01: A prefix-trie output vocabulary gives the byte model the output half of BPE's string-keyed memory
+    g1_mem_02: 'Key the chunk vocabulary by the string that ends at the boundary, at every length, not by the string since
+      the previous '
+    g1_opt_01: 'Muon-native LR transfer: drop the paper''s Adam-derived per-stage multiplier (x2'
+    g1_opt_02: The bypass dominance (residual rms 5x the hierarchy's at the end of hnet_ws, 8x prior-free, 5-25x in every
+      L04 run above
+    g1_router_01: Self-surprise tokenizer teacher (prior-free; a decaying curriculum, labelled as such)
+    g1_router_02: Exploring rank decisions (prior-free; an annealed exploration schedule, not a curriculum toward any target)
