@@ -1,0 +1,233 @@
+{
+ "bytes": 126939,
+ "whitespace": {
+  "chunks": 20837,
+  "mean_len": 6.092,
+  "types": 7394,
+  "type_token_ratio": 0.3548,
+  "singleton_frac": 0.2522,
+  "unigram_bits_per_chunk": 10.617,
+  "unigram_bits_per_byte": 1.7427,
+  "top": [
+   [
+    "the ",
+    1062
+   ],
+   [
+    "of ",
+    692
+   ],
+   [
+    "and ",
+    570
+   ],
+   [
+    "to ",
+    514
+   ],
+   [
+    "a ",
+    448
+   ],
+   [
+    "in ",
+    398
+   ],
+   [
+    "is ",
+    294
+   ],
+   [
+    "for ",
+    184
+   ],
+   [
+    "that ",
+    179
+   ],
+   [
+    "The ",
+    166
+   ],
+   [
+    "are ",
+    159
+   ],
+   [
+    "as ",
+    131
+   ],
+   [
+    "on ",
+    126
+   ],
+   [
+    "with ",
+    105
+   ],
+   [
+    "have ",
+    100
+   ],
+   [
+    "be ",
+    99
+   ],
+   [
+    "by ",
+    95
+   ],
+   [
+    "or ",
+    92
+   ],
+   [
+    "from ",
+    90
+   ],
+   [
+    "it ",
+    81
+   ],
+   [
+    "can ",
+    76
+   ],
+   [
+    "was ",
+    74
+   ],
+   [
+    "you ",
+    74
+   ],
+   [
+    "- ",
+    73
+   ],
+   [
+    "at ",
+    69
+   ]
+  ]
+ },
+ "stages": [
+  {
+   "chunks": 21388,
+   "mean_len": 5.935,
+   "types": 7649,
+   "type_token_ratio": 0.3576,
+   "singleton_frac": 0.2571,
+   "unigram_bits_per_chunk": 10.645,
+   "unigram_bits_per_byte": 1.7936,
+   "top": [
+    [
+     "the ",
+     1060
+    ],
+    [
+     "of ",
+     688
+    ],
+    [
+     "and ",
+     571
+    ],
+    [
+     "to ",
+     497
+    ],
+    [
+     "a ",
+     443
+    ],
+    [
+     "in ",
+     387
+    ],
+    [
+     "is ",
+     294
+    ],
+    [
+     " ",
+     274
+    ],
+    [
+     "for ",
+     180
+    ],
+    [
+     "that ",
+     178
+    ],
+    [
+     "The ",
+     170
+    ],
+    [
+     "are ",
+     158
+    ],
+    [
+     "on ",
+     119
+    ],
+    [
+     "as ",
+     119
+    ],
+    [
+     "\n",
+     101
+    ],
+    [
+     "with ",
+     100
+    ],
+    [
+     "(",
+     99
+    ],
+    [
+     "have ",
+     97
+    ],
+    [
+     "by ",
+     94
+    ],
+    [
+     "or ",
+     90
+    ],
+    [
+     "be ",
+     89
+    ],
+    [
+     "from ",
+     89
+    ],
+    [
+     "it ",
+     81
+    ],
+    [
+     "can ",
+     75
+    ],
+    [
+     "you ",
+     74
+    ]
+   ],
+   "boundaries_on_whitespace_frac": 0.9532,
+   "whitespace_boundaries_hit_frac": 0.9785,
+   "word_types_seen_3plus": 1114,
+   "words_segmented_consistently_frac": 0.9937,
+   "dominant_segmentation_share": 0.9983
+  }
+ ],
+ "checkpoint": "runs/gcp/exp023_word_vocab_trimmed/vp_ng_s2/ckpt/step_0001763"
+}

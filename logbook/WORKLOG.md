@@ -806,3 +806,16 @@ is invisible without a vocabulary), `h1r_vocab_pred_ng` reached 1.82 at step 100
 Fix: mean/std over the central 98% of the scores (outlier-proof, cannot collapse unless 98% of scores coincide; unit
 test with 5/6 identical scores). Rule, stated generally: a scale estimator for boundary scores must straddle both
 modes of a bimodal distribution; medians do not. → EXP-023 (same arms + residual warmup; EXP-022 draft superseded).
+
+### EXP-023 tokenizer statistics: adoption and the kind of tokenizer go together (`cs_exp023_*.json`)
+| checkpoint | bpb | main contribution | boundaries on word boundaries | words cut consistently | top chunks |
+|---|---|---|---|---|---|
+| `vp_ng_s2` (adopted) | 1.656 | 0.42 | 95% | 99.4% | `the `, `of `, `and `, `to `, `a ` |
+| `vp_s1` (not adopted) | 1.855 | 0.18 | 4% | 89% | `s`, `d`, `ing`, `ed`, `er`, `ly`, `ion`, `ment` |
+
+Same picture as EXP-018 with the same seed: the seed that ends up with a *suffix/morpheme* tokenizer is the one whose
+hierarchy is not adopted; the seeds that find the *word* tokenizer are adopted and reach 1.66–1.73. Deterministic per
+seed across two deciders, so the bifurcation is in the router's initialization or the first few hundred steps of
+data, not in the decision rule. Open question whether the tokenizer causes the non-adoption (morpheme chunks are
+less predictable, a weaker chunk-level signal) or both follow from the same early state; either way the fix is to
+steer the first ~300 steps (residual warmup `vp_rwarm`, pending; or a brief whitespace-prior on the router).
