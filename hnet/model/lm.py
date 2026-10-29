@@ -193,6 +193,8 @@ class HNetForCausalLM(nn.Module):
             self.chunk_pred_head = nn.Linear(d_in, cfg.dc.chunk_pred_k * cfg.vocab_size, bias=False)
         if cfg.tie_embeddings:
             self.lm_head.weight = self.embeddings.weight
+        self.register_buffer("gain_mu", torch.zeros(()))  # running mean / std of the per-chunk hierarchy gain
+        self.register_buffer("gain_var", torch.ones(()))
         self._param_stage = {}
         for st in self.backbone.stages():
             prefix = "backbone" + ".main_network" * st.stage_idx + "."
@@ -260,6 +262,10 @@ class HNetForCausalLM(nn.Module):
                 prior = F.binary_cross_entropy_with_logits(bpred[0].logit.float(), tgt)
                 out.aux_loss = out.aux_loss + dc.router_prior_weight * scale * prior
                 stats["router_prior/s0"] = prior.detach()
+        if dc.router_gain_weight > 0 and self.training and labels is not None and bpred:
+            gain_loss, gstats = self._router_gain_loss(h, bpred[0], ctx, labels.reshape(-1))
+            out.aux_loss = out.aux_loss + dc.router_gain_weight * gain_loss
+            stats.update(gstats)
         if dc.router_consistency_weight > 0 and bpred and bpred[0].logit is not None:
             cons = self._router_consistency(bpred[0].logit, ids, ctx)
             out.aux_loss = out.aux_loss + dc.router_consistency_weight * cons
@@ -318,6 +324,37 @@ class HNetForCausalLM(nn.Module):
         dev = ((lg - mean[idx]) ** 2 * valid).sum()
         total = (((lg - (lg * valid).sum() / ones.sum().clamp(min=1)) ** 2) * valid).sum()
         return dev / (total + 1e-6)
+
+    def _router_gain_loss(self, h: torch.Tensor, r: RouterOutput, ctx: SeqCtx, labels: torch.Tensor):
+        """REINFORCE on the hierarchy's measured usefulness (dc.router_gain_weight): the stage-0 decoder and the LM
+        head are rerun on the residual bypass alone; the per-byte gain CE_res - CE_full is averaged over the chunk
+        covering each byte, standardized by running statistics, and the router's realized decisions inside each
+        chunk are pushed toward (positive advantage) or away from (negative) their current confidence."""
+        st = self.backbone
+        D = h.shape[-1]
+        with torch.no_grad():
+            h_res = st.decoder(r.residual_in.to(h.dtype), ctx)[:, :D]
+            ce_res = F.cross_entropy(self.lm_head(h_res).float(), labels, ignore_index=IGNORE_INDEX, reduction="none")
+            ce_full = F.cross_entropy(self.lm_head(h.detach()).float(), labels, ignore_index=IGNORE_INDEX, reduction="none")
+            valid = (labels != IGNORE_INDEX).float()
+            gain = (ce_res - ce_full) * valid
+            mask = r.boundary_mask.reshape(-1).long()
+            cs = torch.cumsum(mask, 0)
+            chunk = (cs - mask) if r.semantics == "end" else (cs - 1).clamp(min=0)  # chunk index covering each byte
+            n_chunks = int(chunk.max()) + 1
+            sums = torch.zeros(n_chunks, device=h.device).index_add_(0, chunk, gain)
+            cnt = torch.zeros(n_chunks, device=h.device).index_add_(0, chunk, valid).clamp(min=1)
+            mean_gain = sums / cnt
+            ema = self.config.dc.router_gain_ema
+            batch_mu = mean_gain.mean()
+            batch_var = mean_gain.var(unbiased=False)
+            self.gain_mu.mul_(ema).add_((1 - ema) * batch_mu)
+            self.gain_var.mul_(ema).add_((1 - ema) * batch_var)
+            adv = (mean_gain - self.gain_mu) / (self.gain_var.sqrt() + 1e-3)
+            adv_t = adv[chunk] * valid
+        logc = torch.log(r.selected_probs.reshape(-1).float().clamp(1e-4, 1 - 1e-4))
+        loss = -(adv_t * logc).sum() / valid.sum().clamp(min=1)
+        return loss, {"router_gain/s0": batch_mu.detach(), "router_gain_std/s0": batch_var.sqrt().detach()}
 
     def _chunk_pred_loss(self, bpred, ids: torch.Tensor, labels: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
         """Mean CE of predicting, from the innermost main network's output at each innermost position, the k bytes

@@ -110,6 +110,14 @@ class DCConfig:
     # chunk_ste: multiply the chunk vectors entering the main network by STE(selected_probs), so chunk-level losses
     #   (next-chunk CE, main_aux) reach the router directly instead of only through the decoder's use of the output.
     chunk_ste: bool = False
+    # router_gain_weight: a usefulness objective for the stage-0 router (training only). The stage-0 decoder + LM
+    #   head are run a second time on the residual bypass alone (no gradient); the per-byte gain CE_residual_only -
+    #   CE_full is credited to the chunk covering the byte, standardized against running statistics, and the router's
+    #   decisions inside each chunk are trained with REINFORCE on that advantage (-A * log c_t). Measured motivation
+    #   (work log): the hierarchy's gain is 2.4x larger under a word tokenizer than under a suffix tokenizer at step
+    #   500, while the next-chunk CE is identical. Extra compute: one decoder + head pass per step (not in FLOPs).
+    router_gain_weight: float = 0.0
+    router_gain_ema: float = 0.99
     # main_aux_weight: weight of an auxiliary next-byte CE on the stage-0 dechunked main-network output alone
     #   (before the residual is added), a direct learning signal for everything below stage 0.
     main_aux_weight: float = 0.0

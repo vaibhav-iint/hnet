@@ -166,6 +166,7 @@ class HNet(nn.Module):
             n_seg = ctx.cu_seqlens.numel() - 1
             keep = (torch.rand(n_seg, device=residual.device) >= self.residual_dropout).to(residual.dtype)
             residual = residual * keep[ctx.seq_idx.reshape(-1).long()].unsqueeze(-1)
+        r.residual_in = residual.detach()  # read by HNetForCausalLM for the router gain objective (stage 0)
         h = (out + residual).to(h.dtype)
         h = self.decoder(h, ctx)
         return h[:, :D_in], [r, *inner_preds]

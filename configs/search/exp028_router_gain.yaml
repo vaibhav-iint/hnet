@@ -1,0 +1,31 @@
+# EXP-028: a usefulness objective for the router (work log, "Falsifiers from the first-principles ideas"). On EXP-023
+# checkpoints the hierarchy's per-byte gain (CE with the hierarchy zeroed minus CE with it) is 2.4x larger under the
+# word tokenizer than under the suffix tokenizer at step 500, while the next-chunk CE is identical: the gain is the
+# first measured router objective that prefers the useful basin. dc.router_gain_weight reruns the stage-0 decoder +
+# LM head on the residual bypass alone (no grad), credits each byte's gain to its chunk, standardizes it against
+# running statistics and trains the router's decisions by REINFORCE on that advantage. Extra compute: one decoder +
+# head pass per step (~15% at this scale; not iso-FLOP, a mechanism test). Base = EXP-023 `vp_ng` (prior-free best).
+#   gain        router_gain_weight 1
+#   gain_rgate  + residual_gate=margin (EXP-027: the gate makes the hierarchy load-bearing from the start)
+#   gain_cste   + chunk_ste (the next-chunk loss also reaches the router)
+# No whitespace prior anywhere. 3 seeds. References: `vp_ng` 1.720 / 1.669 / 1.656; EXP-024 `prior` 1.635.
+name: exp028_router_gain
+out_root: runs/search/exp028_router_gain
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp028_router_gain
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - model.dc.decision=quantile
+  - "model.dc.chunk_vocab=[{buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024}]"
+  - "model.ngram_embed={ns: [3, 4, 5, 6, 7, 8], buckets: 12289}"
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+  - model.dc.router_gain_weight=1.0
+report:
+  labels: {gain: "router trained by REINFORCE on the hierarchy's gain", gain_rgate: "+ bypass gated by router margin",
+           gain_cste: "+ chunk STE"}
+runs:
+  - {name: gain,       config: configs/runs/tiny_hnet1_2m.yaml, set: []}
+  - {name: gain_rgate, config: configs/runs/tiny_hnet1_2m.yaml, set: [model.dc.residual_gate=margin]}
+  - {name: gain_cste,  config: configs/runs/tiny_hnet1_2m.yaml, set: [model.dc.chunk_ste=true]}
