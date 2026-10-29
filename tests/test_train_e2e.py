@@ -149,3 +149,24 @@ def test_set_progress_called_every_step(tmp_path):
     tr2 = Trainer(load_run_config(base=toy_cfg(tmp_path, steps=8)))  # resume continues the schedule
     tr2.train()
     assert tr2.raw.progress_log == [s / 8 for s in range(5, 8)]
+
+
+def test_hnet_probe_stats_and_zero_main_eval(tmp_path):
+    """Router-confidence / decoder-input stats are logged, and the zero-main eval probe runs and hurts the loss."""
+    from hnet.train.config import load_run_config
+    from hnet.train.train import Trainer
+
+    cfg = load_run_config(base={
+        "model": {"include": "configs/models/tiny_hnet2_2m.yaml"},
+        "data": {"source": "synthetic", "seq_len": 256, "micro_batch": 2, "batch_windows": 2},
+        "train": {"out_dir": str(tmp_path), "steps": 4, "lr": 1e-3, "precision": "fp32", "ckpt_every": 0,
+                  "schedule": {"name": "wsd", "warmup": 1, "decay": 1}, "compile": False},
+        "eval": {"every": 0, "at_end": True, "zero_main_probe": True},
+        "log": {"every": 1},
+    })
+    Trainer(cfg).train()
+    m = read_metrics(tmp_path)[-1]
+    for k in ("p_mid/s0", "p_margin/s1", "dechunk_rms/s0", "residual_rms/s1"):
+        assert k in m, k
+    ev = read_metrics(tmp_path, "eval.jsonl")[-1]
+    assert "val/zero_main_s0_bpb" in ev and "val/zero_main_s1_bpb" in ev

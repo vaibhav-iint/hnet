@@ -114,6 +114,9 @@ class HNet(nn.Module):
         out = self.dechunk_layer(z, r, ctx, ctx_inner)
         if self.use_ste:
             out = out * STE.apply(r.selected_probs)
+        with torch.no_grad():  # how strongly the hierarchy below speaks to the decoder, vs the residual path
+            r.extra["dechunk_rms"] = out.detach().float().pow(2).mean().sqrt()
+            r.extra["residual_rms"] = residual.detach().pow(2).mean().sqrt()
         h = (out + residual).to(h.dtype)
         h = self.decoder(h, ctx)
         return h[:, :D_in], [r, *inner_preds]

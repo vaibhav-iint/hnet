@@ -152,6 +152,11 @@ class HNetForCausalLM(nn.Module):
             stats[f"aux/s{s}"] = loss.detach()
             stats.update({f"{k}/s{s}": v for k, v in st.items()})
             stats[f"compression/s{s}"] = r.boundary_mask.numel() / n_sel
+            with torch.no_grad():
+                p = r.p.detach()
+                stats[f"p_mid/s{s}"] = ((p > 0.4) & (p < 0.6)).float().mean()  # undecided boundary decisions
+                stats[f"p_margin/s{s}"] = (p - 0.5).abs().mean()  # 0.5 = fully confident, 0 = coin flips
+                stats.update({f"{k}/s{s}": v for k, v in r.extra.items()})
             stats[f"positions/s{s + 1}"] = n_sel
         out.stats = stats
         return out

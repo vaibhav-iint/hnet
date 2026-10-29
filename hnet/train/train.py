@@ -323,6 +323,19 @@ class Trainer:
     def evaluate(self) -> dict:
         if not self.val_batches:
             return {}
+        rec = self._evaluate_once()
+        if self.ec.get("zero_main_probe") and hasattr(self.raw, "backbone"):
+            # val bpb with each stage's main network silenced: how much the hierarchy below that stage contributes
+            from hnet.model.probes import zero_main
+
+            for st in self.raw.backbone.stages():
+                if not st.is_innermost:
+                    with zero_main(st):
+                        rec[f"val/zero_main_s{st.stage_idx}_bpb"] = self._evaluate_once()["val/bpb"]
+        return rec
+
+    @torch.no_grad()
+    def _evaluate_once(self) -> dict:
         model = self.raw
         was_training = model.training
         model.eval()

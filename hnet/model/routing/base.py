@@ -17,7 +17,7 @@ the first byte of the next chunk when closing a chunk.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import torch
 
@@ -40,6 +40,7 @@ class RouterOutput:
     boundary_mask: torch.Tensor
     selected_probs: torch.Tensor
     semantics: str = "start"
+    extra: dict = field(default_factory=dict)  # detached diagnostics filled in by the owning stage
 
     @property
     def p(self) -> torch.Tensor:
