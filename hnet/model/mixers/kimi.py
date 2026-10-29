@@ -74,6 +74,11 @@ def _check_ignored(name: str, kwargs: dict, ignored: tuple):
         raise TypeError(f"{name}: unexpected constructor arguments {unknown}")
 
 
+def _up(t: torch.Tensor) -> torch.Tensor:
+    """Upcast to fp32 (fp64 stays fp64)."""
+    return t if t.dtype == torch.float64 else t.float()
+
+
 def _no_autocast(t: torch.Tensor):
     return torch.autocast(device_type=t.device.type, enabled=False)
 
@@ -226,9 +231,9 @@ class _HeadRMSNormGated(nn.Module):
         self.weight = nn.Parameter(torch.ones(head_dim))
 
     def forward(self, o: torch.Tensor, gate: torch.Tensor) -> torch.Tensor:
-        of = o.float()
-        y = of * torch.rsqrt(of.square().mean(-1, keepdim=True) + self.eps) * self.weight.float()
-        return (y * torch.sigmoid(gate.float())).to(o.dtype)
+        of = _up(o)
+        y = of * torch.rsqrt(of.square().mean(-1, keepdim=True) + self.eps) * self.weight.to(of.dtype)
+        return (y * torch.sigmoid(gate.to(of.dtype))).to(o.dtype)
 
 
 @register("mixer", "kda")
@@ -359,17 +364,17 @@ class KimiDeltaAttention(nn.Module):
         q = self._conv(self.q_conv1d, self.q_proj(x), seq_idx)[0].view(T, H, K)
         k = self._conv(self.k_conv1d, self.k_proj(x), seq_idx)[0].view(T, H, K)
         v = self._conv(self.v_conv1d, self.v_proj(x), seq_idx)[0].view(T, H, V)
-        q = q * torch.rsqrt(q.float().square().sum(-1, keepdim=True) + 1e-6).to(q.dtype)  # fla l2norm, eps 1e-6
-        k = k * torch.rsqrt(k.float().square().sum(-1, keepdim=True) + 1e-6).to(k.dtype)
-        f = self.f_proj(x[0]).float().view(T, H, K)
-        g = -self.A_log.float().exp()[:, None] * F.softplus(f + self.dt_bias.float().view(H, K))
-        beta = torch.sigmoid(self.b_proj(x[0]).float())
+        q = q * torch.rsqrt(_up(q).square().sum(-1, keepdim=True) + 1e-6).to(q.dtype)  # fla l2norm, eps 1e-6
+        k = k * torch.rsqrt(_up(k).square().sum(-1, keepdim=True) + 1e-6).to(k.dtype)
+        f = _up(self.f_proj(x[0])).view(T, H, K)
+        g = -self.A_log.to(f.dtype).exp()[:, None] * F.softplus(f + self.dt_bias.to(f.dtype).view(H, K))
+        beta = torch.sigmoid(_up(self.b_proj(x[0])))
         if self.allow_neg_eigval:
             beta = 2 * beta
         if use_kernel(x, _fla_chunk_kda):
             cu = torch.unique_consecutive(ctx.cu_seqlens.to(torch.long))  # fla rejects empty segments
-            o, _ = _fla_chunk_kda(q=q[None], k=k[None], v=v[None], g=g[None], beta=beta[None].to(q.dtype),
-                                  scale=self.scale, cu_seqlens=cu)
+            q, k, v, g, beta = (t.unsqueeze(0).contiguous() for t in (q, k, v, g, beta.to(q.dtype)))
+            o, _ = _fla_chunk_kda(q=q, k=k, v=v, g=g, beta=beta, scale=self.scale, cu_seqlens=cu)
             o = o[0]
         else:
             o = kda_chunk_torch(q, k, v, g, beta, self.scale, ctx.seq_idx, self.chunk_size, self.sub_chunk)
@@ -527,8 +532,9 @@ class MoBA(CausalAttention):
 class GatedAttention(CausalAttention):
     """Gated attention (Qiu et al., Qwen, "Gated Attention for Large Language Models", arXiv 2505.06708).
 
-    The paper's best variant (G1): a head-specific, elementwise, multiplicative sigmoid gate applied to the SDPA
-    output before the output projection, computed from the same (pre-normed) block input X as Q/K/V:
+    The paper's best variant (G1, Eq. 5; Table 1 row 5): a head-specific, elementwise, multiplicative sigmoid
+    gate applied to the SDPA output before the output projection, computed from the same (pre-normed) block input
+    X as Q/K/V:
 
         Y   = SDPA(Q, K, V)                       (per head, [T, H, hd]; causal / GQA / RoPE as ``attn``)
         Y'  = Y * sigmoid(X W_theta)               W_theta: d_model -> H * hd ("elementwise"), d_model -> H ("headwise")
@@ -567,8 +573,8 @@ class GatedAttention(CausalAttention):
             cos, sin = rotary_cos_sin(ctx, self.rotary_emb_dim, self.rope_theta)
             q, k = apply_rotary(q, cos, sin), apply_rotary(k, cos, sin)
         out = attention(q, k, v, ctx, self.window_size, self.softmax_scale)
-        gate = torch.sigmoid(self.gate_proj(x[0]).float()).view(T, hq, -1)
-        out = (out.float() * gate).to(out.dtype)
+        gate = torch.sigmoid(_up(self.gate_proj(x[0]))).view(T, hq, -1)
+        out = (_up(out) * gate).to(out.dtype)
         return self.out_proj(out.reshape(1, T, hq * hd))
 
     def extra_repr(self) -> str:

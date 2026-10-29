@@ -1,0 +1,27 @@
+# EXP-003: AdamW learning-rate sweep at the tiny 2M FLOPs-matched scale (PLAN.md §2b; EXP-002 used one LR, 1.5e-3).
+# Same data, budget and eval cadence as EXP-002: FineWeb-Edu shard 1, 2048-byte windows (448-token windows for
+# BPE), 64 windows/step, 50M token-equivalents per run, WSD (10% warmup, 20% decay); train metrics every 10 steps,
+# val CE/bpb every 250 steps, paper7 task metrics every 500 steps.
+# Fairness: tuned. Every architecture is swept over the SAME LR grid with the same seeds; architectures are
+# compared at their own best LR (scripts/search/report.py, which also writes best_params.yaml for EXP-004/005).
+# H-Nets keep the per-stage LR multipliers on top of the base LR. 4 architectures x 5 LRs x 3 seeds = 60 runs.
+name: exp003_lr_adamw
+out_root: runs/search/exp003_lr_adamw
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp003_lr_adamw
+seeds: [0, 1, 2]
+fairness: tuned
+set:
+  - train.compile=false        # tiny models + data-dependent shapes: compile overhead not worth it
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"   # task curves during training
+grid:
+  train.lr: [5.0e-4, 1.0e-3, 1.5e-3, 3.0e-3, 6.0e-3]
+grid_alias: {train.lr: lr}
+report:
+  baseline: bpe
+  labels: {bpe: BPE baseline, paper: paper router (LH-Net), end_mlp: "end-of-chunk, MLP",
+           end_cosine_shift: "end-of-chunk, cosine"}
+runs:
+  - {name: bpe,              config: configs/runs/tiny_bpe_2m.yaml}
+  - {name: paper,            config: configs/runs/tiny_hnet2_2m.yaml}                      # cosine_lookahead, (3,3)
+  - {name: end_mlp,          config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.router=end_mlp]}
+  - {name: end_cosine_shift, config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.router=end_cosine_shift]}

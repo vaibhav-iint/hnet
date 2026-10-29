@@ -307,3 +307,20 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
 - Bug found while planning the BPE resume: on resume, `MetricsLogger` appended to `metrics.jsonl`/`eval.jsonl`,
   so steps between the last checkpoint and the preemption were logged twice. Resume now truncates both files to
   records with step ≤ checkpoint step. New test `test_resume_after_crash_drops_records_past_checkpoint`.
+
+### WS-H done: GCP runner `python -m infra.gcp`
+- Commands: `launch`, `status`, `tail`, `sync-metrics`, `watch`, `pull`, `resume`, `stop`, `teardown`, `ls` and
+  `cost`.
+- Safety: a budget guard ($300 total, $25 per launch) and a ledger that reconciles with the real VM state. Teardown
+  is limited to VMs with the `hnet-` prefix that are in the ledger.
+- Tested live on spot L4s (us-central1-a after zone fallback):
+  - Fused kernels from prebuilt wheels: mamba_ssm 2.3.2.post1, causal_conv1d 1.7.0.
+  - Tiny H-Net: 231k bytes/s, 0.57 s/step, 7.7 GB with `compile=false`.
+  - Bucket shard cache: 8 s, versus about 65 s to download and convert.
+  - Restore and continue across VMs worked from step 177 to 250, through two preemptions.
+- Error handling: nothing is swallowed. Errors in any stage or background thread put a traceback on serial, upload
+  logs to `runs/<vm>/_logs/`, report `HNET_DONE 97`, and exit non-zero. 38 tests (gcloud mocked).
+- **Open issue.** With the fused kernels, `compile: blocks` makes the tiny model about 4.6x *slower* (2.6 s/step).
+  The likely cause is recompiles around the `torch.compiler.disable`d kernels. EXP-002 runs with `compile=false`.
+  Investigate before the 125M runs.
+- About $0.30 spent; all of WS-H's VMs are deleted.

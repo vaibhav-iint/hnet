@@ -12,6 +12,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from dataclasses import dataclass, field
 
 from . import config as C
@@ -214,11 +215,22 @@ def zone_of(inst: dict) -> str:
     return (inst.get("zone") or "").rsplit("/", 1)[-1]
 
 
-def serial_output(name: str, zone: str, start_at: int) -> dict:
-    """{'contents': str, 'start': int, 'next': int} from serial port 1, starting at byte `start_at`."""
-    out, err = run(["compute", "instances", "get-serial-port-output", name, f"--zone={zone}", "--port=1",
-                    f"--start={int(start_at)}", "--format=json"], json_out=False, timeout=180)
-    return parse_serial_response(out, err, start_at)
+SERIAL_BUSY = "serial_port_output_in_progress"  # another reader of this VM's serial port is mid-request
+
+
+def serial_output(name: str, zone: str, start_at: int, retries: int = 6, wait_s: float = 5.0) -> dict:
+    """{'contents': str, 'start': int, 'next': int} from serial port 1, starting at byte `start_at`.
+    GCE serves one serial read per VM at a time; a concurrent read is retried, then raised."""
+    for attempt in range(retries + 1):
+        try:
+            out, err = run(["compute", "instances", "get-serial-port-output", name, f"--zone={zone}", "--port=1",
+                            f"--start={int(start_at)}", "--format=json"], json_out=False, timeout=180)
+            return parse_serial_response(out, err, start_at)
+        except GcloudError as e:
+            if SERIAL_BUSY not in e.stderr.lower() or attempt == retries:
+                raise
+            time.sleep(wait_s * (attempt + 1))
+    raise AssertionError("unreachable")
 
 
 def parse_serial_response(out: str, err: str, start_at: int) -> dict:

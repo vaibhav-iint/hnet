@@ -1,0 +1,52 @@
+# EXP-004: Muon vs AdamW at the tiny 2M FLOPs-matched scale. Same 4 architectures, data, budget and eval cadence as
+# EXP-003 (FineWeb-Edu shard 1, 50M token-equivalents, WSD 10%/20%, val every 250, paper7 every 500 steps).
+# Muon (hnet/optim/muon.py, modded-nanogpt record #18) updates the hidden 2-D matrices; Adam updates embeddings,
+# LM head, norms, biases, router projections and Mamba scalars.
+#   * Muon LR grid (identical for every architecture): 0.0125, 0.025, 0.05 -- factor-2 steps ending at the
+#     record's default 0.05 and bracketing Keller Jordan's original 0.02; momentum 0.95 (warmup from 0.85 over
+#     300 steps), Nesterov, 5 Newton-Schulz steps, no Muon weight decay (record defaults).
+#   * Adam part: each architecture's best AdamW LR from EXP-003 (params best_lr.<arch>, NOT swept here) for
+#     embeddings, head and other Adam params, with the AdamW runs' betas (0.9, 0.95) and weight decay 0.1 (1-D
+#     params exempt), so the only change vs EXP-003's best run is Muon on the hidden matrices.
+#   * H-Net per-stage LR multipliers apply to the Muon and the Adam groups alike.
+# Fill params after EXP-003: `python scripts/search/report.py configs/search/exp003_lr_adamw.yaml` writes
+# <exp003 out_root>/report/best_params.yaml; copy its best_lr values below and commit (the VMs read the spec from
+# git), or pass --params-file for local checks. Until then every command refuses with "parameters not set".
+# 4 architectures x 3 Muon LRs x 3 seeds = 36 runs.
+name: exp004_muon
+out_root: runs/search/exp004_muon
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp004_muon
+seeds: [0, 1, 2]
+fairness: {mode: tuned, per_arch: [train.muon.lr_embed, train.muon.lr_head, train.muon.lr_other]}
+params:
+  best_lr: {bpe: null, paper: null, end_mlp: null, end_cosine_shift: null}
+params_note: "best_lr.<arch> = that architecture's best AdamW LR in EXP-003 (report.py -> best_params.yaml)"
+set:
+  - train.compile=false
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+  - train.optimizer=muon
+  - "train.muon.adam_betas=[0.9, 0.95]"
+  - train.muon.adam_weight_decay=0.1
+grid:
+  train.muon.lr: [0.0125, 0.025, 0.05]
+grid_alias: {train.muon.lr: mlr}
+report:
+  baseline: bpe
+  labels: {bpe: BPE baseline, paper: paper router (LH-Net), end_mlp: "end-of-chunk, MLP",
+           end_cosine_shift: "end-of-chunk, cosine"}
+runs:
+  - name: bpe
+    config: configs/runs/tiny_bpe_2m.yaml
+    set: [train.muon.lr_embed=${best_lr.bpe}, train.muon.lr_head=${best_lr.bpe}, train.muon.lr_other=${best_lr.bpe}]
+  - name: paper
+    config: configs/runs/tiny_hnet2_2m.yaml
+    set: [train.muon.lr_embed=${best_lr.paper}, train.muon.lr_head=${best_lr.paper},
+          train.muon.lr_other=${best_lr.paper}]
+  - name: end_mlp
+    config: configs/runs/tiny_hnet2_2m.yaml
+    set: [model.dc.router=end_mlp, train.muon.lr_embed=${best_lr.end_mlp}, train.muon.lr_head=${best_lr.end_mlp},
+          train.muon.lr_other=${best_lr.end_mlp}]
+  - name: end_cosine_shift
+    config: configs/runs/tiny_hnet2_2m.yaml
+    set: [model.dc.router=end_cosine_shift, train.muon.lr_embed=${best_lr.end_cosine_shift},
+          train.muon.lr_head=${best_lr.end_cosine_shift}, train.muon.lr_other=${best_lr.end_cosine_shift}]

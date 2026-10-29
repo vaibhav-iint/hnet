@@ -901,3 +901,24 @@ def test_bucket_select_objects():
     with pytest.raises(ValueError):
         B.select_objects(rels, "newest")
     assert B.run_name("runs/tiny/x/") == "tiny/x" and B.bucket_of({"meta": {}}) is None
+
+
+def test_serial_busy_is_retried_then_raised(monkeypatch):
+    n = {"calls": 0}
+    busy = ("ERROR: (gcloud.compute.instances.get-serial-port-output) An existing request to fetch the output is "
+            "still being processed. (Category: SERIAL_PORT_OUTPUT_IN_PROGRESS)")
+
+    def h(a):
+        n["calls"] += 1
+        if n["calls"] < 3:
+            return 1, "", busy
+        return 0, json.dumps({"contents": "x\n", "start": "0", "next": "2"}), ""
+
+    monkeypatch.setattr(subprocess, "run", FakeGcloud(h))
+    assert gce.serial_output("hnet-a", "z", 0, wait_s=0)["next"] == 2 and n["calls"] == 3
+    monkeypatch.setattr(subprocess, "run", FakeGcloud(lambda a: (1, "", busy)))
+    with pytest.raises(gce.GcloudError, match="IN_PROGRESS"):
+        gce.serial_output("hnet-a", "z", 0, retries=2, wait_s=0)
+    monkeypatch.setattr(subprocess, "run", FakeGcloud(lambda a: (1, "", "ERROR: permission denied")))
+    with pytest.raises(gce.GcloudError, match="permission"):
+        gce.serial_output("hnet-a", "z", 0, wait_s=0)

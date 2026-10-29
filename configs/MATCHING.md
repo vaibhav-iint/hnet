@@ -121,3 +121,29 @@ blog's 0.32B (0.321B). It gives 0.52 GFLOPs/byte when stage 1 runs at the realiz
 (same params) fits equally well; params and FLOPs cannot tell the two apart. Global (non-SWA) stage-1 attention
 would give 0.51 at 4.0. Note that this yaml's `dc.smoothing: true` key is not a `DCConfig` field, so
 `model_config_from_yaml` currently rejects it (tests strip it).
+
+## Attention variants
+
+Configs identical to their base except the sequence mixer (`DenseConfig.mixer` + `mixer_kwargs`; H-Net: per-stage
+`mixer_codes` swapping only the main network's `t`, plus `mixer_cfg`), FLOPs-matched to `tiny_bpe_2m` (+-2%, SPEC,
+2048 bytes / 448 tokens) by tuning only the variant's own knobs. Mixers are counted by their `flops_per_position`
+classmethods; params from the registered classes built on the meta device.
+
+### Kimi / gated attention (WS-I2; docs/ATTENTION_KIMI.md)
+
+| config | mixer (knobs) | params (M) | non-emb (M) | train GFLOPs/byte | per-stage GFLOPs/byte | vs ref |
+|---|---|---:|---:|---:|---|---:|
+| tiny_bpe_2m_kda | kda (expand_v 1.25; default expand_v 1 is -2.6%) | 15.3 | 2.5 | 0.0119 | 0.0119 | -0.6% |
+| tiny_bpe_2m_moba | moba (block 64, top-4 incl. current; max 256 of 448 keys) | 15.0 | 2.1 | 0.0118 | 0.0118 | -1.5% |
+| tiny_bpe_2m_gated | gated_attn (elementwise, Qwen G1) | 15.2 | 2.3 | 0.0122 | 0.0122 | +1.8% |
+| tiny_bpe_2m_gated_headwise | gated_attn (headwise) | 15.0 | 2.1 | 0.0120 | 0.0120 | +0.1% |
+| tiny_hnet2_2m_kda | main T7 -> kda (defaults) | 8.2 | 8.1 | 0.0120 | 0.0042, 0.0034, 0.0043 | +0.4% |
+| tiny_hnet2_2m_kda_hybrid | main K3T1K2T1: 5 kda + 2 NoPE attn (Kimi Linear 3:1 pattern) | 8.1 | 8.0 | 0.0120 | 0.0042, 0.0034, 0.0043 | +0.3% |
+| tiny_hnet2_2m_moba | main T7 -> moba (block 32, top-3; max 96 of ~227 keys) | 7.9 | 7.9 | 0.0118 | 0.0042, 0.0034, 0.0041 | -1.0% |
+| tiny_hnet2_2m_gated | main T7 -> gated_attn (headwise; elementwise is +2.5%) | 7.9 | 7.9 | 0.0120 | 0.0042, 0.0034, 0.0043 | +0.1% |
+
+Notes: KDA is linear-time, so at 448 tokens it is cheaper than causal attention in the dense model (the quadratic
+term is ~47% of the attention layer there); `expand_v` 1.25 (value head dim 40) spends the difference on state size.
+In the H-Net main network (~227 positions, d 256) KDA's projections/gates roughly cancel the attention term, so the
+defaults match. No dense hybrid: `DenseConfig` builds one mixer for all layers (`T{n_layers}`) and `hnet.flops._dense`
+counts one layer x n_layers; a dense KDA/attn hybrid needs a layout field there (see docs/ATTENTION_KIMI.md).

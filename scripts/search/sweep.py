@@ -1,23 +1,25 @@
 """Run an experiment sweep (many short training runs) on one machine, then chunking diagnostics per run.
 
-    python scripts/search/sweep.py configs/search/exp002_tiny2m.yaml [--parallel 3] [--only name1,name2]
-        [--gcs gs://bucket/runs/exp002] [--dry-run]
+    python scripts/search/sweep.py SPEC [--shard i/n] [--parallel 3] [--only run1,run2] [--gcs gs://.../NAME]
+        [--restore] [--mirror-every 120] [--param name=value ...] [--params-file f.yaml] [--allow-missing]
+        [--list] [--dry-run]
 
-Spec file::
+Spec format, job names, ordering and sharding: ``scripts/search/spec.py``; walkthrough: docs/EXPERIMENTS_HOWTO.md.
 
-    name: exp002_tiny2m
-    out_root: runs/search/exp002_tiny2m
-    seeds: [0, 1]
-    set: [train.train_tokens=5e7]            # applied to every run
-    runs:
-      - {name: bpe, config: configs/runs/tiny_bpe_2m.yaml}
-      - {name: end_mlp, config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.router=end_mlp]}
+Each job trains with ``python -m hnet.train.train`` into ``<out_root>/<job name>`` and writes ``sweep_job.json``
+(architecture, grid point, seed) there. Finished jobs (a ``done.json`` marker) are skipped and unfinished ones
+resume from their newest checkpoint (trainer ``resume: auto``), so the sweep can be re-launched after a
+preemption. A run whose loss goes non-finite stops itself (trainer ``stop_on_nonfinite``) and is recorded as
+``diverged`` (a result, e.g. too high an LR; not a failure). After training, H-Net runs get ``diag.json``
+(hnet.analysis.chunks on the blog's English texts and FineWeb-Edu val documents).
 
-Each run trains with ``python -m hnet.train.train`` into ``<out_root>/<name>_s<seed>``; finished runs (a
-``done.json`` marker) are skipped, so the sweep can be re-launched after a preemption. After training, H-Net runs get
-``diag.json`` (hnet.analysis.chunks on FineWeb-Edu val documents) and every run dir is mirrored to ``--gcs`` if given.
-``<out_root>/sweep_status.json`` records the state of every run. The sweep first runs ``fairness.py`` (same data,
-bytes, FLOPs/byte, optimizer, schedule, eval for every run) and refuses to start if it fails.
+Before starting, the fairness gate (``fairness.py``, strict or tuned per the spec) must pass. The first failed
+job stops new jobs from starting (running ones finish); the exit code is then 1.
+
+GCS (``--gcs``): ``--restore`` first downloads this selection's run dirs (finished runs, checkpoints) from the
+prefix; ``--mirror-every S`` uploads them every S seconds while training (a failed periodic upload is reported
+on stdout and retried next period); after each job and at the end, uploads are mandatory (a failure raises).
+Status: ``<out_root>/sweep_status[.shard-i-of-n].json`` per selection, so several VMs can share one prefix.
 """
 
 from __future__ import annotations
@@ -28,32 +30,35 @@ from pathlib import Path as _Path
 REPO_ROOT = _Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in _sys.path:  # allow `python scripts/...` from anywhere without PYTHONPATH
     _sys.path.insert(0, str(REPO_ROOT))
+_HERE = str(_Path(__file__).resolve().parent)
+if _HERE not in _sys.path:
+    _sys.path.insert(0, _HERE)
 
+import argparse  # noqa: E402
+import json  # noqa: E402
+import subprocess  # noqa: E402
+import sys  # noqa: E402
+import threading  # noqa: E402
+import time  # noqa: E402
+from concurrent.futures import ThreadPoolExecutor  # noqa: E402
+from pathlib import Path  # noqa: E402
 
-import argparse
-import json
-import os
-import subprocess
-import sys
-import time
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
+from spec import Spec, SpecError, parse_shard, status_filename  # noqa: E402
 
-import yaml
-
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = REPO_ROOT
 
 
 def expand(spec: dict, only=None):
-    jobs = []
-    for r in spec["runs"]:
-        if only and r["name"] not in only:
-            continue
-        for seed in r.get("seeds", spec.get("seeds", [0])):
-            out = Path(spec["out_root"]) / f"{r['name']}_s{seed}"
-            sets = list(spec.get("set", [])) + list(r.get("set", [])) + [f"train.seed={seed}", f"train.out_dir={out}"]
-            jobs.append(dict(name=f"{r['name']}_s{seed}", config=r["config"], sets=sets, out=str(out)))
-    return jobs
+    """v1 API (dict spec -> list of job dicts with name/config/sets/out); kept for old callers."""
+    import tempfile
+
+    import yaml
+
+    with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+        yaml.safe_dump(spec, f)
+    jobs = Spec.load(f.name).jobs(only=set(only) if only else None)
+    Path(f.name).unlink()
+    return [dict(name=j.name, config=j.config, sets=j.sets, out=j.out, model=j.model) for j in jobs]
 
 
 def diag_texts(n_docs: int = 40, max_bytes: int = 3000):
@@ -91,91 +96,190 @@ def run_diag(out_dir: str, texts) -> dict:
     return rep
 
 
+# ---------------------------------------------------------------------------------------------------- GCS
+def gcloud(args, check=True):
+    return subprocess.run(["gcloud", *args], capture_output=True, text=True, check=False)
+
+
 def gcs_sync(local: str, remote: str):
     """Mirror a directory to GCS; a failed upload is an error (results must not silently stay local)."""
-    r = subprocess.run(["gcloud", "storage", "rsync", "-r", local, remote], capture_output=True, text=True)
+    r = gcloud(["storage", "rsync", "-r", local, remote])
     if r.returncode != 0:
         raise RuntimeError(f"gcloud storage rsync {local} -> {remote} failed:\n{r.stderr[-2000:]}")
+
+
+def gcs_list_dirs(prefix: str) -> set:
+    """Names of the immediate sub-directories of a gs:// prefix (empty if the prefix does not exist yet)."""
+    r = gcloud(["storage", "ls", prefix.rstrip("/") + "/"])
+    if r.returncode != 0:
+        if "matched no objects" in r.stderr or "One or more URLs matched no" in r.stderr:
+            return set()
+        raise RuntimeError(f"gcloud storage ls {prefix} failed:\n{r.stderr[-2000:]}")
+    return {line.rstrip("/").rsplit("/", 1)[-1] for line in r.stdout.splitlines() if line.endswith("/")}
+
+
+def restore(jobs, gcs: str):
+    """Download this selection's run dirs (incl. checkpoints and done markers) from GCS before starting."""
+    remote = gcs_list_dirs(gcs)
+    for j in jobs:
+        if j.name in remote:
+            Path(j.out).mkdir(parents=True, exist_ok=True)
+            r = gcloud(["storage", "rsync", "-r", f"{gcs.rstrip('/')}/{j.name}", j.out])
+            if r.returncode != 0:
+                raise RuntimeError(f"restore of {j.name} from {gcs} failed:\n{r.stderr[-2000:]}")
+            print(f"[sweep] restored {j.name} from GCS", flush=True)
+
+
+class Mirror(threading.Thread):
+    """Uploads the selection's existing run dirs every ``every`` seconds. Failures are printed (with gcloud's
+    stderr) and retried next period; the mandatory uploads after each job / at the end raise instead."""
+
+    def __init__(self, jobs, gcs: str, every: float):
+        super().__init__(daemon=True)
+        self.jobs, self.gcs, self.every = jobs, gcs.rstrip("/"), every
+        self.stop_event = threading.Event()
+
+    def run(self):
+        while not self.stop_event.wait(self.every):
+            self.sync_once()
+
+    def sync_once(self):
+        for j in self.jobs:
+            if Path(j.out).exists():
+                r = gcloud(["storage", "rsync", "-r", j.out, f"{self.gcs}/{j.name}"])
+                if r.returncode != 0:
+                    print(f"[sweep] WARN live mirror of {j.name} failed (retrying in {self.every:.0f}s):\n"
+                          f"{r.stderr[-1000:]}", flush=True)
 
 
 def log_tail(path: Path, n: int = 40) -> str:
     return "\n".join(path.read_text(errors="replace").splitlines()[-n:]) if path.exists() else "(no log)"
 
 
-def main(argv=None):
-    ap = argparse.ArgumentParser()
+# ---------------------------------------------------------------------------------------------------- main
+def build_parser():
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("spec")
-    ap.add_argument("--parallel", type=int, default=1)
-    ap.add_argument("--only", default=None, help="comma-separated run names (without seed suffix)")
-    ap.add_argument("--gcs", default=None, help="gs:// prefix to mirror run dirs to")
-    ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--parallel", type=int, default=1, help="jobs trained at once on this machine")
+    ap.add_argument("--only", default=None, help="comma-separated run names (architectures) to keep")
+    ap.add_argument("--shard", default=None, help="i/n: run only jobs i, i+n, ... of the spec's job order")
+    ap.add_argument("--gcs", default=None, help="gs:// prefix to mirror run dirs to (default: spec `gcs`)")
+    ap.add_argument("--restore", action="store_true", help="download this selection's run dirs from --gcs first")
+    ap.add_argument("--mirror-every", type=float, default=0, help="upload run dirs every N seconds (0 = off)")
+    ap.add_argument("--param", action="append", default=[], help="spec parameter name=value (repeatable)")
+    ap.add_argument("--params-file", default=None, help="YAML of spec parameters (e.g. a report's best_params)")
+    ap.add_argument("--allow-missing", action="store_true", help="skip runs whose config files do not exist")
     ap.add_argument("--allow-unfair", action="store_true", help="run even if scripts/search/fairness.py fails")
-    a = ap.parse_args(argv)
-    spec = yaml.safe_load(open(a.spec))
+    ap.add_argument("--list", action="store_true", help="print the selected jobs and exit")
+    ap.add_argument("--dry-run", action="store_true", help="print the trainer commands and exit")
+    return ap
+
+
+def main(argv=None):
+    a = build_parser().parse_args(argv)
+    try:
+        spec = Spec.load(a.spec, a.param, a.params_file)
+        shard = parse_shard(a.shard)
+        only = set(a.only.split(",")) if a.only else None
+        jobs = spec.jobs(only=only, shard=shard, allow_missing=a.allow_missing)
+    except SpecError as e:
+        print(f"[sweep] spec error: {e}", flush=True)
+        return 2
+    if spec.missing:
+        print(f"[sweep] WARNING: skipping runs with missing configs: {spec.missing}", flush=True)
+    if a.list or a.dry_run:
+        for j in jobs:
+            print(f"{j.index:4d} {j.name:48s} {j.setting}" if a.list else
+                  f"{sys.executable} " + " ".join(j.trainer_args()), flush=True)
+        return 0
+    gcs = a.gcs or spec.raw.get("gcs")
+
     from fairness import main as fairness_main  # apples-to-apples gate (writes <out_root>/fairness.md)
 
-    if fairness_main([a.spec]) != 0 and not a.allow_unfair:
+    fargs = [a.spec] + [f"--param={p}" for p in a.param] + (["--params-file", a.params_file] if a.params_file else [])
+    if fairness_main(fargs + (["--allow-missing"] if a.allow_missing else [])) != 0 and not a.allow_unfair:
         print("[sweep] fairness check failed; refusing to run (see fairness.md, or pass --allow-unfair)", flush=True)
         return 2
-    jobs = expand(spec, set(a.only.split(",")) if a.only else None)
-    Path(spec["out_root"]).mkdir(parents=True, exist_ok=True)
-    status_path = Path(spec["out_root"]) / "sweep_status.json"
-    status = {j["name"]: "pending" for j in jobs}
+    out_root = Path(spec.out_root)
+    out_root.mkdir(parents=True, exist_ok=True)
+    (out_root / "sweep_manifest.json").write_text(json.dumps(spec.manifest(a.allow_missing), indent=1))
+    if gcs and a.restore:
+        restore(jobs, gcs)
+    status_path = out_root / status_filename(shard, only)
+    status = {j.name: "pending" for j in jobs}
+    lock = threading.Lock()
     texts = None
 
     def save_status():
-        status_path.write_text(json.dumps(status, indent=1))
+        with lock:
+            tmp = status_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps({"spec": spec.name, "shard": a.shard, "only": a.only,
+                                       "updated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                                       "runs": status}, indent=1))
+            tmp.replace(status_path)
 
     failed = []  # first failure stops new runs from starting; running ones finish
+    mirror = None
+    if gcs and a.mirror_every > 0:
+        mirror = Mirror(jobs, gcs, a.mirror_every)
+        mirror.start()
 
     def run(job):
         nonlocal texts
-        done = Path(job["out"]) / "done.json"
+        out = Path(job.out)
+        done = out / "done.json"
         if done.exists():
-            status[job["name"]] = "done"
+            status[job.name] = "diverged" if json.loads(done.read_text()).get("diverged") else "done"
             return
         if failed:
-            status[job["name"]] = "skipped (earlier failure)"
+            status[job.name] = "skipped (earlier failure)"
             return
-        cmd = [sys.executable, "-m", "hnet.train.train", "--config", job["config"]]
-        for s in job["sets"]:
-            cmd += ["--set", s]
-        print("[sweep] start", job["name"], " ".join(cmd[3:]), flush=True)
-        if a.dry_run:
-            return
-        status[job["name"]] = "running"
+        cmd = [sys.executable, *job.trainer_args()]
+        print("[sweep] start", job.name, " ".join(cmd[3:]), flush=True)
+        status[job.name] = "running"
         save_status()
         t0 = time.time()
-        Path(job["out"]).mkdir(parents=True, exist_ok=True)
-        log_path = Path(job["out"]) / "stdout.log"
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "sweep_job.json").write_text(json.dumps({"spec": spec.name, **job.to_json()}, indent=1))
+        log_path = out / "stdout.log"
         with open(log_path, "a") as log:
             rc = subprocess.call(cmd, stdout=log, stderr=subprocess.STDOUT, cwd=ROOT)
         if rc != 0:
-            status[job["name"]] = f"failed rc={rc}"
-            failed.append(job["name"])
+            status[job.name] = f"failed rc={rc}"
+            failed.append(job.name)
             save_status()
-            print(f"[sweep] FAILED {job['name']} rc={rc}; last lines of {log_path}:\n{log_tail(log_path)}", flush=True)
-            if a.gcs:
-                gcs_sync(job["out"], f"{a.gcs.rstrip('/')}/{Path(job['out']).name}")
+            print(f"[sweep] FAILED {job.name} rc={rc}; last lines of {log_path}:\n{log_tail(log_path)}", flush=True)
+            if gcs:
+                gcs_sync(job.out, f"{gcs.rstrip('/')}/{job.name}")
             return
-        if texts is None:
-            texts = diag_texts()
-        diag = run_diag(job["out"], texts)
-        if diag:
-            (Path(job["out"]) / "diag.json").write_text(json.dumps(diag, indent=1))
         result = {"rc": rc, "seconds": round(time.time() - t0, 1)}
+        if (out / "diverged.json").exists():
+            result["diverged"] = True  # a result (e.g. LR too high), no diagnostics on a NaN model
+        else:
+            if texts is None:
+                texts = diag_texts()
+            diag = run_diag(job.out, texts)
+            if diag:
+                (out / "diag.json").write_text(json.dumps(diag, indent=1))
         done.write_text(json.dumps(result))
-        status[job["name"]] = "done"
+        status[job.name] = "diverged" if result.get("diverged") else "done"
         save_status()
-        print("[sweep] end", job["name"], result, flush=True)
-        if a.gcs:
-            gcs_sync(job["out"], f"{a.gcs.rstrip('/')}/{Path(job['out']).name}")
+        print("[sweep] end", job.name, result, flush=True)
+        if gcs:
+            gcs_sync(job.out, f"{gcs.rstrip('/')}/{job.name}")
 
-    with ThreadPoolExecutor(max_workers=a.parallel) as ex:
-        list(ex.map(run, jobs))  # re-raises the first exception from any worker
-    save_status()
-    if a.gcs:
-        gcs_sync(str(Path(spec["out_root"])), a.gcs.rstrip("/"))
+    try:
+        with ThreadPoolExecutor(max_workers=a.parallel) as ex:
+            list(ex.map(run, jobs))  # re-raises the first exception from any worker
+    finally:
+        if mirror is not None:
+            mirror.stop_event.set()
+        save_status()
+    if gcs:
+        for name in ("fairness.md", "fairness.json", "sweep_manifest.json", status_path.name):
+            r = gcloud(["storage", "cp", str(out_root / name), f"{gcs.rstrip('/')}/{name}"])
+            if r.returncode != 0:
+                raise RuntimeError(f"upload of {name} to {gcs} failed:\n{r.stderr[-2000:]}")
     print("[sweep] finished:", json.dumps(status), flush=True)
     if failed:
         print(f"[sweep] FAILED runs: {failed}", flush=True)
