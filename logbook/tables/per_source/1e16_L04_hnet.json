@@ -1,0 +1,1235 @@
+{
+ "sources": {
+  "en.fineweb_edu": {
+   "group": "english",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.7,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-en.fineweb_edu_000000.bytes.bin"
+   ],
+   "n_docs": 44,
+   "n_bytes": 202384,
+   "n_segments": 52,
+   "skipped_invalid_utf8": 0,
+   "bits": 364995.44109623076,
+   "bpb": 1.80347972713372,
+   "bpb_ci95": [
+    1.7009349978438086,
+    1.883671410776391
+   ],
+   "split_bytes_per_token": 4.474453361632508,
+   "positions_by_stage": [
+    202436,
+    41976
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.822660567943587
+   ],
+   "bytes_per_main_position": 4.822660567943587,
+   "text_bytes_per_main_position": 4.821421764817991
+  },
+  "code.c": {
+   "group": "code",
+   "lang": "c",
+   "held_out": false,
+   "weight": 0.03331645569620254,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.c_000000.bytes.bin"
+   ],
+   "n_docs": 19,
+   "n_bytes": 220074,
+   "n_segments": 47,
+   "skipped_invalid_utf8": 0,
+   "bits": 533136.1407791723,
+   "bpb": 2.4225312430326724,
+   "bpb_ci95": [
+    2.220354850161077,
+    2.5282460507712377
+   ],
+   "split_bytes_per_token": 3.04347946342138,
+   "positions_by_stage": [
+    220121,
+    54181
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.062697255495469
+   ],
+   "bytes_per_main_position": 4.062697255495469,
+   "text_bytes_per_main_position": 4.0618297927317695
+  },
+  "code.cpp": {
+   "group": "code",
+   "lang": "cpp",
+   "held_out": false,
+   "weight": 0.025316455696202535,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.cpp_000000.bytes.bin"
+   ],
+   "n_docs": 4,
+   "n_bytes": 254968,
+   "n_segments": 34,
+   "skipped_invalid_utf8": 0,
+   "bits": 537700.5667610947,
+   "bpb": 2.1088943191345373,
+   "bpb_ci95": [
+    2.043367134074101,
+    2.236453762190661
+   ],
+   "split_bytes_per_token": 3.8263949335174234,
+   "positions_by_stage": [
+    255002,
+    57436
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.4397590361445785
+   ],
+   "bytes_per_main_position": 4.4397590361445785,
+   "text_bytes_per_main_position": 4.439167072915941
+  },
+  "code.javascript": {
+   "group": "code",
+   "lang": "javascript",
+   "held_out": false,
+   "weight": 0.023594936708860766,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.javascript_000000.bytes.bin"
+   ],
+   "n_docs": 5,
+   "n_bytes": 294133,
+   "n_segments": 41,
+   "skipped_invalid_utf8": 0,
+   "bits": 587083.558363012,
+   "bpb": 1.9959799082830285,
+   "bpb_ci95": [
+    1.769563511695747,
+    2.1713812256554776
+   ],
+   "split_bytes_per_token": 3.734310924903193,
+   "positions_by_stage": [
+    294174,
+    86423
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    3.4038855397290075
+   ],
+   "bytes_per_main_position": 3.4038855397290075,
+   "text_bytes_per_main_position": 3.403411128981868
+  },
+  "code.python": {
+   "group": "code",
+   "lang": "python",
+   "held_out": false,
+   "weight": 0.023189873417721524,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.python_000000.bytes.bin"
+   ],
+   "n_docs": 15,
+   "n_bytes": 220099,
+   "n_segments": 37,
+   "skipped_invalid_utf8": 0,
+   "bits": 428495.1872729809,
+   "bpb": 1.9468293234997929,
+   "bpb_ci95": [
+    1.75239028573955,
+    2.0714840753734354
+   ],
+   "split_bytes_per_token": 3.9264829185621264,
+   "positions_by_stage": [
+    220136,
+    53177
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.139684450044192
+   ],
+   "bytes_per_main_position": 4.139684450044192,
+   "text_bytes_per_main_position": 4.1389886605111235
+  },
+  "code.java": {
+   "group": "code",
+   "lang": "java",
+   "held_out": false,
+   "weight": 0.022987341772151903,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.java_000000.bytes.bin"
+   ],
+   "n_docs": 39,
+   "n_bytes": 204178,
+   "n_segments": 51,
+   "skipped_invalid_utf8": 0,
+   "bits": 342884.34412875306,
+   "bpb": 1.6793403017404083,
+   "bpb_ci95": [
+    1.5558147718012094,
+    1.7931218827672992
+   ],
+   "split_bytes_per_token": 4.172347555991499,
+   "positions_by_stage": [
+    204229,
+    50677
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.030013615644178
+   ],
+   "bytes_per_main_position": 4.030013615644178,
+   "text_bytes_per_main_position": 4.029007241944077
+  },
+  "code.php": {
+   "group": "code",
+   "lang": "php",
+   "held_out": false,
+   "weight": 0.02025316455696203,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.php_000000.bytes.bin"
+   ],
+   "n_docs": 44,
+   "n_bytes": 205186,
+   "n_segments": 58,
+   "skipped_invalid_utf8": 0,
+   "bits": 364582.2849011403,
+   "bpb": 1.7768380147823941,
+   "bpb_ci95": [
+    1.6801766502403455,
+    1.9030113750921893
+   ],
+   "split_bytes_per_token": 3.6076659340659343,
+   "positions_by_stage": [
+    205244,
+    55432
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    3.702626641651032
+   ],
+   "bytes_per_main_position": 3.702626641651032,
+   "text_bytes_per_main_position": 3.701580314619714
+  },
+  "code.csharp": {
+   "group": "code",
+   "lang": "csharp",
+   "held_out": false,
+   "weight": 0.01944303797468355,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.csharp_000000.bytes.bin"
+   ],
+   "n_docs": 37,
+   "n_bytes": 212265,
+   "n_segments": 52,
+   "skipped_invalid_utf8": 0,
+   "bits": 356268.3615399054,
+   "bpb": 1.678413122935507,
+   "bpb_ci95": [
+    1.5234987256445145,
+    1.860153243199795
+   ],
+   "split_bytes_per_token": 4.326464473523297,
+   "positions_by_stage": [
+    212317,
+    51292
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.139378460578648
+   ],
+   "bytes_per_main_position": 4.139378460578648,
+   "text_bytes_per_main_position": 4.138364657256492
+  },
+  "code.markdown": {
+   "group": "code",
+   "lang": "markdown",
+   "held_out": false,
+   "weight": 0.012962025316455699,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.markdown_000000.bytes.bin"
+   ],
+   "n_docs": 44,
+   "n_bytes": 203191,
+   "n_segments": 63,
+   "skipped_invalid_utf8": 0,
+   "bits": 523121.20114989585,
+   "bpb": 2.574529389342519,
+   "bpb_ci95": [
+    2.251429159902635,
+    2.9030917690589972
+   ],
+   "split_bytes_per_token": 3.0806119045453166,
+   "positions_by_stage": [
+    203254,
+    83322
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    2.439379755646768
+   ],
+   "bytes_per_main_position": 2.439379755646768,
+   "text_bytes_per_main_position": 2.438623652816783
+  },
+  "code.typescript": {
+   "group": "code",
+   "lang": "typescript",
+   "held_out": false,
+   "weight": 0.005873417721518988,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.typescript_000000.bytes.bin"
+   ],
+   "n_docs": 11,
+   "n_bytes": 233779,
+   "n_segments": 37,
+   "skipped_invalid_utf8": 0,
+   "bits": 283136.9538866001,
+   "bpb": 1.2111308282035602,
+   "bpb_ci95": [
+    0.8520959931544659,
+    2.0738542428527516
+   ],
+   "split_bytes_per_token": 4.021381635531703,
+   "positions_by_stage": [
+    233816,
+    69281
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    3.3748935494580046
+   ],
+   "bytes_per_main_position": 3.3748935494580046,
+   "text_bytes_per_main_position": 3.3743594925015516
+  },
+  "code.sql": {
+   "group": "code",
+   "lang": "sql",
+   "held_out": false,
+   "weight": 0.004050632911392406,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.sql_000000.bytes.bin"
+   ],
+   "n_docs": 8,
+   "n_bytes": 294041,
+   "n_segments": 69,
+   "skipped_invalid_utf8": 0,
+   "bits": 1127520.9399826727,
+   "bpb": 3.8345704850094804,
+   "bpb_ci95": [
+    2.1031880365002986,
+    4.1638345657250655
+   ],
+   "split_bytes_per_token": 2.2607061030553717,
+   "positions_by_stage": [
+    294110,
+    47374
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    6.208257694093807
+   ],
+   "bytes_per_main_position": 6.208257694093807,
+   "text_bytes_per_main_position": 6.206801198969899
+  },
+  "code.go": {
+   "group": "code",
+   "lang": "go",
+   "held_out": false,
+   "weight": 0.0031392405063291147,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.go_000000.bytes.bin"
+   ],
+   "n_docs": 19,
+   "n_bytes": 201595,
+   "n_segments": 40,
+   "skipped_invalid_utf8": 0,
+   "bits": 483181.9958393942,
+   "bpb": 2.3967955348068863,
+   "bpb_ci95": [
+    2.3377324780912194,
+    2.536678150317736
+   ],
+   "split_bytes_per_token": 3.354884340156432,
+   "positions_by_stage": [
+    201635,
+    45234
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.457598266790467
+   ],
+   "bytes_per_main_position": 4.457598266790467,
+   "text_bytes_per_main_position": 4.456713976212583
+  },
+  "code.ruby": {
+   "group": "code",
+   "lang": "ruby",
+   "held_out": false,
+   "weight": 0.002734177215189874,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.ruby_000000.bytes.bin"
+   ],
+   "n_docs": 99,
+   "n_bytes": 200668,
+   "n_segments": 112,
+   "skipped_invalid_utf8": 0,
+   "bits": 497476.04415351397,
+   "bpb": 2.4791000266784637,
+   "bpb_ci95": [
+    2.3678459559787464,
+    2.5875455481079586
+   ],
+   "split_bytes_per_token": 3.22104688678791,
+   "positions_by_stage": [
+    200780,
+    49591
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.0487185174729285
+   ],
+   "bytes_per_main_position": 4.0487185174729285,
+   "text_bytes_per_main_position": 4.046460043152991
+  },
+  "code.shell": {
+   "group": "code",
+   "lang": "shell",
+   "held_out": false,
+   "weight": 0.0016202531645569623,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.shell_000000.bytes.bin"
+   ],
+   "n_docs": 82,
+   "n_bytes": 215674,
+   "n_segments": 98,
+   "skipped_invalid_utf8": 0,
+   "bits": 618993.1990963861,
+   "bpb": 2.870040890864852,
+   "bpb_ci95": [
+    2.730347127095253,
+    3.092051877607578
+   ],
+   "split_bytes_per_token": 3.0304912320143886,
+   "positions_by_stage": [
+    215772,
+    51413
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.196837375760994
+   ],
+   "bytes_per_main_position": 4.196837375760994,
+   "text_bytes_per_main_position": 4.194931243070819
+  },
+  "code.rust": {
+   "group": "code",
+   "lang": "rust",
+   "held_out": false,
+   "weight": 0.001518987341772152,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.rust_000000.bytes.bin"
+   ],
+   "n_docs": 26,
+   "n_bytes": 206481,
+   "n_segments": 48,
+   "skipped_invalid_utf8": 0,
+   "bits": 468208.14368269,
+   "bpb": 2.267560422909081,
+   "bpb_ci95": [
+    2.1437539546061277,
+    2.439656621289136
+   ],
+   "split_bytes_per_token": 3.4471527070568793,
+   "positions_by_stage": [
+    206529,
+    53621
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    3.851643945469126
+   ],
+   "bytes_per_main_position": 3.851643945469126,
+   "text_bytes_per_main_position": 3.850748773801309
+  },
+  "heldout.haskell": {
+   "group": "code",
+   "lang": "haskell",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.haskell_000000.bytes.bin"
+   ],
+   "n_docs": 27,
+   "n_bytes": 202462,
+   "n_segments": 46,
+   "skipped_invalid_utf8": 0,
+   "bits": 540048.6845385142,
+   "bpb": 2.6674076347092996,
+   "bpb_ci95": [
+    2.5831823483989607,
+    2.8724774210964843
+   ],
+   "split_bytes_per_token": 3.5319505259668893,
+   "positions_by_stage": [
+    202508,
+    42776
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.734149990648962
+   ],
+   "bytes_per_main_position": 4.734149990648962,
+   "text_bytes_per_main_position": 4.733074621282962
+  },
+  "heldout.fortran": {
+   "group": "code",
+   "lang": "fortran",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.fortran_000000.bytes.bin"
+   ],
+   "n_docs": 18,
+   "n_bytes": 215321,
+   "n_segments": 47,
+   "skipped_invalid_utf8": 0,
+   "bits": 574338.8510417747,
+   "bpb": 2.6673610611216496,
+   "bpb_ci95": [
+    2.512203133649187,
+    2.876260536376253
+   ],
+   "split_bytes_per_token": 2.9931468764769664,
+   "positions_by_stage": [
+    215368,
+    59373
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    3.6273727115018612
+   ],
+   "bytes_per_main_position": 3.6273727115018612,
+   "text_bytes_per_main_position": 3.6265811058898825
+  },
+  "heldout.lua": {
+   "group": "code",
+   "lang": "lua",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.lua_000000.bytes.bin"
+   ],
+   "n_docs": 35,
+   "n_bytes": 349841,
+   "n_segments": 76,
+   "skipped_invalid_utf8": 0,
+   "bits": 831197.6758017619,
+   "bpb": 2.3759298532812387,
+   "bpb_ci95": [
+    2.283500697685449,
+    2.723318548314863
+   ],
+   "split_bytes_per_token": 3.5118956794089304,
+   "positions_by_stage": [
+    349917,
+    89619
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    3.9044956984568007
+   ],
+   "bytes_per_main_position": 3.9044956984568007,
+   "text_bytes_per_main_position": 3.9036476639998217
+  },
+  "heldout.julia": {
+   "group": "code",
+   "lang": "julia",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.julia_000000.bytes.bin"
+   ],
+   "n_docs": 59,
+   "n_bytes": 201823,
+   "n_segments": 77,
+   "skipped_invalid_utf8": 0,
+   "bits": 594679.2382347404,
+   "bpb": 2.9465384928117233,
+   "bpb_ci95": [
+    2.793559175756632,
+    3.0381794561215285
+   ],
+   "split_bytes_per_token": 2.871004452537093,
+   "positions_by_stage": [
+    201900,
+    49707
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.061802160661476
+   ],
+   "bytes_per_main_position": 4.061802160661476,
+   "text_bytes_per_main_position": 4.060253083066772
+  },
+  "heldout.perl": {
+   "group": "code",
+   "lang": "perl",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.perl_000000.bytes.bin"
+   ],
+   "n_docs": 34,
+   "n_bytes": 252522,
+   "n_segments": 64,
+   "skipped_invalid_utf8": 0,
+   "bits": 697368.0772198881,
+   "bpb": 2.761613155368198,
+   "bpb_ci95": [
+    2.5695684543938135,
+    3.0339349874981987
+   ],
+   "split_bytes_per_token": 2.915655416873535,
+   "positions_by_stage": [
+    252586,
+    67694
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    3.731290808638875
+   ],
+   "bytes_per_main_position": 3.731290808638875,
+   "text_bytes_per_main_position": 3.730345377729193
+  },
+  "heldout.scala": {
+   "group": "code",
+   "lang": "scala",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.scala_000000.bytes.bin"
+   ],
+   "n_docs": 67,
+   "n_bytes": 203717,
+   "n_segments": 76,
+   "skipped_invalid_utf8": 0,
+   "bits": 479770.8523393923,
+   "bpb": 2.3550850068447517,
+   "bpb_ci95": [
+    2.260240619121415,
+    2.469834205573665
+   ],
+   "split_bytes_per_token": 3.384509312023392,
+   "positions_by_stage": [
+    203793,
+    46871
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.347955025495509
+   ],
+   "bytes_per_main_position": 4.347955025495509,
+   "text_bytes_per_main_position": 4.34633355379659
+  },
+  "heldout.assembly": {
+   "group": "code",
+   "lang": "assembly",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.assembly_000000.bytes.bin"
+   ],
+   "n_docs": 31,
+   "n_bytes": 216258,
+   "n_segments": 65,
+   "skipped_invalid_utf8": 0,
+   "bits": 692528.1576614485,
+   "bpb": 3.202323880094371,
+   "bpb_ci95": [
+    3.1309369020797546,
+    3.3548623912358995
+   ],
+   "split_bytes_per_token": 2.474970816452654,
+   "positions_by_stage": [
+    216323,
+    53826
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.018931371456174
+   ],
+   "bytes_per_main_position": 4.018931371456174,
+   "text_bytes_per_main_position": 4.017723776613533
+  },
+  "heldout.visual_basic": {
+   "group": "code",
+   "lang": "visual_basic",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.visual_basic_000000.bytes.bin"
+   ],
+   "n_docs": 32,
+   "n_bytes": 202851,
+   "n_segments": 47,
+   "skipped_invalid_utf8": 0,
+   "bits": 432941.8672729545,
+   "bpb": 2.134285102232449,
+   "bpb_ci95": [
+    2.013726896865184,
+    2.2686053896879024
+   ],
+   "split_bytes_per_token": 4.119889513983386,
+   "positions_by_stage": [
+    202898,
+    43418
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.673130959509881
+   ],
+   "bytes_per_main_position": 4.673130959509881,
+   "text_bytes_per_main_position": 4.672048459164402
+  },
+  "heldout.powershell": {
+   "group": "code",
+   "lang": "powershell",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.powershell_000000.bytes.bin"
+   ],
+   "n_docs": 61,
+   "n_bytes": 202918,
+   "n_segments": 73,
+   "skipped_invalid_utf8": 0,
+   "bits": 568330.6629450388,
+   "bpb": 2.8007897916648044,
+   "bpb_ci95": [
+    2.538129368636108,
+    3.1710629211190007
+   ],
+   "split_bytes_per_token": 3.0977482634913365,
+   "positions_by_stage": [
+    202991,
+    43767
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.637992094500422
+   ],
+   "bytes_per_main_position": 4.637992094500422,
+   "text_bytes_per_main_position": 4.636324171179199
+  },
+  "heldout.tex": {
+   "group": "code",
+   "lang": "tex",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.tex_000000.bytes.bin"
+   ],
+   "n_docs": 1,
+   "n_bytes": 223754,
+   "n_segments": 39,
+   "skipped_invalid_utf8": 0,
+   "bits": 734985.2898972494,
+   "bpb": 3.284791735107526,
+   "bpb_ci95": null,
+   "split_bytes_per_token": 2.819800632632229,
+   "positions_by_stage": [
+    223793,
+    56619
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    3.952613080414702
+   ],
+   "bytes_per_main_position": 3.952613080414702,
+   "text_bytes_per_main_position": 3.9519242657058586
+  },
+  "math.finemath": {
+   "group": "math",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.030699999999999998,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-math.finemath_000000.bytes.bin"
+   ],
+   "n_docs": 64,
+   "n_bytes": 202448,
+   "n_segments": 70,
+   "skipped_invalid_utf8": 0,
+   "bits": 463723.24219234724,
+   "bpb": 2.29057951766551,
+   "bpb_ci95": [
+    2.1339503556269803,
+    2.492670606568624
+   ],
+   "split_bytes_per_token": 3.475323159322267,
+   "positions_by_stage": [
+    202518,
+    48674
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.160701812055717
+   ],
+   "bytes_per_main_position": 4.160701812055717,
+   "text_bytes_per_main_position": 4.15926367259728
+  },
+  "math.infiwebmath": {
+   "group": "math",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.0193,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-math.infiwebmath_000000.bytes.bin"
+   ],
+   "n_docs": 31,
+   "n_bytes": 201197,
+   "n_segments": 47,
+   "skipped_invalid_utf8": 0,
+   "bits": 437631.3888672554,
+   "bpb": 2.175138738983461,
+   "bpb_ci95": [
+    2.0612325564558533,
+    2.295668024546258
+   ],
+   "split_bytes_per_token": 3.4648515533512434,
+   "positions_by_stage": [
+    201244,
+    46751
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    4.304592415135505
+   ],
+   "bytes_per_main_position": 4.304592415135505,
+   "text_bytes_per_main_position": 4.303587089046224
+  },
+  "ml.rus_Cyrl": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.rus_Cyrl_000000.bytes.bin"
+   ],
+   "n_docs": 18,
+   "n_bytes": 208637,
+   "n_segments": 39,
+   "skipped_invalid_utf8": 0,
+   "bits": 436281.4557537901,
+   "bpb": 2.091102995891381,
+   "bpb_ci95": [
+    2.0559801200858936,
+    2.191187836112021
+   ],
+   "split_bytes_per_token": 3.8336181393895963,
+   "positions_by_stage": [
+    208676,
+    112923
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    1.8479494877040108
+   ],
+   "bytes_per_main_position": 1.8479494877040108,
+   "text_bytes_per_main_position": 1.8476041196213349
+  },
+  "ml.cmn_Hani": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.cmn_Hani_000000.bytes.bin"
+   ],
+   "n_docs": 50,
+   "n_bytes": 252659,
+   "n_segments": 82,
+   "skipped_invalid_utf8": 0,
+   "bits": 978620.2823603941,
+   "bpb": 3.8732848715477943,
+   "bpb_ci95": [
+    3.7047024995499167,
+    4.15782633038513
+   ],
+   "split_bytes_per_token": 2.421821981097713,
+   "positions_by_stage": [
+    252741,
+    214163
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    1.1801338233028114
+   ],
+   "bytes_per_main_position": 1.1801338233028114,
+   "text_bytes_per_main_position": 1.179750937370134
+  },
+  "ml.deu_Latn": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.deu_Latn_000000.bytes.bin"
+   ],
+   "n_docs": 72,
+   "n_bytes": 200445,
+   "n_segments": 83,
+   "skipped_invalid_utf8": 0,
+   "bits": 622992.7650947116,
+   "bpb": 3.1080484177440773,
+   "bpb_ci95": [
+    3.0694083775211536,
+    3.142395834943394
+   ],
+   "split_bytes_per_token": 2.920618962276522,
+   "positions_by_stage": [
+    200528,
+    13361
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    15.008457450789612
+   ],
+   "bytes_per_main_position": 15.008457450789612,
+   "text_bytes_per_main_position": 15.002245340917597
+  },
+  "ml.fra_Latn": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.fra_Latn_000000.bytes.bin"
+   ],
+   "n_docs": 10,
+   "n_bytes": 226229,
+   "n_segments": 42,
+   "skipped_invalid_utf8": 0,
+   "bits": 649882.5339372387,
+   "bpb": 2.8726756248634735,
+   "bpb_ci95": [
+    2.6783027757612747,
+    2.8909119166094963
+   ],
+   "split_bytes_per_token": 3.0488261771919896,
+   "positions_by_stage": [
+    226271,
+    25643
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    8.823889560503842
+   ],
+   "bytes_per_main_position": 8.823889560503842,
+   "text_bytes_per_main_position": 8.822251686620131
+  },
+  "ml.spa_Latn": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.spa_Latn_000000.bytes.bin"
+   ],
+   "n_docs": 31,
+   "n_bytes": 203933,
+   "n_segments": 48,
+   "skipped_invalid_utf8": 0,
+   "bits": 536831.9235463473,
+   "bpb": 2.632393597634259,
+   "bpb_ci95": [
+    2.5651493079578276,
+    2.725990543846085
+   ],
+   "split_bytes_per_token": 3.2348751625900194,
+   "positions_by_stage": [
+    203981,
+    15827
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    12.888165792632842
+   ],
+   "bytes_per_main_position": 12.888165792632842,
+   "text_bytes_per_main_position": 12.885133000568649
+  },
+  "ml.ita_Latn": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.ita_Latn_000000.bytes.bin"
+   ],
+   "n_docs": 43,
+   "n_bytes": 202587,
+   "n_segments": 62,
+   "skipped_invalid_utf8": 0,
+   "bits": 556181.1661480234,
+   "bpb": 2.7453941573152445,
+   "bpb_ci95": [
+    2.709182447744752,
+    2.817252445833373
+   ],
+   "split_bytes_per_token": 3.145712023105231,
+   "positions_by_stage": [
+    202649,
+    12008
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    16.876165889407062
+   ],
+   "bytes_per_main_position": 16.876165889407062,
+   "text_bytes_per_main_position": 16.871002664890074
+  },
+  "ml.por_Latn": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.por_Latn_000000.bytes.bin"
+   ],
+   "n_docs": 89,
+   "n_bytes": 202121,
+   "n_segments": 98,
+   "skipped_invalid_utf8": 0,
+   "bits": 559040.4469849742,
+   "bpb": 2.7658701816484887,
+   "bpb_ci95": [
+    2.64452666368959,
+    2.9023128040986523
+   ],
+   "split_bytes_per_token": 3.1479099177672563,
+   "positions_by_stage": [
+    202219,
+    15955
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    12.674334064556565
+   ],
+   "bytes_per_main_position": 12.674334064556565,
+   "text_bytes_per_main_position": 12.66819178940771
+  },
+  "ml.arb_Arab": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.arb_Arab_000000.bytes.bin"
+   ],
+   "n_docs": 37,
+   "n_bytes": 201678,
+   "n_segments": 49,
+   "skipped_invalid_utf8": 0,
+   "bits": 398499.72285460046,
+   "bpb": 1.975920640102542,
+   "bpb_ci95": [
+    1.9244507761844138,
+    2.0241765329397436
+   ],
+   "split_bytes_per_token": 3.6122295457801976,
+   "positions_by_stage": [
+    201727,
+    71654
+   ],
+   "bytes_per_position_by_stage": [
+    1.0,
+    2.815292935495576
+   ],
+   "bytes_per_main_position": 2.815292935495576,
+   "text_bytes_per_main_position": 2.814609093700282
+  }
+ },
+ "groups": {
+  "english": {
+   "sources": [
+    "en.fineweb_edu"
+   ],
+   "bits": 364995.44109623076,
+   "n_bytes": 202384,
+   "bpb": 1.80347972713372,
+   "bytes_per_main_position": 4.822660567943587
+  },
+  "all": {
+   "sources": [
+    "en.fineweb_edu",
+    "code.c",
+    "code.cpp",
+    "code.javascript",
+    "code.python",
+    "code.java",
+    "code.php",
+    "code.csharp",
+    "code.markdown",
+    "code.typescript",
+    "code.sql",
+    "code.go",
+    "code.ruby",
+    "code.shell",
+    "code.rust",
+    "math.finemath",
+    "math.infiwebmath",
+    "ml.rus_Cyrl",
+    "ml.cmn_Hani",
+    "ml.deu_Latn",
+    "ml.fra_Latn",
+    "ml.spa_Latn",
+    "ml.ita_Latn",
+    "ml.por_Latn",
+    "ml.arb_Arab"
+   ],
+   "bits": 13156469.29037313,
+   "n_bytes": 5470650,
+   "bpb": 2.4049188470059555,
+   "bytes_per_main_position": 3.833649411617996
+  },
+  "code": {
+   "sources": [
+    "code.c",
+    "code.cpp",
+    "code.javascript",
+    "code.python",
+    "code.java",
+    "code.php",
+    "code.csharp",
+    "code.markdown",
+    "code.typescript",
+    "code.sql",
+    "code.go",
+    "code.ruby",
+    "code.shell",
+    "code.rust"
+   ],
+   "bits": 7151788.921537213,
+   "n_bytes": 3166332,
+   "bpb": 2.258698368186663,
+   "bytes_per_main_position": 3.9175005628025836
+  },
+  "code_held_out": {
+   "sources": [
+    "heldout.haskell",
+    "heldout.fortran",
+    "heldout.lua",
+    "heldout.julia",
+    "heldout.perl",
+    "heldout.scala",
+    "heldout.assembly",
+    "heldout.visual_basic",
+    "heldout.powershell",
+    "heldout.tex"
+   ],
+   "bits": 6146189.356952762,
+   "n_bytes": 2271467,
+   "bpb": 2.705823750445312,
+   "bytes_per_main_position": 4.103666443910632
+  },
+  "math": {
+   "sources": [
+    "math.finemath",
+    "math.infiwebmath"
+   ],
+   "bits": 901354.6310596026,
+   "n_bytes": 403645,
+   "bpb": 2.2330380187035703,
+   "bytes_per_main_position": 4.231197275347132
+  },
+  "multilingual": {
+   "sources": [
+    "ml.rus_Cyrl",
+    "ml.cmn_Hani",
+    "ml.deu_Latn",
+    "ml.fra_Latn",
+    "ml.spa_Latn",
+    "ml.ita_Latn",
+    "ml.por_Latn",
+    "ml.arb_Arab"
+   ],
+   "bits": 4738330.296680079,
+   "n_bytes": 1698289,
+   "bpb": 2.790061230261798,
+   "bytes_per_main_position": 3.5278754978879996
+  },
+  "mix": {
+   "sources": [
+    "code.c",
+    "code.cpp",
+    "code.csharp",
+    "code.go",
+    "code.java",
+    "code.javascript",
+    "code.markdown",
+    "code.php",
+    "code.python",
+    "code.ruby",
+    "code.rust",
+    "code.shell",
+    "code.sql",
+    "code.typescript",
+    "en.fineweb_edu",
+    "math.finemath",
+    "math.infiwebmath",
+    "ml.arb_Arab",
+    "ml.cmn_Hani",
+    "ml.deu_Latn",
+    "ml.fra_Latn",
+    "ml.ita_Latn",
+    "ml.por_Latn",
+    "ml.rus_Cyrl",
+    "ml.spa_Latn"
+   ],
+   "bpb": 1.9246203699147182,
+   "weights": {
+    "en.fineweb_edu": 0.7000000000000002,
+    "code.c": 0.033316455696202556,
+    "code.cpp": 0.02531645569620254,
+    "code.javascript": 0.023594936708860773,
+    "code.python": 0.02318987341772153,
+    "code.java": 0.02298734177215191,
+    "code.php": 0.020253164556962036,
+    "code.csharp": 0.019443037974683556,
+    "code.markdown": 0.012962025316455702,
+    "code.typescript": 0.00587341772151899,
+    "code.sql": 0.004050632911392408,
+    "code.go": 0.0031392405063291155,
+    "code.ruby": 0.002734177215189875,
+    "code.shell": 0.0016202531645569628,
+    "code.rust": 0.0015189873417721525,
+    "math.finemath": 0.03070000000000001,
+    "math.infiwebmath": 0.019300000000000008,
+    "ml.rus_Cyrl": 0.006250000000000002,
+    "ml.cmn_Hani": 0.006250000000000002,
+    "ml.deu_Latn": 0.006250000000000002,
+    "ml.fra_Latn": 0.006250000000000002,
+    "ml.spa_Latn": 0.006250000000000002,
+    "ml.ita_Latn": 0.006250000000000002,
+    "ml.por_Latn": 0.006250000000000002,
+    "ml.arb_Arab": 0.006250000000000002
+   }
+  }
+ },
+ "seconds": 32.43422245979309,
+ "settings": {
+  "kind": "byte",
+  "model_tokenizer": null,
+  "split_tokenizer": "dataset:mix_v1",
+  "byte_seq_len": 8512,
+  "token_seq_len": 2048,
+  "max_bytes": 200000,
+  "batch_tokens": 16384
+ },
+ "run": {
+  "model": "ckpts/L04/hnet",
+  "checkpoint": "ckpts/L04/hnet",
+  "step": 728,
+  "kind": "byte",
+  "bytes_seen": 396436189
+ }
+}

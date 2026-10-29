@@ -1,0 +1,955 @@
+{
+ "sources": {
+  "en.fineweb_edu": {
+   "group": "english",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.7,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-en.fineweb_edu_000000.bytes.bin"
+   ],
+   "n_docs": 44,
+   "n_bytes": 202384,
+   "n_segments": 52,
+   "skipped_invalid_utf8": 0,
+   "bits": 310841.48666866834,
+   "bpb": 1.535899511170193,
+   "bpb_ci95": [
+    1.4671314883011277,
+    1.5908973576104564
+   ],
+   "split_bytes_per_token": 4.474453361632508,
+   "n_tokens": 45231,
+   "bytes_per_token": 4.474453361632508
+  },
+  "code.c": {
+   "group": "code",
+   "lang": "c",
+   "held_out": false,
+   "weight": 0.03331645569620254,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.c_000000.bytes.bin"
+   ],
+   "n_docs": 19,
+   "n_bytes": 220074,
+   "n_segments": 47,
+   "skipped_invalid_utf8": 0,
+   "bits": 406734.4385685813,
+   "bpb": 1.848171244983875,
+   "bpb_ci95": [
+    1.6717837816278702,
+    1.956595963672477
+   ],
+   "split_bytes_per_token": 3.04347946342138,
+   "n_tokens": 72310,
+   "bytes_per_token": 3.04347946342138
+  },
+  "code.cpp": {
+   "group": "code",
+   "lang": "cpp",
+   "held_out": false,
+   "weight": 0.025316455696202535,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.cpp_000000.bytes.bin"
+   ],
+   "n_docs": 4,
+   "n_bytes": 254968,
+   "n_segments": 34,
+   "skipped_invalid_utf8": 0,
+   "bits": 424016.1359004624,
+   "bpb": 1.6630170684182424,
+   "bpb_ci95": [
+    1.6295430334633074,
+    1.7594851152316535
+   ],
+   "split_bytes_per_token": 3.8263949335174234,
+   "n_tokens": 66634,
+   "bytes_per_token": 3.8263949335174234
+  },
+  "code.javascript": {
+   "group": "code",
+   "lang": "javascript",
+   "held_out": false,
+   "weight": 0.023594936708860766,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.javascript_000000.bytes.bin"
+   ],
+   "n_docs": 5,
+   "n_bytes": 294133,
+   "n_segments": 41,
+   "skipped_invalid_utf8": 0,
+   "bits": 466550.4188600065,
+   "bpb": 1.586188625077793,
+   "bpb_ci95": [
+    1.426536072362195,
+    1.7621806653024248
+   ],
+   "split_bytes_per_token": 3.734310924903193,
+   "n_tokens": 78765,
+   "bytes_per_token": 3.734310924903193
+  },
+  "code.python": {
+   "group": "code",
+   "lang": "python",
+   "held_out": false,
+   "weight": 0.023189873417721524,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.python_000000.bytes.bin"
+   ],
+   "n_docs": 15,
+   "n_bytes": 220099,
+   "n_segments": 37,
+   "skipped_invalid_utf8": 0,
+   "bits": 350120.8957176356,
+   "bpb": 1.5907427826461527,
+   "bpb_ci95": [
+    1.3839998221622092,
+    1.723862520595225
+   ],
+   "split_bytes_per_token": 3.9264829185621264,
+   "n_tokens": 56055,
+   "bytes_per_token": 3.9264829185621264
+  },
+  "code.java": {
+   "group": "code",
+   "lang": "java",
+   "held_out": false,
+   "weight": 0.022987341772151903,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.java_000000.bytes.bin"
+   ],
+   "n_docs": 39,
+   "n_bytes": 204178,
+   "n_segments": 51,
+   "skipped_invalid_utf8": 0,
+   "bits": 260558.59444273295,
+   "bpb": 1.2761345220480804,
+   "bpb_ci95": [
+    1.1935140321220414,
+    1.3438383431028136
+   ],
+   "split_bytes_per_token": 4.172347555991499,
+   "n_tokens": 48936,
+   "bytes_per_token": 4.172347555991499
+  },
+  "code.php": {
+   "group": "code",
+   "lang": "php",
+   "held_out": false,
+   "weight": 0.02025316455696203,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.php_000000.bytes.bin"
+   ],
+   "n_docs": 44,
+   "n_bytes": 205186,
+   "n_segments": 58,
+   "skipped_invalid_utf8": 0,
+   "bits": 286033.1292673308,
+   "bpb": 1.3940187403981306,
+   "bpb_ci95": [
+    1.3145476836549703,
+    1.489493821834932
+   ],
+   "split_bytes_per_token": 3.6076659340659343,
+   "n_tokens": 56875,
+   "bytes_per_token": 3.6076659340659343
+  },
+  "code.csharp": {
+   "group": "code",
+   "lang": "csharp",
+   "held_out": false,
+   "weight": 0.01944303797468355,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.csharp_000000.bytes.bin"
+   ],
+   "n_docs": 37,
+   "n_bytes": 212265,
+   "n_segments": 52,
+   "skipped_invalid_utf8": 0,
+   "bits": 272538.9653610541,
+   "bpb": 1.2839562120983399,
+   "bpb_ci95": [
+    1.175957993470517,
+    1.410395507126562
+   ],
+   "split_bytes_per_token": 4.326464473523297,
+   "n_tokens": 49062,
+   "bytes_per_token": 4.326464473523297
+  },
+  "code.markdown": {
+   "group": "code",
+   "lang": "markdown",
+   "held_out": false,
+   "weight": 0.012962025316455699,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.markdown_000000.bytes.bin"
+   ],
+   "n_docs": 44,
+   "n_bytes": 203191,
+   "n_segments": 63,
+   "skipped_invalid_utf8": 0,
+   "bits": 435458.13468124537,
+   "bpb": 2.1430975519646314,
+   "bpb_ci95": [
+    1.8694596036463322,
+    2.371892153170067
+   ],
+   "split_bytes_per_token": 3.0806119045453166,
+   "n_tokens": 65958,
+   "bytes_per_token": 3.0806119045453166
+  },
+  "code.typescript": {
+   "group": "code",
+   "lang": "typescript",
+   "held_out": false,
+   "weight": 0.005873417721518988,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.typescript_000000.bytes.bin"
+   ],
+   "n_docs": 11,
+   "n_bytes": 233779,
+   "n_segments": 37,
+   "skipped_invalid_utf8": 0,
+   "bits": 232743.5475134123,
+   "bpb": 0.9955708062461227,
+   "bpb_ci95": [
+    0.6721189720262807,
+    1.7476161646927155
+   ],
+   "split_bytes_per_token": 4.021381635531703,
+   "n_tokens": 58134,
+   "bytes_per_token": 4.021381635531703
+  },
+  "code.sql": {
+   "group": "code",
+   "lang": "sql",
+   "held_out": false,
+   "weight": 0.004050632911392406,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.sql_000000.bytes.bin"
+   ],
+   "n_docs": 8,
+   "n_bytes": 294041,
+   "n_segments": 69,
+   "skipped_invalid_utf8": 0,
+   "bits": 829049.9852958381,
+   "bpb": 2.81950471293404,
+   "bpb_ci95": [
+    1.3239816560571687,
+    3.074907236893424
+   ],
+   "split_bytes_per_token": 2.2607061030553717,
+   "n_tokens": 130066,
+   "bytes_per_token": 2.2607061030553717
+  },
+  "code.go": {
+   "group": "code",
+   "lang": "go",
+   "held_out": false,
+   "weight": 0.0031392405063291147,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.go_000000.bytes.bin"
+   ],
+   "n_docs": 19,
+   "n_bytes": 201595,
+   "n_segments": 40,
+   "skipped_invalid_utf8": 0,
+   "bits": 397170.5593896941,
+   "bpb": 1.970140923086853,
+   "bpb_ci95": [
+    1.8856698557316012,
+    2.1367499505291883
+   ],
+   "split_bytes_per_token": 3.354884340156432,
+   "n_tokens": 60090,
+   "bytes_per_token": 3.354884340156432
+  },
+  "code.ruby": {
+   "group": "code",
+   "lang": "ruby",
+   "held_out": false,
+   "weight": 0.002734177215189874,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.ruby_000000.bytes.bin"
+   ],
+   "n_docs": 99,
+   "n_bytes": 200668,
+   "n_segments": 112,
+   "skipped_invalid_utf8": 0,
+   "bits": 406621.5224648474,
+   "bpb": 2.026339637933539,
+   "bpb_ci95": [
+    1.9307816807439122,
+    2.1373394084337756
+   ],
+   "split_bytes_per_token": 3.22104688678791,
+   "n_tokens": 62299,
+   "bytes_per_token": 3.22104688678791
+  },
+  "code.shell": {
+   "group": "code",
+   "lang": "shell",
+   "held_out": false,
+   "weight": 0.0016202531645569623,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.shell_000000.bytes.bin"
+   ],
+   "n_docs": 82,
+   "n_bytes": 215674,
+   "n_segments": 98,
+   "skipped_invalid_utf8": 0,
+   "bits": 483402.8541104747,
+   "bpb": 2.2413589682134827,
+   "bpb_ci95": [
+    2.14006369312206,
+    2.4046956865540747
+   ],
+   "split_bytes_per_token": 3.0304912320143886,
+   "n_tokens": 71168,
+   "bytes_per_token": 3.0304912320143886
+  },
+  "code.rust": {
+   "group": "code",
+   "lang": "rust",
+   "held_out": false,
+   "weight": 0.001518987341772152,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-code.rust_000000.bytes.bin"
+   ],
+   "n_docs": 26,
+   "n_bytes": 206481,
+   "n_segments": 48,
+   "skipped_invalid_utf8": 0,
+   "bits": 375204.9307747128,
+   "bpb": 1.817140224886129,
+   "bpb_ci95": [
+    1.7286420996288603,
+    1.9350196903975962
+   ],
+   "split_bytes_per_token": 3.4471527070568793,
+   "n_tokens": 59899,
+   "bytes_per_token": 3.4471527070568793
+  },
+  "heldout.haskell": {
+   "group": "code",
+   "lang": "haskell",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.haskell_000000.bytes.bin"
+   ],
+   "n_docs": 27,
+   "n_bytes": 202462,
+   "n_segments": 46,
+   "skipped_invalid_utf8": 0,
+   "bits": 445094.3850209046,
+   "bpb": 2.198409504108942,
+   "bpb_ci95": [
+    2.147886698183002,
+    2.3194478258652946
+   ],
+   "split_bytes_per_token": 3.5319505259668893,
+   "n_tokens": 57323,
+   "bytes_per_token": 3.5319505259668893
+  },
+  "heldout.fortran": {
+   "group": "code",
+   "lang": "fortran",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.fortran_000000.bytes.bin"
+   ],
+   "n_docs": 18,
+   "n_bytes": 215321,
+   "n_segments": 47,
+   "skipped_invalid_utf8": 0,
+   "bits": 454111.62073964963,
+   "bpb": 2.108998289714657,
+   "bpb_ci95": [
+    1.9859064521841001,
+    2.2606644197809356
+   ],
+   "split_bytes_per_token": 2.9931468764769664,
+   "n_tokens": 71938,
+   "bytes_per_token": 2.9931468764769664
+  },
+  "heldout.lua": {
+   "group": "code",
+   "lang": "lua",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.lua_000000.bytes.bin"
+   ],
+   "n_docs": 35,
+   "n_bytes": 349841,
+   "n_segments": 76,
+   "skipped_invalid_utf8": 0,
+   "bits": 657593.2012222168,
+   "bpb": 1.8796916348347301,
+   "bpb_ci95": [
+    1.8243989879152698,
+    2.23543218437022
+   ],
+   "split_bytes_per_token": 3.5118956794089304,
+   "n_tokens": 99616,
+   "bytes_per_token": 3.5118956794089304
+  },
+  "heldout.julia": {
+   "group": "code",
+   "lang": "julia",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.julia_000000.bytes.bin"
+   ],
+   "n_docs": 59,
+   "n_bytes": 201823,
+   "n_segments": 77,
+   "skipped_invalid_utf8": 0,
+   "bits": 462423.78261329856,
+   "bpb": 2.291234312309789,
+   "bpb_ci95": [
+    2.179198656934851,
+    2.4150663747610586
+   ],
+   "split_bytes_per_token": 2.871004452537093,
+   "n_tokens": 70297,
+   "bytes_per_token": 2.871004452537093
+  },
+  "heldout.perl": {
+   "group": "code",
+   "lang": "perl",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.perl_000000.bytes.bin"
+   ],
+   "n_docs": 34,
+   "n_bytes": 252522,
+   "n_segments": 64,
+   "skipped_invalid_utf8": 0,
+   "bits": 546245.4434393059,
+   "bpb": 2.163159817518101,
+   "bpb_ci95": [
+    2.06332663005681,
+    2.318105038412631
+   ],
+   "split_bytes_per_token": 2.915655416873535,
+   "n_tokens": 86609,
+   "bytes_per_token": 2.915655416873535
+  },
+  "heldout.scala": {
+   "group": "code",
+   "lang": "scala",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.scala_000000.bytes.bin"
+   ],
+   "n_docs": 67,
+   "n_bytes": 203717,
+   "n_segments": 76,
+   "skipped_invalid_utf8": 0,
+   "bits": 385479.4750014548,
+   "bpb": 1.8922302753400788,
+   "bpb_ci95": [
+    1.8056489474286996,
+    2.015845604414524
+   ],
+   "split_bytes_per_token": 3.384509312023392,
+   "n_tokens": 60191,
+   "bytes_per_token": 3.384509312023392
+  },
+  "heldout.assembly": {
+   "group": "code",
+   "lang": "assembly",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.assembly_000000.bytes.bin"
+   ],
+   "n_docs": 31,
+   "n_bytes": 216258,
+   "n_segments": 65,
+   "skipped_invalid_utf8": 0,
+   "bits": 506253.05679496686,
+   "bpb": 2.3409679956115697,
+   "bpb_ci95": [
+    2.2061181436148165,
+    2.5669179272422986
+   ],
+   "split_bytes_per_token": 2.474970816452654,
+   "n_tokens": 87378,
+   "bytes_per_token": 2.474970816452654
+  },
+  "heldout.visual_basic": {
+   "group": "code",
+   "lang": "visual_basic",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.visual_basic_000000.bytes.bin"
+   ],
+   "n_docs": 32,
+   "n_bytes": 202851,
+   "n_segments": 47,
+   "skipped_invalid_utf8": 0,
+   "bits": 354994.9829069706,
+   "bpb": 1.750028261664821,
+   "bpb_ci95": [
+    1.6616120773628151,
+    1.849270585624172
+   ],
+   "split_bytes_per_token": 4.119889513983386,
+   "n_tokens": 49237,
+   "bytes_per_token": 4.119889513983386
+  },
+  "heldout.powershell": {
+   "group": "code",
+   "lang": "powershell",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.powershell_000000.bytes.bin"
+   ],
+   "n_docs": 61,
+   "n_bytes": 202918,
+   "n_segments": 73,
+   "skipped_invalid_utf8": 0,
+   "bits": 475599.30453773466,
+   "bpb": 2.343800473776277,
+   "bpb_ci95": [
+    2.0451918828822575,
+    2.7903764979550894
+   ],
+   "split_bytes_per_token": 3.0977482634913365,
+   "n_tokens": 65505,
+   "bytes_per_token": 3.0977482634913365
+  },
+  "heldout.tex": {
+   "group": "code",
+   "lang": "tex",
+   "held_out": true,
+   "weight": null,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-heldout.tex_000000.bytes.bin"
+   ],
+   "n_docs": 1,
+   "n_bytes": 223754,
+   "n_segments": 39,
+   "skipped_invalid_utf8": 0,
+   "bits": 600716.4266679541,
+   "bpb": 2.6847181577444608,
+   "bpb_ci95": null,
+   "split_bytes_per_token": 2.819800632632229,
+   "n_tokens": 79351,
+   "bytes_per_token": 2.819800632632229
+  },
+  "math.finemath": {
+   "group": "math",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.030699999999999998,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-math.finemath_000000.bytes.bin"
+   ],
+   "n_docs": 64,
+   "n_bytes": 202448,
+   "n_segments": 70,
+   "skipped_invalid_utf8": 0,
+   "bits": 389655.7852421148,
+   "bpb": 1.9247203491371354,
+   "bpb_ci95": [
+    1.800501954242245,
+    2.071417331430133
+   ],
+   "split_bytes_per_token": 3.475323159322267,
+   "n_tokens": 58253,
+   "bytes_per_token": 3.475323159322267
+  },
+  "math.infiwebmath": {
+   "group": "math",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.0193,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-math.infiwebmath_000000.bytes.bin"
+   ],
+   "n_docs": 31,
+   "n_bytes": 201197,
+   "n_segments": 47,
+   "skipped_invalid_utf8": 0,
+   "bits": 371130.22464815713,
+   "bpb": 1.844611125653748,
+   "bpb_ci95": [
+    1.7478451578021623,
+    1.946452651594189
+   ],
+   "split_bytes_per_token": 3.4648515533512434,
+   "n_tokens": 58068,
+   "bytes_per_token": 3.4648515533512434
+  },
+  "ml.rus_Cyrl": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.rus_Cyrl_000000.bytes.bin"
+   ],
+   "n_docs": 18,
+   "n_bytes": 208637,
+   "n_segments": 39,
+   "skipped_invalid_utf8": 0,
+   "bits": 350049.6861386943,
+   "bpb": 1.6777929424727842,
+   "bpb_ci95": [
+    1.6285591493528044,
+    1.8228749406302438
+   ],
+   "split_bytes_per_token": 3.8336181393895963,
+   "n_tokens": 54423,
+   "bytes_per_token": 3.8336181393895963
+  },
+  "ml.cmn_Hani": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.cmn_Hani_000000.bytes.bin"
+   ],
+   "n_docs": 50,
+   "n_bytes": 252659,
+   "n_segments": 82,
+   "skipped_invalid_utf8": 0,
+   "bits": 846576.806654713,
+   "bpb": 3.350669505755635,
+   "bpb_ci95": [
+    3.1922588611247464,
+    3.606557363849296
+   ],
+   "split_bytes_per_token": 2.421821981097713,
+   "n_tokens": 104326,
+   "bytes_per_token": 2.421821981097713
+  },
+  "ml.deu_Latn": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.deu_Latn_000000.bytes.bin"
+   ],
+   "n_docs": 72,
+   "n_bytes": 200445,
+   "n_segments": 83,
+   "skipped_invalid_utf8": 0,
+   "bits": 542168.7998800329,
+   "bpb": 2.7048257620795373,
+   "bpb_ci95": [
+    2.6205727619620265,
+    2.7883263039519575
+   ],
+   "split_bytes_per_token": 2.920618962276522,
+   "n_tokens": 68631,
+   "bytes_per_token": 2.920618962276522
+  },
+  "ml.fra_Latn": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.fra_Latn_000000.bytes.bin"
+   ],
+   "n_docs": 10,
+   "n_bytes": 226229,
+   "n_segments": 42,
+   "skipped_invalid_utf8": 0,
+   "bits": 568756.1495642379,
+   "bpb": 2.514072685483461,
+   "bpb_ci95": [
+    2.2977272360494374,
+    2.533864464759779
+   ],
+   "split_bytes_per_token": 3.0488261771919896,
+   "n_tokens": 74202,
+   "bytes_per_token": 3.0488261771919896
+  },
+  "ml.spa_Latn": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.spa_Latn_000000.bytes.bin"
+   ],
+   "n_docs": 31,
+   "n_bytes": 203933,
+   "n_segments": 48,
+   "skipped_invalid_utf8": 0,
+   "bits": 475848.01665665954,
+   "bpb": 2.3333546638192915,
+   "bpb_ci95": [
+    2.2260966757332032,
+    2.4324455318831117
+   ],
+   "split_bytes_per_token": 3.2348751625900194,
+   "n_tokens": 63042,
+   "bytes_per_token": 3.2348751625900194
+  },
+  "ml.ita_Latn": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.ita_Latn_000000.bytes.bin"
+   ],
+   "n_docs": 43,
+   "n_bytes": 202587,
+   "n_segments": 62,
+   "skipped_invalid_utf8": 0,
+   "bits": 484981.2242668789,
+   "bpb": 2.3939405009545474,
+   "bpb_ci95": [
+    2.343209349335942,
+    2.4844084534863478
+   ],
+   "split_bytes_per_token": 3.145712023105231,
+   "n_tokens": 64401,
+   "bytes_per_token": 3.145712023105231
+  },
+  "ml.por_Latn": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.por_Latn_000000.bytes.bin"
+   ],
+   "n_docs": 89,
+   "n_bytes": 202121,
+   "n_segments": 98,
+   "skipped_invalid_utf8": 0,
+   "bits": 489102.5473448607,
+   "bpb": 2.419850225087253,
+   "bpb_ci95": [
+    2.2918090361871517,
+    2.56980931987008
+   ],
+   "split_bytes_per_token": 3.1479099177672563,
+   "n_tokens": 64208,
+   "bytes_per_token": 3.1479099177672563
+  },
+  "ml.arb_Arab": {
+   "group": "multilingual",
+   "lang": null,
+   "held_out": false,
+   "weight": 0.00625,
+   "paths": [
+    "/opt/hnet/data/mix_v1/bytes/mix_v1_val-ml.arb_Arab_000000.bytes.bin"
+   ],
+   "n_docs": 37,
+   "n_bytes": 201678,
+   "n_segments": 49,
+   "skipped_invalid_utf8": 0,
+   "bits": 370101.15619279485,
+   "bpb": 1.8351092146530352,
+   "bpb_ci95": [
+    1.7739342351075031,
+    1.886879099789407
+   ],
+   "split_bytes_per_token": 3.6122295457801976,
+   "n_tokens": 55832,
+   "bytes_per_token": 3.6122295457801976
+  }
+ },
+ "groups": {
+  "english": {
+   "sources": [
+    "en.fineweb_edu"
+   ],
+   "bits": 310841.48666866834,
+   "n_bytes": 202384,
+   "bpb": 1.535899511170193,
+   "bytes_per_token": 4.474453361632508
+  },
+  "all": {
+   "sources": [
+    "en.fineweb_edu",
+    "code.c",
+    "code.cpp",
+    "code.javascript",
+    "code.python",
+    "code.java",
+    "code.php",
+    "code.csharp",
+    "code.markdown",
+    "code.typescript",
+    "code.sql",
+    "code.go",
+    "code.ruby",
+    "code.shell",
+    "code.rust",
+    "math.finemath",
+    "math.infiwebmath",
+    "ml.rus_Cyrl",
+    "ml.cmn_Hani",
+    "ml.deu_Latn",
+    "ml.fra_Latn",
+    "ml.spa_Latn",
+    "ml.ita_Latn",
+    "ml.por_Latn",
+    "ml.arb_Arab"
+   ],
+   "bits": 10825415.995605843,
+   "n_bytes": 5470650,
+   "bpb": 1.9788171415838782,
+   "bytes_per_token": 3.3218509315865026
+  },
+  "code": {
+   "sources": [
+    "code.c",
+    "code.cpp",
+    "code.javascript",
+    "code.python",
+    "code.java",
+    "code.php",
+    "code.csharp",
+    "code.markdown",
+    "code.typescript",
+    "code.sql",
+    "code.go",
+    "code.ruby",
+    "code.shell",
+    "code.rust"
+   ],
+   "bits": 5626204.112348028,
+   "n_bytes": 3166332,
+   "bpb": 1.7768838240424656,
+   "bytes_per_token": 3.381926427848942
+  },
+  "code_held_out": {
+   "sources": [
+    "heldout.haskell",
+    "heldout.fortran",
+    "heldout.lua",
+    "heldout.julia",
+    "heldout.perl",
+    "heldout.scala",
+    "heldout.assembly",
+    "heldout.visual_basic",
+    "heldout.powershell",
+    "heldout.tex"
+   ],
+   "bits": 4888511.678944456,
+   "n_bytes": 2271467,
+   "bpb": 2.1521385426002033,
+   "bytes_per_token": 3.1225274763040507
+  },
+  "math": {
+   "sources": [
+    "math.finemath",
+    "math.infiwebmath"
+   ],
+   "bits": 760786.0098902719,
+   "n_bytes": 403645,
+   "bpb": 1.8847898769717746,
+   "bytes_per_token": 3.470095683496531
+  },
+  "multilingual": {
+   "sources": [
+    "ml.rus_Cyrl",
+    "ml.cmn_Hani",
+    "ml.deu_Latn",
+    "ml.fra_Latn",
+    "ml.spa_Latn",
+    "ml.ita_Latn",
+    "ml.por_Latn",
+    "ml.arb_Arab"
+   ],
+   "bits": 4127584.386698872,
+   "n_bytes": 1698289,
+   "bpb": 2.430436979041183,
+   "bytes_per_token": 3.0930563776602042
+  },
+  "mix": {
+   "sources": [
+    "code.c",
+    "code.cpp",
+    "code.csharp",
+    "code.go",
+    "code.java",
+    "code.javascript",
+    "code.markdown",
+    "code.php",
+    "code.python",
+    "code.ruby",
+    "code.rust",
+    "code.shell",
+    "code.sql",
+    "code.typescript",
+    "en.fineweb_edu",
+    "math.finemath",
+    "math.infiwebmath",
+    "ml.arb_Arab",
+    "ml.cmn_Hani",
+    "ml.deu_Latn",
+    "ml.fra_Latn",
+    "ml.ita_Latn",
+    "ml.por_Latn",
+    "ml.rus_Cyrl",
+    "ml.spa_Latn"
+   ],
+   "bpb": 1.613692228546405,
+   "weights": {
+    "en.fineweb_edu": 0.7000000000000002,
+    "code.c": 0.033316455696202556,
+    "code.cpp": 0.02531645569620254,
+    "code.javascript": 0.023594936708860773,
+    "code.python": 0.02318987341772153,
+    "code.java": 0.02298734177215191,
+    "code.php": 0.020253164556962036,
+    "code.csharp": 0.019443037974683556,
+    "code.markdown": 0.012962025316455702,
+    "code.typescript": 0.00587341772151899,
+    "code.sql": 0.004050632911392408,
+    "code.go": 0.0031392405063291155,
+    "code.ruby": 0.002734177215189875,
+    "code.shell": 0.0016202531645569628,
+    "code.rust": 0.0015189873417721525,
+    "math.finemath": 0.03070000000000001,
+    "math.infiwebmath": 0.019300000000000008,
+    "ml.rus_Cyrl": 0.006250000000000002,
+    "ml.cmn_Hani": 0.006250000000000002,
+    "ml.deu_Latn": 0.006250000000000002,
+    "ml.fra_Latn": 0.006250000000000002,
+    "ml.spa_Latn": 0.006250000000000002,
+    "ml.ita_Latn": 0.006250000000000002,
+    "ml.por_Latn": 0.006250000000000002,
+    "ml.arb_Arab": 0.006250000000000002
+   }
+  }
+ },
+ "seconds": 17.096624851226807,
+ "settings": {
+  "kind": "token",
+  "model_tokenizer": "dataset:mix_v1",
+  "split_tokenizer": "dataset:mix_v1",
+  "byte_seq_len": 8512,
+  "token_seq_len": 2048,
+  "max_bytes": 200000,
+  "batch_tokens": 8192
+ },
+ "run": {
+  "model": "ckpts/L04/bpe",
+  "checkpoint": "ckpts/L04/bpe",
+  "step": 728,
+  "kind": "token",
+  "bytes_seen": 394060002
+ }
+}

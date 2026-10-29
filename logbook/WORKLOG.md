@@ -1073,3 +1073,20 @@ EXP-028 interim (step 1500): gain 1.804 / 1.797, gain_cste 1.801 / 1.851, gain_r
 1.757 / 1.710 / 1.699 at the same step: 0.05-0.10 worse. The two `gain` seeds agree to 0.007 (the reference's
 spread is 0.06), so the objective does remove the lottery, but into a worse basin; tokenizer statistics of the
 finals will say which.
+
+### Per-source evaluation of the 1e16 ladder (L03, L04; `logbook/tables/per_source/1e16_*.json`; 200 kB per source)
+| group | L03 BPE | L03 H-Net | L03 H-Net ws | L04 BPE | L04 H-Net | L04 H-Net ws |
+|---|---|---|---|---|---|---|
+| English | 1.591 | 1.777 | 1.707 | 1.536 | 1.803 | 1.738 |
+| code (14 langs) | 2.067 | 2.246 | 2.221 | 1.777 | 2.259 | 2.322 |
+| held-out code (10 langs) | 2.618 | 2.706 | 2.709 | 2.152 | 2.706 | 2.767 |
+| math | 2.031 | 2.228 | 2.163 | 1.885 | 2.233 | 2.195 |
+| multilingual | 2.441 | 2.729 | 2.676 | 2.430 | 2.790 | 2.756 |
+- At L03 the H-Net's deficit is smallest on held-out code: +0.02 to +0.08 bpb for Lua, Haskell, Visual Basic, Scala,
+  Powershell, Perl (prior-free H-Net), and Go is at parity (-0.003, warm start), against +0.12 to +0.19 on English. This
+  is the direction the blog reports (the H-Net transfers to unseen code better than BPE does), at 1e16 and one seed.
+- At L04 the picture flips: BPE improves 0.29 bpb on code and 0.47 on held-out code going from L03 to L04 while
+  improving 0.055 on English, and the H-Nets do not improve at all. BPE's L04 gain on code is suspiciously large and
+  one seed; worth a second seed before drawing conclusions. The H-Net's realized compression on code is 2.8-3.8
+  bytes/position (BPE 2.3-4.3 bytes/token): it does not compress code more than BPE at this scale, unlike the blog.
+- Largest deficits: Chinese (+0.52), Russian (+0.36 to +0.45), assembly and SQL; smallest: Arabic (+0.14), English.
