@@ -1,0 +1,25 @@
+# EXP-016: chunk-level multi-byte prediction (dc.chunk_pred_k / chunk_pred_weight): a head on the innermost main
+# network's OUTPUT predicts the first k bytes of the next chunk, a direct next-chunk training signal that bypasses
+# the dechunker, residual sum and byte decoder (probes: the main network's output carries less next-byte
+# information than its input). Honest compute: end-of-chunk MLP router + quantile decisions (compression pinned).
+# Baselines: EXP-014 `quant` (no extra loss) and EXP-015 `q_aux` (byte-level aux head on the dechunked output).
+name: exp016_chunk_pred
+out_root: runs/search/exp016_chunk_pred
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp016_chunk_pred
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - model.dc.router=end_mlp
+  - model.dc.decision=quantile
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  labels: {cp4: "chunk-pred k=4, w=0.5", cp4_w1: "chunk-pred k=4, w=1.0",
+           cp4_pool: "chunk-pred k=4 + mean-pool chunk vectors", cp8_pool: "chunk-pred k=8 + mean-pool chunk vectors"}
+runs:
+  - {name: cp4,      config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.chunk_pred_k=4, model.dc.chunk_pred_weight=0.5]}
+  - {name: cp4_w1,   config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.chunk_pred_k=4, model.dc.chunk_pred_weight=1.0]}
+  - {name: cp4_pool, config: configs/runs/tiny_hnet2_2m.yaml,
+     set: [model.dc.chunk_pred_k=4, model.dc.chunk_pred_weight=0.5, model.dc.chunker=pool, "model.dc.chunker_kwargs={mode: mean}"]}
+  - {name: cp8_pool, config: configs/runs/tiny_hnet2_2m.yaml,
+     set: [model.dc.chunk_pred_k=8, model.dc.chunk_pred_weight=0.5, model.dc.chunker=pool, "model.dc.chunker_kwargs={mode: mean}"]}
