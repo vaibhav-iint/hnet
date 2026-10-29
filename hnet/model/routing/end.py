@@ -61,7 +61,7 @@ class EndLinearRouter(nn.Module):
 
     def forward(self, h: torch.Tensor, ctx: SeqCtx, **_) -> RouterOutput:
         logit = self.proj(h).squeeze(-1).float()
-        return router_output(torch.sigmoid(logit), ctx, self.boundary_semantics)
+        return router_output(torch.sigmoid(logit), ctx, self.boundary_semantics, logit=logit)
 
 
 @register("router", "end_mlp")
@@ -88,4 +88,4 @@ class EndMLPRouter(nn.Module):
 
     def forward(self, h: torch.Tensor, ctx: SeqCtx, **_) -> RouterOutput:
         logit = self.fc2(F.silu(self.fc1(h))).squeeze(-1).float()
-        return router_output(torch.sigmoid(logit), ctx, self.boundary_semantics)
+        return router_output(torch.sigmoid(logit), ctx, self.boundary_semantics, logit=logit)

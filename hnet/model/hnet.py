@@ -87,7 +87,8 @@ class HNet(nn.Module):
             from .routing.decide import DECISIONS, QuantileDecider
 
             assert dc["decision"] in DECISIONS, dc["decision"]
-            self.decider = QuantileDecider(dc["target_ratio"]) if dc["decision"] == "quantile" else None
+            self.decider = (QuantileDecider(dc["target_ratio"], **(dc["decision_kwargs"] or {}))
+                            if dc["decision"] == "quantile" else None)
             self.chunk_layer = registry.build("chunker", dc["chunker"], d, **(dc["chunker_kwargs"] or {}))
             need = getattr(self.chunk_layer, "requires_semantics", None)
             have = self.routing_module.boundary_semantics

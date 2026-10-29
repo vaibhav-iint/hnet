@@ -44,6 +44,7 @@ class RouterOutput:
     extra: dict = field(default_factory=dict)  # detached diagnostics filled in by the owning stage
     main_out: Optional[torch.Tensor] = None  # the stage's dechunked main-network output (with grad), [T, D]
     inner_out: Optional[torch.Tensor] = None  # the stage's main-network output before dechunking (with grad), [M, D]
+    logit: Optional[torch.Tensor] = None  # fp32 [T] raw router score (log-odds of p) when the router has one
 
     @property
     def p(self) -> torch.Tensor:
@@ -51,15 +52,18 @@ class RouterOutput:
         return self.boundary_prob[:, 1]
 
 
-def router_output(p: torch.Tensor, ctx: SeqCtx, semantics: str) -> RouterOutput:
+def router_output(p: torch.Tensor, ctx: SeqCtx, semantics: str, logit: Optional[torch.Tensor] = None,
+                  mask: Optional[torch.Tensor] = None) -> RouterOutput:
     """Turn boundary probabilities p [T] into a ``RouterOutput``; p is forced to 1 at the first position of every
-    segment (that position is always selected)."""
+    segment (that position is always selected). ``logit`` is the router's raw score (kept for rank-based decisions,
+    which must not work on a saturated p); ``mask`` overrides the ``p > 0.5`` rule with an explicit selection."""
     assert semantics in SEMANTICS, semantics
-    p = torch.where(ctx.position_ids == 0, torch.ones_like(p), p.float())
+    forced = ctx.position_ids == 0
+    p = torch.where(forced, torch.ones_like(p), p.float())
     prob = torch.stack((1 - p, p), dim=-1)
-    mask = prob[:, 1] > prob[:, 0]
+    mask = (prob[:, 1] > prob[:, 0]) if mask is None else (mask | forced)
     selected = torch.where(mask, prob[:, 1], prob[:, 0]).unsqueeze(-1)
-    return RouterOutput(prob, mask, selected, semantics)
+    return RouterOutput(prob, mask, selected, semantics, logit=logit)
 
 
 def ratio_init_bias(target_ratio) -> float:
