@@ -1,0 +1,934 @@
+{
+ "bpe_checkpoint": "runs/gcp/exp006_close_gap_tiny/bpe_s0",
+ "docs": 47,
+ "models": {
+  "EXP-024 prior s0 (word, warm start)": {
+   "hnet_bpb_same_text": 1.62,
+   "bpe_bpb_same_text": 1.6178,
+   "by_kind": {
+    "ALL": {
+     "tokens": 17598,
+     "share_bytes": 1.0,
+     "bpe_bits_per_byte": 1.6178,
+     "hnet_bits_per_byte": 1.62,
+     "gap_bits_per_byte": 0.0022,
+     "share_of_total_gap": 1.0,
+     "hnet_first_byte_bits": 1.337,
+     "hnet_rest_bits_per_byte": 1.6989,
+     "bpe_bits_per_token": 7.424
+    },
+    "space+word": {
+     "tokens": 12119,
+     "share_bytes": 0.8561,
+     "bpe_bits_per_byte": 1.4204,
+     "hnet_bits_per_byte": 1.4318,
+     "gap_bits_per_byte": 0.0114,
+     "share_of_total_gap": 4.5339,
+     "hnet_first_byte_bits": 0.402,
+     "hnet_rest_bits_per_byte": 1.6508,
+     "bpe_bits_per_token": 8.104
+    },
+    "word_piece": {
+     "tokens": 2079,
+     "share_bytes": 0.085,
+     "bpe_bits_per_byte": 2.6367,
+     "hnet_bits_per_byte": 2.5037,
+     "gap_bits_per_byte": -0.133,
+     "share_of_total_gap": -5.2572,
+     "hnet_first_byte_bits": 4.133,
+     "hnet_rest_bits_per_byte": 1.7961,
+     "bpe_bits_per_token": 8.709
+    },
+    "punct/other": {
+     "tokens": 2558,
+     "share_bytes": 0.0399,
+     "bpe_bits_per_byte": 3.026,
+     "hnet_bits_per_byte": 3.1439,
+     "gap_bits_per_byte": 0.118,
+     "share_of_total_gap": 2.1864,
+     "hnet_first_byte_bits": 3.153,
+     "hnet_rest_bits_per_byte": 3.1089,
+     "bpe_bits_per_token": 3.809
+    },
+    "number": {
+     "tokens": 379,
+     "share_bytes": 0.0132,
+     "bpe_bits_per_byte": 3.2917,
+     "hnet_bits_per_byte": 3.0824,
+     "gap_bits_per_byte": -0.2094,
+     "share_of_total_gap": -1.2884,
+     "hnet_first_byte_bits": 2.051,
+     "hnet_rest_bits_per_byte": 3.6491,
+     "bpe_bits_per_token": 9.285
+    },
+    "whitespace/newline": {
+     "tokens": 463,
+     "share_bytes": 0.0057,
+     "bpe_bits_per_byte": 2.3205,
+     "hnet_bits_per_byte": 2.6302,
+     "gap_bits_per_byte": 0.3097,
+     "share_of_total_gap": 0.8254,
+     "hnet_first_byte_bits": 2.63,
+     "hnet_rest_bits_per_byte": 0.0,
+     "bpe_bits_per_token": 2.321
+    }
+   },
+   "gap_by_token_len": {
+    "1": {
+     "gap_bits_per_byte": -0.0131,
+     "share_bytes": 0.035
+    },
+    "2": {
+     "gap_bits_per_byte": -0.5152,
+     "share_bytes": 0.0377
+    },
+    "3": {
+     "gap_bits_per_byte": -0.1957,
+     "share_bytes": 0.1026
+    },
+    "4": {
+     "gap_bits_per_byte": -0.0599,
+     "share_bytes": 0.1362
+    },
+    "5": {
+     "gap_bits_per_byte": 0.0093,
+     "share_bytes": 0.134
+    },
+    "6": {
+     "gap_bits_per_byte": 0.0785,
+     "share_bytes": 0.1132
+    },
+    "7": {
+     "gap_bits_per_byte": 0.1048,
+     "share_bytes": 0.0999
+    },
+    "8": {
+     "gap_bits_per_byte": 0.087,
+     "share_bytes": 0.3415
+    }
+   },
+   "space_word_pos_bits": {
+    "space": 0.4016,
+    "letter1": 3.7876,
+    "letter2": 1.7648,
+    "letter3": 1.5437,
+    "letter4": 0.9371,
+    "letter5": 0.5296,
+    "letter6": 0.3513,
+    "letter7+": 0.2575
+   }
+  },
+  "EXP-023 vp_ng s2 (word)": {
+   "hnet_bpb_same_text": 1.6436,
+   "bpe_bpb_same_text": 1.6178,
+   "by_kind": {
+    "ALL": {
+     "tokens": 17598,
+     "share_bytes": 1.0,
+     "bpe_bits_per_byte": 1.6178,
+     "hnet_bits_per_byte": 1.6436,
+     "gap_bits_per_byte": 0.0258,
+     "share_of_total_gap": 1.0,
+     "hnet_first_byte_bits": 1.348,
+     "hnet_rest_bits_per_byte": 1.7261,
+     "bpe_bits_per_token": 7.424
+    },
+    "space+word": {
+     "tokens": 12119,
+     "share_bytes": 0.8561,
+     "bpe_bits_per_byte": 1.4204,
+     "hnet_bits_per_byte": 1.4564,
+     "gap_bits_per_byte": 0.0359,
+     "share_of_total_gap": 1.1936,
+     "hnet_first_byte_bits": 0.415,
+     "hnet_rest_bits_per_byte": 1.6778,
+     "bpe_bits_per_token": 8.104
+    },
+    "word_piece": {
+     "tokens": 2079,
+     "share_bytes": 0.085,
+     "bpe_bits_per_byte": 2.6367,
+     "hnet_bits_per_byte": 2.5068,
+     "gap_bits_per_byte": -0.1298,
+     "share_of_total_gap": -0.4282,
+     "hnet_first_byte_bits": 4.129,
+     "hnet_rest_bits_per_byte": 1.8026,
+     "bpe_bits_per_token": 8.709
+    },
+    "punct/other": {
+     "tokens": 2558,
+     "share_bytes": 0.0399,
+     "bpe_bits_per_byte": 3.026,
+     "hnet_bits_per_byte": 3.1803,
+     "gap_bits_per_byte": 0.1543,
+     "share_of_total_gap": 0.2386,
+     "hnet_first_byte_bits": 3.165,
+     "hnet_rest_bits_per_byte": 3.2391,
+     "bpe_bits_per_token": 3.809
+    },
+    "number": {
+     "tokens": 379,
+     "share_bytes": 0.0132,
+     "bpe_bits_per_byte": 3.2917,
+     "hnet_bits_per_byte": 3.1307,
+     "gap_bits_per_byte": -0.1611,
+     "share_of_total_gap": -0.0827,
+     "hnet_first_byte_bits": 2.031,
+     "hnet_rest_bits_per_byte": 3.7349,
+     "bpe_bits_per_token": 9.285
+    },
+    "whitespace/newline": {
+     "tokens": 463,
+     "share_bytes": 0.0057,
+     "bpe_bits_per_byte": 2.3205,
+     "hnet_bits_per_byte": 2.6743,
+     "gap_bits_per_byte": 0.3537,
+     "share_of_total_gap": 0.0787,
+     "hnet_first_byte_bits": 2.674,
+     "hnet_rest_bits_per_byte": 0.0,
+     "bpe_bits_per_token": 2.321
+    }
+   },
+   "gap_by_token_len": {
+    "1": {
+     "gap_bits_per_byte": -0.0058,
+     "share_bytes": 0.035
+    },
+    "2": {
+     "gap_bits_per_byte": -0.4571,
+     "share_bytes": 0.0377
+    },
+    "3": {
+     "gap_bits_per_byte": -0.1686,
+     "share_bytes": 0.1026
+    },
+    "4": {
+     "gap_bits_per_byte": -0.0501,
+     "share_bytes": 0.1362
+    },
+    "5": {
+     "gap_bits_per_byte": 0.0308,
+     "share_bytes": 0.134
+    },
+    "6": {
+     "gap_bits_per_byte": 0.1207,
+     "share_bytes": 0.1132
+    },
+    "7": {
+     "gap_bits_per_byte": 0.1246,
+     "share_bytes": 0.0999
+    },
+    "8": {
+     "gap_bits_per_byte": 0.1087,
+     "share_bytes": 0.3415
+    }
+   },
+   "space_word_pos_bits": {
+    "space": 0.4148,
+    "letter1": 3.813,
+    "letter2": 1.7962,
+    "letter3": 1.5917,
+    "letter4": 0.9802,
+    "letter5": 0.5443,
+    "letter6": 0.3582,
+    "letter7+": 0.2557
+   }
+  },
+  "EXP-018 h1_vocab_pred s0 (word)": {
+   "hnet_bpb_same_text": 1.706,
+   "bpe_bpb_same_text": 1.6178,
+   "by_kind": {
+    "ALL": {
+     "tokens": 17598,
+     "share_bytes": 1.0,
+     "bpe_bits_per_byte": 1.6178,
+     "hnet_bits_per_byte": 1.706,
+     "gap_bits_per_byte": 0.0882,
+     "share_of_total_gap": 1.0,
+     "hnet_first_byte_bits": 1.449,
+     "hnet_rest_bits_per_byte": 1.7776,
+     "bpe_bits_per_token": 7.424
+    },
+    "space+word": {
+     "tokens": 12119,
+     "share_bytes": 0.8561,
+     "bpe_bits_per_byte": 1.4204,
+     "hnet_bits_per_byte": 1.4951,
+     "gap_bits_per_byte": 0.0746,
+     "share_of_total_gap": 0.7249,
+     "hnet_first_byte_bits": 0.447,
+     "hnet_rest_bits_per_byte": 1.7178,
+     "bpe_bits_per_token": 8.104
+    },
+    "word_piece": {
+     "tokens": 2079,
+     "share_bytes": 0.085,
+     "bpe_bits_per_byte": 2.6367,
+     "hnet_bits_per_byte": 2.6988,
+     "gap_bits_per_byte": 0.0621,
+     "share_of_total_gap": 0.0599,
+     "hnet_first_byte_bits": 4.353,
+     "hnet_rest_bits_per_byte": 1.9807,
+     "bpe_bits_per_token": 8.709
+    },
+    "punct/other": {
+     "tokens": 2558,
+     "share_bytes": 0.0399,
+     "bpe_bits_per_byte": 3.026,
+     "hnet_bits_per_byte": 3.3942,
+     "gap_bits_per_byte": 0.3682,
+     "share_of_total_gap": 0.1665,
+     "hnet_first_byte_bits": 3.388,
+     "hnet_rest_bits_per_byte": 3.4197,
+     "bpe_bits_per_token": 3.809
+    },
+    "number": {
+     "tokens": 379,
+     "share_bytes": 0.0132,
+     "bpe_bits_per_byte": 3.2917,
+     "hnet_bits_per_byte": 3.1653,
+     "gap_bits_per_byte": -0.1264,
+     "share_of_total_gap": -0.019,
+     "hnet_first_byte_bits": 2.122,
+     "hnet_rest_bits_per_byte": 3.7382,
+     "bpe_bits_per_token": 9.285
+    },
+    "whitespace/newline": {
+     "tokens": 463,
+     "share_bytes": 0.0057,
+     "bpe_bits_per_byte": 2.3205,
+     "hnet_bits_per_byte": 3.3591,
+     "gap_bits_per_byte": 1.0386,
+     "share_of_total_gap": 0.0675,
+     "hnet_first_byte_bits": 3.359,
+     "hnet_rest_bits_per_byte": 0.0,
+     "bpe_bits_per_token": 2.321
+    }
+   },
+   "gap_by_token_len": {
+    "1": {
+     "gap_bits_per_byte": 0.2655,
+     "share_bytes": 0.035
+    },
+    "2": {
+     "gap_bits_per_byte": -0.2717,
+     "share_bytes": 0.0377
+    },
+    "3": {
+     "gap_bits_per_byte": -0.1,
+     "share_bytes": 0.1026
+    },
+    "4": {
+     "gap_bits_per_byte": -0.0126,
+     "share_bytes": 0.1362
+    },
+    "5": {
+     "gap_bits_per_byte": 0.0573,
+     "share_bytes": 0.134
+    },
+    "6": {
+     "gap_bits_per_byte": 0.1684,
+     "share_bytes": 0.1132
+    },
+    "7": {
+     "gap_bits_per_byte": 0.1728,
+     "share_bytes": 0.0999
+    },
+    "8": {
+     "gap_bits_per_byte": 0.1673,
+     "share_bytes": 0.3415
+    }
+   },
+   "space_word_pos_bits": {
+    "space": 0.4473,
+    "letter1": 3.8294,
+    "letter2": 1.8364,
+    "letter3": 1.5928,
+    "letter4": 1.0155,
+    "letter5": 0.6358,
+    "letter6": 0.4364,
+    "letter7+": 0.3328
+   }
+  },
+  "EXP-018 h1_vocab_pred s1 (suffix)": {
+   "hnet_bpb_same_text": 1.8508,
+   "bpe_bpb_same_text": 1.6178,
+   "by_kind": {
+    "ALL": {
+     "tokens": 17598,
+     "share_bytes": 1.0,
+     "bpe_bits_per_byte": 1.6178,
+     "hnet_bits_per_byte": 1.8508,
+     "gap_bits_per_byte": 0.233,
+     "share_of_total_gap": 1.0,
+     "hnet_first_byte_bits": 1.5,
+     "hnet_rest_bits_per_byte": 1.9485,
+     "bpe_bits_per_token": 7.424
+    },
+    "space+word": {
+     "tokens": 12119,
+     "share_bytes": 0.8561,
+     "bpe_bits_per_byte": 1.4204,
+     "hnet_bits_per_byte": 1.6417,
+     "gap_bits_per_byte": 0.2213,
+     "share_of_total_gap": 0.8132,
+     "hnet_first_byte_bits": 0.473,
+     "hnet_rest_bits_per_byte": 1.8901,
+     "bpe_bits_per_token": 8.104
+    },
+    "word_piece": {
+     "tokens": 2079,
+     "share_bytes": 0.085,
+     "bpe_bits_per_byte": 2.6367,
+     "hnet_bits_per_byte": 2.8259,
+     "gap_bits_per_byte": 0.1892,
+     "share_of_total_gap": 0.0691,
+     "hnet_first_byte_bits": 4.483,
+     "hnet_rest_bits_per_byte": 2.1061,
+     "bpe_bits_per_token": 8.709
+    },
+    "punct/other": {
+     "tokens": 2558,
+     "share_bytes": 0.0399,
+     "bpe_bits_per_byte": 3.026,
+     "hnet_bits_per_byte": 3.6106,
+     "gap_bits_per_byte": 0.5847,
+     "share_of_total_gap": 0.1001,
+     "hnet_first_byte_bits": 3.611,
+     "hnet_rest_bits_per_byte": 3.6112,
+     "bpe_bits_per_token": 3.809
+    },
+    "number": {
+     "tokens": 379,
+     "share_bytes": 0.0132,
+     "bpe_bits_per_byte": 3.2917,
+     "hnet_bits_per_byte": 3.4119,
+     "gap_bits_per_byte": 0.1202,
+     "share_of_total_gap": 0.0068,
+     "hnet_first_byte_bits": 2.188,
+     "hnet_rest_bits_per_byte": 4.0844,
+     "bpe_bits_per_token": 9.285
+    },
+    "whitespace/newline": {
+     "tokens": 463,
+     "share_bytes": 0.0057,
+     "bpe_bits_per_byte": 2.3205,
+     "hnet_bits_per_byte": 2.761,
+     "gap_bits_per_byte": 0.4405,
+     "share_of_total_gap": 0.0108,
+     "hnet_first_byte_bits": 2.761,
+     "hnet_rest_bits_per_byte": 0.0,
+     "bpe_bits_per_token": 2.321
+    }
+   },
+   "gap_by_token_len": {
+    "1": {
+     "gap_bits_per_byte": 0.4008,
+     "share_bytes": 0.035
+    },
+    "2": {
+     "gap_bits_per_byte": -0.1036,
+     "share_bytes": 0.0377
+    },
+    "3": {
+     "gap_bits_per_byte": 0.1139,
+     "share_bytes": 0.1026
+    },
+    "4": {
+     "gap_bits_per_byte": 0.1411,
+     "share_bytes": 0.1362
+    },
+    "5": {
+     "gap_bits_per_byte": 0.2287,
+     "share_bytes": 0.134
+    },
+    "6": {
+     "gap_bits_per_byte": 0.3098,
+     "share_bytes": 0.1132
+    },
+    "7": {
+     "gap_bits_per_byte": 0.3173,
+     "share_bytes": 0.0999
+    },
+    "8": {
+     "gap_bits_per_byte": 0.277,
+     "share_bytes": 0.3415
+    }
+   },
+   "space_word_pos_bits": {
+    "space": 0.4732,
+    "letter1": 4.0626,
+    "letter2": 2.0177,
+    "letter3": 1.8376,
+    "letter4": 1.1855,
+    "letter5": 0.7372,
+    "letter6": 0.5139,
+    "letter7+": 0.3976
+   }
+  },
+  "EXP-023 vp s1 (suffix)": {
+   "hnet_bpb_same_text": 1.8481,
+   "bpe_bpb_same_text": 1.6178,
+   "by_kind": {
+    "ALL": {
+     "tokens": 17598,
+     "share_bytes": 1.0,
+     "bpe_bits_per_byte": 1.6178,
+     "hnet_bits_per_byte": 1.8481,
+     "gap_bits_per_byte": 0.2303,
+     "share_of_total_gap": 1.0,
+     "hnet_first_byte_bits": 1.526,
+     "hnet_rest_bits_per_byte": 1.9379,
+     "bpe_bits_per_token": 7.424
+    },
+    "space+word": {
+     "tokens": 12119,
+     "share_bytes": 0.8561,
+     "bpe_bits_per_byte": 1.4204,
+     "hnet_bits_per_byte": 1.6311,
+     "gap_bits_per_byte": 0.2106,
+     "share_of_total_gap": 0.7831,
+     "hnet_first_byte_bits": 0.474,
+     "hnet_rest_bits_per_byte": 1.877,
+     "bpe_bits_per_token": 8.104
+    },
+    "word_piece": {
+     "tokens": 2079,
+     "share_bytes": 0.085,
+     "bpe_bits_per_byte": 2.6367,
+     "hnet_bits_per_byte": 2.8482,
+     "gap_bits_per_byte": 0.2116,
+     "share_of_total_gap": 0.0781,
+     "hnet_first_byte_bits": 4.533,
+     "hnet_rest_bits_per_byte": 2.1169,
+     "bpe_bits_per_token": 8.709
+    },
+    "punct/other": {
+     "tokens": 2558,
+     "share_bytes": 0.0399,
+     "bpe_bits_per_byte": 3.026,
+     "hnet_bits_per_byte": 3.6435,
+     "gap_bits_per_byte": 0.6175,
+     "share_of_total_gap": 0.1069,
+     "hnet_first_byte_bits": 3.621,
+     "hnet_rest_bits_per_byte": 3.7317,
+     "bpe_bits_per_token": 3.809
+    },
+    "number": {
+     "tokens": 379,
+     "share_bytes": 0.0132,
+     "bpe_bits_per_byte": 3.2917,
+     "hnet_bits_per_byte": 3.3761,
+     "gap_bits_per_byte": 0.0844,
+     "share_of_total_gap": 0.0049,
+     "hnet_first_byte_bits": 2.219,
+     "hnet_rest_bits_per_byte": 4.0118,
+     "bpe_bits_per_token": 9.285
+    },
+    "whitespace/newline": {
+     "tokens": 463,
+     "share_bytes": 0.0057,
+     "bpe_bits_per_byte": 2.3205,
+     "hnet_bits_per_byte": 3.4048,
+     "gap_bits_per_byte": 1.0842,
+     "share_of_total_gap": 0.027,
+     "hnet_first_byte_bits": 3.405,
+     "hnet_rest_bits_per_byte": 0.0,
+     "bpe_bits_per_token": 2.321
+    }
+   },
+   "gap_by_token_len": {
+    "1": {
+     "gap_bits_per_byte": 0.496,
+     "share_bytes": 0.035
+    },
+    "2": {
+     "gap_bits_per_byte": -0.0535,
+     "share_bytes": 0.0377
+    },
+    "3": {
+     "gap_bits_per_byte": 0.1044,
+     "share_bytes": 0.1026
+    },
+    "4": {
+     "gap_bits_per_byte": 0.1363,
+     "share_bytes": 0.1362
+    },
+    "5": {
+     "gap_bits_per_byte": 0.2184,
+     "share_bytes": 0.134
+    },
+    "6": {
+     "gap_bits_per_byte": 0.3124,
+     "share_bytes": 0.1132
+    },
+    "7": {
+     "gap_bits_per_byte": 0.3107,
+     "share_bytes": 0.0999
+    },
+    "8": {
+     "gap_bits_per_byte": 0.2636,
+     "share_bytes": 0.3415
+    }
+   },
+   "space_word_pos_bits": {
+    "space": 0.4742,
+    "letter1": 4.0366,
+    "letter2": 2.0186,
+    "letter3": 1.8129,
+    "letter4": 1.1703,
+    "letter5": 0.7192,
+    "letter6": 0.515,
+    "letter7+": 0.3969
+   }
+  },
+  "EXP-018 h1_quant s0 (no vocab)": {
+   "hnet_bpb_same_text": 1.8497,
+   "bpe_bpb_same_text": 1.6178,
+   "by_kind": {
+    "ALL": {
+     "tokens": 17598,
+     "share_bytes": 1.0,
+     "bpe_bits_per_byte": 1.6178,
+     "hnet_bits_per_byte": 1.8497,
+     "gap_bits_per_byte": 0.2319,
+     "share_of_total_gap": 1.0,
+     "hnet_first_byte_bits": 1.507,
+     "hnet_rest_bits_per_byte": 1.9452,
+     "bpe_bits_per_token": 7.424
+    },
+    "space+word": {
+     "tokens": 12119,
+     "share_bytes": 0.8561,
+     "bpe_bits_per_byte": 1.4204,
+     "hnet_bits_per_byte": 1.6408,
+     "gap_bits_per_byte": 0.2204,
+     "share_of_total_gap": 0.8136,
+     "hnet_first_byte_bits": 0.479,
+     "hnet_rest_bits_per_byte": 1.8877,
+     "bpe_bits_per_token": 8.104
+    },
+    "word_piece": {
+     "tokens": 2079,
+     "share_bytes": 0.085,
+     "bpe_bits_per_byte": 2.6367,
+     "hnet_bits_per_byte": 2.7802,
+     "gap_bits_per_byte": 0.1436,
+     "share_of_total_gap": 0.0526,
+     "hnet_first_byte_bits": 4.42,
+     "hnet_rest_bits_per_byte": 2.0682,
+     "bpe_bits_per_token": 8.709
+    },
+    "punct/other": {
+     "tokens": 2558,
+     "share_bytes": 0.0399,
+     "bpe_bits_per_byte": 3.026,
+     "hnet_bits_per_byte": 3.6703,
+     "gap_bits_per_byte": 0.6443,
+     "share_of_total_gap": 0.1108,
+     "hnet_first_byte_bits": 3.665,
+     "hnet_rest_bits_per_byte": 3.6923,
+     "bpe_bits_per_token": 3.809
+    },
+    "number": {
+     "tokens": 379,
+     "share_bytes": 0.0132,
+     "bpe_bits_per_byte": 3.2917,
+     "hnet_bits_per_byte": 3.4959,
+     "gap_bits_per_byte": 0.2041,
+     "share_of_total_gap": 0.0117,
+     "hnet_first_byte_bits": 2.277,
+     "hnet_rest_bits_per_byte": 4.1653,
+     "bpe_bits_per_token": 9.285
+    },
+    "whitespace/newline": {
+     "tokens": 463,
+     "share_bytes": 0.0057,
+     "bpe_bits_per_byte": 2.3205,
+     "hnet_bits_per_byte": 2.7802,
+     "gap_bits_per_byte": 0.4596,
+     "share_of_total_gap": 0.0114,
+     "hnet_first_byte_bits": 2.78,
+     "hnet_rest_bits_per_byte": 0.0,
+     "bpe_bits_per_token": 2.321
+    }
+   },
+   "gap_by_token_len": {
+    "1": {
+     "gap_bits_per_byte": 0.3978,
+     "share_bytes": 0.035
+    },
+    "2": {
+     "gap_bits_per_byte": -0.0509,
+     "share_bytes": 0.0377
+    },
+    "3": {
+     "gap_bits_per_byte": 0.1074,
+     "share_bytes": 0.1026
+    },
+    "4": {
+     "gap_bits_per_byte": 0.146,
+     "share_bytes": 0.1362
+    },
+    "5": {
+     "gap_bits_per_byte": 0.2293,
+     "share_bytes": 0.134
+    },
+    "6": {
+     "gap_bits_per_byte": 0.3084,
+     "share_bytes": 0.1132
+    },
+    "7": {
+     "gap_bits_per_byte": 0.3222,
+     "share_bytes": 0.0999
+    },
+    "8": {
+     "gap_bits_per_byte": 0.267,
+     "share_bytes": 0.3415
+    }
+   },
+   "space_word_pos_bits": {
+    "space": 0.4791,
+    "letter1": 4.0653,
+    "letter2": 2.0298,
+    "letter3": 1.8586,
+    "letter4": 1.1703,
+    "letter5": 0.6971,
+    "letter6": 0.4954,
+    "letter7+": 0.3814
+   }
+  },
+  "EXP-006 hnet1 s0 (1-stage, threshold)": {
+   "hnet_bpb_same_text": 1.8373,
+   "bpe_bpb_same_text": 1.6178,
+   "by_kind": {
+    "ALL": {
+     "tokens": 17598,
+     "share_bytes": 1.0,
+     "bpe_bits_per_byte": 1.6178,
+     "hnet_bits_per_byte": 1.8373,
+     "gap_bits_per_byte": 0.2195,
+     "share_of_total_gap": 1.0,
+     "hnet_first_byte_bits": 1.507,
+     "hnet_rest_bits_per_byte": 1.9294,
+     "bpe_bits_per_token": 7.424
+    },
+    "space+word": {
+     "tokens": 12119,
+     "share_bytes": 0.8561,
+     "bpe_bits_per_byte": 1.4204,
+     "hnet_bits_per_byte": 1.6299,
+     "gap_bits_per_byte": 0.2094,
+     "share_of_total_gap": 0.8171,
+     "hnet_first_byte_bits": 0.476,
+     "hnet_rest_bits_per_byte": 1.8752,
+     "bpe_bits_per_token": 8.104
+    },
+    "word_piece": {
+     "tokens": 2079,
+     "share_bytes": 0.085,
+     "bpe_bits_per_byte": 2.6367,
+     "hnet_bits_per_byte": 2.7873,
+     "gap_bits_per_byte": 0.1507,
+     "share_of_total_gap": 0.0584,
+     "hnet_first_byte_bits": 4.463,
+     "hnet_rest_bits_per_byte": 2.0595,
+     "bpe_bits_per_token": 8.709
+    },
+    "punct/other": {
+     "tokens": 2558,
+     "share_bytes": 0.0399,
+     "bpe_bits_per_byte": 3.026,
+     "hnet_bits_per_byte": 3.5987,
+     "gap_bits_per_byte": 0.5727,
+     "share_of_total_gap": 0.104,
+     "hnet_first_byte_bits": 3.632,
+     "hnet_rest_bits_per_byte": 3.4685,
+     "bpe_bits_per_token": 3.809
+    },
+    "number": {
+     "tokens": 379,
+     "share_bytes": 0.0132,
+     "bpe_bits_per_byte": 3.2917,
+     "hnet_bits_per_byte": 3.3736,
+     "gap_bits_per_byte": 0.0818,
+     "share_of_total_gap": 0.0049,
+     "hnet_first_byte_bits": 2.182,
+     "hnet_rest_bits_per_byte": 4.0279,
+     "bpe_bits_per_token": 9.285
+    },
+    "whitespace/newline": {
+     "tokens": 463,
+     "share_bytes": 0.0057,
+     "bpe_bits_per_byte": 2.3205,
+     "hnet_bits_per_byte": 2.9166,
+     "gap_bits_per_byte": 0.5961,
+     "share_of_total_gap": 0.0156,
+     "hnet_first_byte_bits": 2.917,
+     "hnet_rest_bits_per_byte": 0.0,
+     "bpe_bits_per_token": 2.321
+    }
+   },
+   "gap_by_token_len": {
+    "1": {
+     "gap_bits_per_byte": 0.4202,
+     "share_bytes": 0.035
+    },
+    "2": {
+     "gap_bits_per_byte": -0.1402,
+     "share_bytes": 0.0377
+    },
+    "3": {
+     "gap_bits_per_byte": 0.1056,
+     "share_bytes": 0.1026
+    },
+    "4": {
+     "gap_bits_per_byte": 0.1315,
+     "share_bytes": 0.1362
+    },
+    "5": {
+     "gap_bits_per_byte": 0.2124,
+     "share_bytes": 0.134
+    },
+    "6": {
+     "gap_bits_per_byte": 0.2987,
+     "share_bytes": 0.1132
+    },
+    "7": {
+     "gap_bits_per_byte": 0.3057,
+     "share_bytes": 0.0999
+    },
+    "8": {
+     "gap_bits_per_byte": 0.2592,
+     "share_bytes": 0.3415
+    }
+   },
+   "space_word_pos_bits": {
+    "space": 0.4758,
+    "letter1": 4.0505,
+    "letter2": 2.0187,
+    "letter3": 1.8256,
+    "letter4": 1.1674,
+    "letter5": 0.6823,
+    "letter6": 0.4963,
+    "letter7+": 0.3824
+   }
+  },
+  "EXP-002 paper s0 (2-stage)": {
+   "hnet_bpb_same_text": 1.7794,
+   "bpe_bpb_same_text": 1.6178,
+   "by_kind": {
+    "ALL": {
+     "tokens": 17598,
+     "share_bytes": 1.0,
+     "bpe_bits_per_byte": 1.6178,
+     "hnet_bits_per_byte": 1.7794,
+     "gap_bits_per_byte": 0.1616,
+     "share_of_total_gap": 1.0,
+     "hnet_first_byte_bits": 1.451,
+     "hnet_rest_bits_per_byte": 1.8708,
+     "bpe_bits_per_token": 7.424
+    },
+    "space+word": {
+     "tokens": 12119,
+     "share_bytes": 0.8561,
+     "bpe_bits_per_byte": 1.4204,
+     "hnet_bits_per_byte": 1.576,
+     "gap_bits_per_byte": 0.1555,
+     "share_of_total_gap": 0.8241,
+     "hnet_first_byte_bits": 0.454,
+     "hnet_rest_bits_per_byte": 1.8145,
+     "bpe_bits_per_token": 8.104
+    },
+    "word_piece": {
+     "tokens": 2079,
+     "share_bytes": 0.085,
+     "bpe_bits_per_byte": 2.6367,
+     "hnet_bits_per_byte": 2.741,
+     "gap_bits_per_byte": 0.1044,
+     "share_of_total_gap": 0.0549,
+     "hnet_first_byte_bits": 4.397,
+     "hnet_rest_bits_per_byte": 2.0222,
+     "bpe_bits_per_token": 8.709
+    },
+    "punct/other": {
+     "tokens": 2558,
+     "share_bytes": 0.0399,
+     "bpe_bits_per_byte": 3.026,
+     "hnet_bits_per_byte": 3.4563,
+     "gap_bits_per_byte": 0.4303,
+     "share_of_total_gap": 0.1062,
+     "hnet_first_byte_bits": 3.457,
+     "hnet_rest_bits_per_byte": 3.4535,
+     "bpe_bits_per_token": 3.809
+    },
+    "number": {
+     "tokens": 379,
+     "share_bytes": 0.0132,
+     "bpe_bits_per_byte": 3.2917,
+     "hnet_bits_per_byte": 3.2988,
+     "gap_bits_per_byte": 0.0071,
+     "share_of_total_gap": 0.0006,
+     "hnet_first_byte_bits": 2.097,
+     "hnet_rest_bits_per_byte": 3.9591,
+     "bpe_bits_per_token": 9.285
+    },
+    "whitespace/newline": {
+     "tokens": 463,
+     "share_bytes": 0.0057,
+     "bpe_bits_per_byte": 2.3205,
+     "hnet_bits_per_byte": 2.7213,
+     "gap_bits_per_byte": 0.4008,
+     "share_of_total_gap": 0.0142,
+     "hnet_first_byte_bits": 2.721,
+     "hnet_rest_bits_per_byte": 0.0,
+     "bpe_bits_per_token": 2.321
+    }
+   },
+   "gap_by_token_len": {
+    "1": {
+     "gap_bits_per_byte": 0.2296,
+     "share_bytes": 0.035
+    },
+    "2": {
+     "gap_bits_per_byte": -0.1977,
+     "share_bytes": 0.0377
+    },
+    "3": {
+     "gap_bits_per_byte": 0.0234,
+     "share_bytes": 0.1026
+    },
+    "4": {
+     "gap_bits_per_byte": 0.0813,
+     "share_bytes": 0.1362
+    },
+    "5": {
+     "gap_bits_per_byte": 0.1579,
+     "share_bytes": 0.134
+    },
+    "6": {
+     "gap_bits_per_byte": 0.2419,
+     "share_bytes": 0.1132
+    },
+    "7": {
+     "gap_bits_per_byte": 0.2523,
+     "share_bytes": 0.0999
+    },
+    "8": {
+     "gap_bits_per_byte": 0.2161,
+     "share_bytes": 0.3415
+    }
+   },
+   "space_word_pos_bits": {
+    "space": 0.4537,
+    "letter1": 3.9723,
+    "letter2": 1.9626,
+    "letter3": 1.7314,
+    "letter4": 1.0968,
+    "letter5": 0.653,
+    "letter6": 0.4716,
+    "letter7+": 0.3556
+   }
+  }
+ }
+}
