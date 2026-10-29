@@ -45,6 +45,8 @@ def param_groups(model) -> Dict[str, List[torch.nn.Parameter]]:
                 i += 1
             if i < len(parts) and parts[i] in roles:
                 key = f"s{stage}.{parts[i]}"
+                if parts[i] == "chunk_vocab" and i + 1 < len(parts) and parts[i + 1].startswith("suffix"):
+                    key += ".suffix_gates"  # dc.chunk_vocab.suffix_lens gates, reported separately from the tables
             else:  # ... except the innermost one, which is that stage's Isotropic main network
                 key = f"s{stage - 1}.main_network"
         groups.setdefault(key, []).append(p)
@@ -97,7 +99,7 @@ def grad_table(model, terms: Dict[str, torch.Tensor], groups: Dict[str, List[tor
 
 def mechanism_metrics(out) -> Dict[str, float]:
     keep = ("compression/", "p_mid/", "p_margin/", "dechunk_rms/", "residual_rms/", "score_std/", "tau/", "F/", "G/",
-            "residual_gate/")
+            "residual_gate/", "suffix_gate")
     m = {k: float(v) for k, v in out.stats.items() if k.startswith(keep)}
     for s, r in enumerate(out.bpred):
         m[f"boundary_frac/s{s}"] = float(r.boundary_mask.float().mean())

@@ -1,0 +1,9 @@
+# Default-config forward of this branch vs the starting commit b9b4cb2, bit for bit.
+# Model: configs/models/tiny_hnet1_2m.yaml + end_mlp + quantile + chunk vocab (2 x 4096, pred 0.5) + n-grams (3,4,5),
+# seed 0, tables re-drawn N(0, 0.3), 2 SGD steps, then an eval forward (no suffix_lens: the flag is off).
+# Script: a one-off (scratchpad bitid.py): build, init, train 2 steps, sha256 of the eval logits.
+b9b4cb2 (parent, git archive):   loss=5.5590052605  aux=2.3363256454  logits_sha256=9c2f8b9767ad9855
+evolve/g1-mem-02 (this branch):  loss=5.5590052605  aux=2.3363256454  logits_sha256=9c2f8b9767ad9855
+# In-suite: tests/test_chunk_vocab_suffix.py::test_default_has_no_suffix_parameters_and_same_ids (no new parameters
+# or state-dict keys by default) and ::test_default_forward_is_bit_identical_to_a_model_with_closed_suffix_rows
+# (suffix_lens on with the gates closed exactly gives the default model's logits bit for bit).

@@ -1,0 +1,37 @@
+# g1-mem-02 step-0 / step-10 gradient audit (tiny_hnet1_2m + end_mlp + quantile + chunk vocab with suffix keys + n-grams)
+# command: python -m hnet.analysis.grad_audit configs/runs/tiny_hnet1_2m.yaml --set model.dc.router=end_mlp
+#   --set model.dc.decision=quantile --set 'model.ngram_embed={ns: [3,4,5,6,7,8], buckets: 1021}'
+#   --set 'model.dc.chunk_vocab=[{buckets: 4096, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 256,
+#          suffix_lens: [2, 3, 4, 6, 8, 12, 16]}]' --steps 0 10
+# s0.chunk_vocab.suffix_gates = the gate projection, bias and length table (reported apart from the tables).
+# Expected and verified: at step 0 the gates get no gradient (every table row is zero, so a gate scales a zero row;
+# flagged below, the same zero-init pattern as the chunk vocabulary's output side); the tables do (byte CE and next-chunk
+# CE). After 10 steps both the byte CE and the next-chunk CE reach the gates (5e-6 / 5e-10 here with plain SGD on tiny
+# rows; under Adam/Muon the step size does not depend on that scale). The suffix rows enter the main network's input
+# only, so the gradient paths of everything else are those of the parent.
+# (The next_chunk_ce router warning is pre-existing behaviour of the parent, unchanged by this candidate.)
+
+== gradient norms by (objective, parameter group) after 0 steps
+                                       embeddings             ngram_embeddings                   s0.encoder             s1.pad_dimension              s1.main_network                   s0.decoder            s0.routing_module               s0.chunk_vocab  s0.chunk_vocab.suffix_gates             s0.residual_proj                      lm_head
+byte_ce                                  8.65e-03                     1.78e-02                     2.46e-01                     6.43e-04                     4.74e-02                     1.78e-01                     4.20e-02                     1.38e-02                     0 (none)                     1.10e-01                     3.80e-01
+ratio/s0                                 5.59e-05                     6.23e-05                     1.51e-03                     0 (none)                     0 (none)                     0 (none)                     5.39e-04                     0 (none)                     0 (none)                     0 (none)                     0 (none)
+next_chunk_ce/s0                         0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     1.21e-01                     0 (none)                     0 (none)                     0 (none)
+
+== mechanism metrics
+  F/s0=0.168  G/s0=0.237  boundary_frac/s0=0.168  compression/s0=5.95  dechunk_rms/s0=1.22  p_margin/s0=0.328  p_mid/s0=0.12  residual_rms/s0=0.0637  score_std/s0=1.39  suffix_gate/s0=0.5  suffix_gate_n12/s0=0.5  suffix_gate_n16/s0=0.5  suffix_gate_n2/s0=0.5  suffix_gate_n3/s0=0.5  suffix_gate_n4/s0=0.5  suffix_gate_n6/s0=0.5  suffix_gate_n8/s0=0.5  tau/s0=0.404
+
+== warnings
+  - s0.chunk_vocab.suffix_gates: no objective reaches it (zero gradient at init)
+  - next_chunk_ce/s0: sends the router no gradient (dc.chunk_ste=false; the STE sits after dechunking)
+
+== gradient norms by (objective, parameter group) after 10 steps
+                                       embeddings             ngram_embeddings                   s0.encoder             s1.pad_dimension              s1.main_network                   s0.decoder            s0.routing_module               s0.chunk_vocab  s0.chunk_vocab.suffix_gates             s0.residual_proj                      lm_head
+byte_ce                                  8.61e-03                     1.73e-02                     2.41e-01                     6.41e-04                     4.79e-02                     1.77e-01                     3.87e-02                     1.38e-02                     5.26e-06                     1.10e-01                     3.80e-01
+ratio/s0                                 5.62e-05                     6.25e-05                     1.52e-03                     0 (none)                     0 (none)                     0 (none)                     5.45e-04                     0 (none)                     0 (none)                     0 (none)                     0 (none)
+next_chunk_ce/s0                         1.31e-05                     1.75e-05                     4.01e-04                     1.60e-06                     1.08e-04                     0 (none)                     0 (none)                     1.21e-01                     5.15e-10                     0 (none)                     0 (none)
+
+== mechanism metrics
+  F/s0=0.168  G/s0=0.24  boundary_frac/s0=0.168  compression/s0=5.95  dechunk_rms/s0=1.22  p_margin/s0=0.328  p_mid/s0=0.109  residual_rms/s0=0.0637  score_std/s0=1.39  suffix_gate/s0=0.5  suffix_gate_n12/s0=0.5  suffix_gate_n16/s0=0.5  suffix_gate_n2/s0=0.5  suffix_gate_n3/s0=0.5  suffix_gate_n4/s0=0.5  suffix_gate_n6/s0=0.5  suffix_gate_n8/s0=0.5  tau/s0=0.404
+
+== warnings
+  - next_chunk_ce/s0: sends the router no gradient (dc.chunk_ste=false; the STE sits after dechunking)
