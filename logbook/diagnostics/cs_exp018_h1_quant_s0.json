@@ -1,0 +1,233 @@
+{
+ "bytes": 126939,
+ "whitespace": {
+  "chunks": 20837,
+  "mean_len": 6.092,
+  "types": 7394,
+  "type_token_ratio": 0.3548,
+  "singleton_frac": 0.2522,
+  "unigram_bits_per_chunk": 10.617,
+  "unigram_bits_per_byte": 1.7427,
+  "top": [
+   [
+    "the ",
+    1062
+   ],
+   [
+    "of ",
+    692
+   ],
+   [
+    "and ",
+    570
+   ],
+   [
+    "to ",
+    514
+   ],
+   [
+    "a ",
+    448
+   ],
+   [
+    "in ",
+    398
+   ],
+   [
+    "is ",
+    294
+   ],
+   [
+    "for ",
+    184
+   ],
+   [
+    "that ",
+    179
+   ],
+   [
+    "The ",
+    166
+   ],
+   [
+    "are ",
+    159
+   ],
+   [
+    "as ",
+    131
+   ],
+   [
+    "on ",
+    126
+   ],
+   [
+    "with ",
+    105
+   ],
+   [
+    "have ",
+    100
+   ],
+   [
+    "be ",
+    99
+   ],
+   [
+    "by ",
+    95
+   ],
+   [
+    "or ",
+    92
+   ],
+   [
+    "from ",
+    90
+   ],
+   [
+    "it ",
+    81
+   ],
+   [
+    "can ",
+    76
+   ],
+   [
+    "was ",
+    74
+   ],
+   [
+    "you ",
+    74
+   ],
+   [
+    "- ",
+    73
+   ],
+   [
+    "at ",
+    69
+   ]
+  ]
+ },
+ "stages": [
+  {
+   "chunks": 21323,
+   "mean_len": 5.953,
+   "types": 9033,
+   "type_token_ratio": 0.4236,
+   "singleton_frac": 0.319,
+   "unigram_bits_per_chunk": 11.287,
+   "unigram_bits_per_byte": 1.896,
+   "top": [
+    [
+     "of ",
+     641
+    ],
+    [
+     "and ",
+     552
+    ],
+    [
+     "to ",
+     500
+    ],
+    [
+     "in ",
+     390
+    ],
+    [
+     " ",
+     375
+    ],
+    [
+     "a ",
+     337
+    ],
+    [
+     "is ",
+     278
+    ],
+    [
+     "for ",
+     176
+    ],
+    [
+     "are ",
+     155
+    ],
+    [
+     "on ",
+     144
+    ],
+    [
+     "as ",
+     102
+    ],
+    [
+     "that ",
+     100
+    ],
+    [
+     "(",
+     99
+    ],
+    [
+     "be ",
+     99
+    ],
+    [
+     "have ",
+     99
+    ],
+    [
+     "with ",
+     98
+    ],
+    [
+     "by ",
+     93
+    ],
+    [
+     "or ",
+     86
+    ],
+    [
+     "it ",
+     80
+    ],
+    [
+     "that",
+     78
+    ],
+    [
+     "can ",
+     76
+    ],
+    [
+     "m ",
+     76
+    ],
+    [
+     "you ",
+     74
+    ],
+    [
+     "fro",
+     73
+    ],
+    [
+     "was ",
+     72
+    ]
+   ],
+   "boundaries_on_whitespace_frac": 0.842,
+   "whitespace_boundaries_hit_frac": 0.8616,
+   "word_types_seen_3plus": 1114,
+   "words_segmented_consistently_frac": 0.8842,
+   "dominant_segmentation_share": 0.9668
+  }
+ ],
+ "checkpoint": "runs/gcp/exp018_vocab_shapes/h1_quant_s0/ckpt/step_0001763"
+}

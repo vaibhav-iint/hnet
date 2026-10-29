@@ -1,0 +1,233 @@
+{
+ "bytes": 126939,
+ "whitespace": {
+  "chunks": 20837,
+  "mean_len": 6.092,
+  "types": 7394,
+  "type_token_ratio": 0.3548,
+  "singleton_frac": 0.2522,
+  "unigram_bits_per_chunk": 10.617,
+  "unigram_bits_per_byte": 1.7427,
+  "top": [
+   [
+    "the ",
+    1062
+   ],
+   [
+    "of ",
+    692
+   ],
+   [
+    "and ",
+    570
+   ],
+   [
+    "to ",
+    514
+   ],
+   [
+    "a ",
+    448
+   ],
+   [
+    "in ",
+    398
+   ],
+   [
+    "is ",
+    294
+   ],
+   [
+    "for ",
+    184
+   ],
+   [
+    "that ",
+    179
+   ],
+   [
+    "The ",
+    166
+   ],
+   [
+    "are ",
+    159
+   ],
+   [
+    "as ",
+    131
+   ],
+   [
+    "on ",
+    126
+   ],
+   [
+    "with ",
+    105
+   ],
+   [
+    "have ",
+    100
+   ],
+   [
+    "be ",
+    99
+   ],
+   [
+    "by ",
+    95
+   ],
+   [
+    "or ",
+    92
+   ],
+   [
+    "from ",
+    90
+   ],
+   [
+    "it ",
+    81
+   ],
+   [
+    "can ",
+    76
+   ],
+   [
+    "was ",
+    74
+   ],
+   [
+    "you ",
+    74
+   ],
+   [
+    "- ",
+    73
+   ],
+   [
+    "at ",
+    69
+   ]
+  ]
+ },
+ "stages": [
+  {
+   "chunks": 21173,
+   "mean_len": 5.995,
+   "types": 9554,
+   "type_token_ratio": 0.4512,
+   "singleton_frac": 0.3673,
+   "unigram_bits_per_chunk": 10.961,
+   "unigram_bits_per_byte": 1.8283,
+   "top": [
+    [
+     "s",
+     1820
+    ],
+    [
+     "d",
+     502
+    ],
+    [
+     "e",
+     438
+    ],
+    [
+     "ing",
+     375
+    ],
+    [
+     "ed",
+     333
+    ],
+    [
+     "t",
+     313
+    ],
+    [
+     "er",
+     303
+    ],
+    [
+     "y",
+     302
+    ],
+    [
+     "al",
+     246
+    ],
+    [
+     "ly",
+     191
+    ],
+    [
+     "ion",
+     164
+    ],
+    [
+     "n",
+     162
+    ],
+    [
+     "h",
+     131
+    ],
+    [
+     "r",
+     118
+    ],
+    [
+     "l",
+     101
+    ],
+    [
+     "ic",
+     92
+    ],
+    [
+     "le",
+     80
+    ],
+    [
+     "ment",
+     78
+    ],
+    [
+     "on",
+     67
+    ],
+    [
+     "a",
+     63
+    ],
+    [
+     "m",
+     60
+    ],
+    [
+     "or",
+     58
+    ],
+    [
+     ")",
+     56
+    ],
+    [
+     "en",
+     50
+    ],
+    [
+     "ation",
+     50
+    ]
+   ],
+   "boundaries_on_whitespace_frac": 0.0063,
+   "whitespace_boundaries_hit_frac": 0.0064,
+   "word_types_seen_3plus": 1114,
+   "words_segmented_consistently_frac": 0.8671,
+   "dominant_segmentation_share": 0.9617
+  }
+ ],
+ "checkpoint": "runs/gcp/exp018_vocab_shapes/h1_vocab_pred_s1/ckpt/step_0001763"
+}

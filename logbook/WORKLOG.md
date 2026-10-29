@@ -777,3 +777,21 @@ predictor of the logit); relaunched as EXP-020 (second launch, same arms).
 - Interpretation for learned tokenization: the paper's hierarchy was starved of *types*. Give the router's chunks an
   identity (a table keyed by their content) and a token-level objective, and the second level has something to
   learn; compression pinning (rank decisions) is what makes the comparison honest.
+
+### What tokenizer did EXP-018 learn? (`chunk_stats`, final checkpoints, `logbook/diagnostics/cs_exp018_*.json`)
+| model | bytes/chunk | singletons | boundaries on word boundaries | word boundaries hit | words cut consistently | top chunks |
+|---|---|---|---|---|---|---|
+| whitespace tokenizer | 6.1 | 25% | 100% | 100% | 100% | the, of, and |
+| `h1_quant_s0` (no vocabulary) | 6.0 | 32% | 84% | 86% | 88% | `of `, `and `, `to `, ` `, `(`, `m `, `fro` |
+| `h1_vocab_pred_s0` (adopted, 1.720) | 6.0 | **24%** | **97.7%** | **100%** | **99.9%** | `the `, `of `, `and `, `to `, `a `, `in `, `is ` |
+| `h1_vocab_pred_s1` (not adopted, 1.863) | 6.0 | 37% | 0.6% | 0.6% | 87% | `s`, `d`, `e`, `ing`, `ed`, `er`, `ly`, `ion`, `ment`, `ation` |
+
+- Given a vocabulary and a chunk-level objective, the router converged to a *word tokenizer* by itself: every word
+  boundary is a chunk boundary and the same word is always one token. That is the learned tokenization H-Net
+  promised, obtained without heuristics, and it is what let the main network take over 0.75 bpb of the work.
+- The non-adopted seed learned a *morphological* tokenizer (suffixes `ing`/`ed`/`ly`/`ion`/`ment`/`ation` as
+  tokens, cuts before the space): also a consistent segmentation (87%), but more fragmented (37% singletons) and
+  slower to make the hierarchy useful; the residual path won the race first. Both outcomes are reachable from the
+  same objective: adoption is decided early (step 200–600), by whether the hierarchy's signal reaches the decoder
+  before the residual path consolidates. That is the next dynamics problem (EXP-021 removes one trigger, the
+  heavy-tailed-score damping).
