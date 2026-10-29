@@ -117,3 +117,21 @@ def test_forward_unchanged_by_flag():
     ids = batch(7)
     with torch.no_grad():
         assert torch.equal(m0.eval()(ids).logits, m1.eval()(ids).logits)
+
+
+def test_model_config_route():
+    """model.lr_multiplier_kinds (next to lr_multiplier, where the fairness gate expects H-Net-only LR knobs) gives
+    the same groups and training as train.muon.lr_mult_kinds; it needs Muon."""
+    cfg = tiny_hnet_cfg()
+    cfg_m = tiny_hnet_cfg()
+    cfg_m.lr_multiplier_kinds = ["embed", "head", "other"]
+    m0, m1 = make(cfg), make(cfg_m)
+    o0 = build_optimizer(m0, cfg, tc(lr_mult_kinds=["embed", "head", "other"]))
+    o1 = build_optimizer(m1, cfg_m, tc())
+    assert summary(o0) == summary(o1)
+    assert any(g["kind"] == "muon" and g["stage"] == 0 and g["lr_mult"] == 1.0 for g in o1.param_groups)
+    p0, p1 = train_steps(m0, o0), train_steps(m1, o1)
+    for n in p0:
+        assert torch.equal(p0[n], p1[n]), n
+    with pytest.raises(AssertionError):
+        build_optimizer(make(cfg_m), cfg_m, {"optimizer": "adamw", "lr": 1e-3})

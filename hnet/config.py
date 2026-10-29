@@ -161,6 +161,9 @@ class HNetConfig:
     # lambda^s = sqrt(N_GPT * D^S / D^s / prod_{i<s} N^i), see hnet.optim) or None (all 1.0).
     lr_multiplier: Any = None
     lr_multiplier_n_gpt: float = 4.6  # bytes per BPE token of the training data (paper: GPT-2 on FineWeb-Edu)
+    # Optimizer kinds the per-stage multipliers apply to under Muon (subset of muon / embed / head / other; see
+    # hnet/optim/muon.py). None = all (default). [embed, head, other]: Muon matrices keep lr_mult 1.
+    lr_multiplier_kinds: Optional[List[str]] = None
     # Layout code -> mixer registry name. Lower case = no MLP, upper case = + SwiGLU MLP. Either one dict for every
     # stage, or a per-stage list of dicts (e.g. swap only the main network's attention: [{..}, {..}, {"t": "mla"}]).
     mixer_codes: Any = field(default_factory=lambda: {"m": "mamba2", "t": "attn"})
