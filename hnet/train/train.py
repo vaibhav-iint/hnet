@@ -78,6 +78,44 @@ def _wrap_checkpointing(block):
     block.forward = fwd
 
 
+class _StepProfiler:
+    """``train.profile: {start: S, steps: N}``: torch.profiler over optimizer steps [S, S + N) of rank 0; writes
+    ``profile_cuda.txt`` / ``profile_cpu.txt`` (op tables) and, with ``trace: true``, ``trace.json`` to out_dir."""
+
+    def __init__(self, cfg: dict, out_dir: str, cuda: bool):
+        self.start, self.n = int(cfg.get("start", 20)), int(cfg.get("steps", 5))
+        self.trace, self.out_dir, self.cuda = bool(cfg.get("trace", False)), out_dir, cuda
+        self.p = None
+
+    def at_step(self, step: int):
+        from torch.profiler import ProfilerActivity, profile
+
+        if step == self.start and self.p is None:
+            acts = [ProfilerActivity.CPU] + ([ProfilerActivity.CUDA] if self.cuda else [])
+            self.p = profile(activities=acts, record_shapes=False)
+            self.p.__enter__()
+        elif self.p is not None and step == self.start + self.n:
+            self.close()
+
+    def close(self):
+        if self.p is None:
+            return
+        if self.cuda:
+            torch.cuda.synchronize()
+        self.p.__exit__(None, None, None)
+        os.makedirs(self.out_dir, exist_ok=True)
+        ka = self.p.key_averages()
+        for key, fn in (("self_cuda_time_total" if self.cuda else "self_cpu_time_total", "profile_cuda.txt"),
+                        ("self_cpu_time_total", "profile_cpu.txt")):
+            with open(os.path.join(self.out_dir, fn), "w") as f:
+                f.write(f"# steps [{self.start}, {self.start + self.n})\n")
+                f.write(ka.table(sort_by=key, row_limit=60, max_name_column_width=90))
+        if self.trace:
+            self.p.export_chrome_trace(os.path.join(self.out_dir, "trace.json"))
+        self.p = None
+        print(f"[train] profile written to {self.out_dir}/profile_*.txt", flush=True)
+
+
 class Trainer:
     def __init__(self, cfg: dict, dry_run: bool = False):
         self.cfg, self.dry_run = cfg, dry_run
@@ -477,6 +515,8 @@ class Trainer:
             steps_since_log = int(ls["steps_since_log"])
             self._log_state = None
         self._steps_since_log = steps_since_log
+        prof = _StepProfiler(tc["profile"], self.out_dir, self.cuda) if tc.get("profile") and self.is_main else None
+        self._data_wait = 0.0  # seconds spent waiting for the prefetcher since the last log step
         t_start = time.time()
         t_log = time.perf_counter()
         self.raw.train()
@@ -490,7 +530,11 @@ class Trainer:
                 lr = set_lr(self.opt, lr_factor)
                 if self._set_progress is not None:  # e.g. dense_modded's attention-window warmup
                     self._set_progress(step / self.total_steps)
+                if prof is not None:
+                    prof.at_step(step)
+                t_wait = time.perf_counter()
                 host = [pf.next() for _ in range(self.accum)]
+                self._data_wait += time.perf_counter() - t_wait
                 n_tgt = [int((hb["labels"] != IGNORE_INDEX).sum()) for hb in host]
                 n_tgt_step = max(sum(n_tgt), 1)
                 tokens_before = self.tokens_local
@@ -590,6 +634,8 @@ class Trainer:
                 if tc.get("save_final", True) or not finished:
                     self.save(keep=finished or self.step in ckpt_steps)
         finally:
+            if prof is not None:
+                prof.close()
             pf.close()
             for sig, h in old_handlers.items():
                 signal.signal(sig, h)
@@ -623,7 +669,9 @@ class Trainer:
             "tokens_per_sec": n_tok / max(dt, 1e-9),
             "mem_gb": torch.cuda.max_memory_allocated(dev) / 1e9 if self.cuda else None,
             "step_time": dt / max(n_steps, 1),
+            "data_wait_frac": self._data_wait / max(dt, 1e-9),  # share of wall time blocked on the loader
         })
+        self._data_wait = 0.0
         if self.cuda:
             torch.cuda.reset_peak_memory_stats(dev)
         return rec

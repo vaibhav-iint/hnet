@@ -91,6 +91,7 @@ Byte and token runs see the same text per step up to the ~1% gap between 256×17
 | `compile_backend` | inductor | torch.compile backend (`aot_eager` / `eager` to debug graph breaks without codegen) |
 | `compile_mode` | null | torch.compile mode (e.g. `max-autotune-no-cudagraphs`) |
 | `activation_checkpointing` | false | non-reentrant checkpointing of each `model.blocks()` unit |
+| `profile` | null | `{start: S, steps: N, trace: false}`: torch.profiler op tables (`profile_cuda.txt`, `profile_cpu.txt`) of steps [S, S+N) in out_dir |
 | `max_hours` | null | wall-clock guard: checkpoint and exit before exceeding it |
 | `ckpt_every` | 1000 | rolling checkpoints every N steps, keep `ckpt_keep` |
 | `ckpt_every_tokens` | null | permanent checkpoints whenever tok-eq crosses a multiple of N |

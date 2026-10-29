@@ -202,6 +202,7 @@ DEFAULTS = {
         "compile_backend": "inductor",  # torch.compile backend (aot_eager / eager: debugging graph breaks)
         "compile_mode": None,  # torch.compile mode (None = default; e.g. max-autotune-no-cudagraphs)
         "activation_checkpointing": False,
+        "profile": None,  # {start: S, steps: N, trace: false}: torch.profiler op tables of steps [S, S+N) (rank 0)
         "max_hours": None,
         "ckpt_every": 1000,
         "ckpt_every_tokens": None,  # permanent checkpoints every N tokens_eq (data-multiplier runs)
