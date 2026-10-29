@@ -36,6 +36,9 @@ for pkg in causal_conv1d mamba_ssm; do
   python3 -c "${KCHECK[$pkg]}"
 done
 python3 infra/prime/gpu_caps.py summary
+# A reset or preemption can leave truncated files in the Triton/inductor caches (JSONDecodeError in the autotuner on
+# the next boot); kernels recompile in seconds, so start every boot with empty caches.
+rm -rf /root/.triton /tmp/torchinductor_*
 python3 -m pytest -q -p no:cacheprovider -m "not slow" tests/test_ssd.py tests/test_mamba2.py tests/test_model_components.py tests/test_model_hnet.py
 mkdir -p data/finewebedu10B
 gcloud storage rsync -r gs://neat-dispatch-501718-a5-hnet/data/finewebedu10B data/finewebedu10B
