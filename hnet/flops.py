@@ -387,6 +387,10 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
             if cp:
                 comp_p["chunker"] = cp
                 comp_f["chunker"] = cf if cv.count_dc else 0.0
+            K = int(dcs.get("dechunk_slots") or 0)
+            if K > 0:  # offset-resolved read-back: K d x d maps, run once per inner (chunk) position
+                comp_p["dechunk_slots"] = K * d * d
+                comp_f["dechunk_slots"] = 2 * K * d * d * bpp[s] / bpp[s + 1]
         else:
             assert len(layout) == 1, layout
             comp_p["main"], comp_f["main"] = _iso(cfg, s, layout[0], L, cv)

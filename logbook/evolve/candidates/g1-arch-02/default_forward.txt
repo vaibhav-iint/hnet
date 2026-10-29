@@ -1,0 +1,16 @@
+# Default forward/backward fingerprint, single-threaded CPU (scratch script: build + init_weights with seed 0, one
+# train-mode forward/backward of loss + aux_loss on 2 random sequences): base commit b9b4cb2 vs this branch with the
+# new flag at its default. Each line: (loss hex, aux-loss hex, sha256 of the logits + every parameter's gradient,
+# sha256 of the state-dict keys). With several threads the CPU index_add / embedding backward sums are
+# thread-order dependent, so the comparison is single-threaded.
+## base b9b4cb2
+tiny end_mlp quantile vocab: ('0x1.63ede60000000p+2', '0x1.51993a0000000p+1', '59ad31f3f0c8936c', '38cf22187182')
+L03 hnet_ws: ('0x1.6516b60000000p+2', '0x1.8643d00000000p+1', 'a9e725ecc99241e1', 'd31f57b1b342')
+L03 hnet: ('0x1.6516b60000000p+2', '0x1.8643d00000000p+1', 'a9e725ecc99241e1', 'd31f57b1b342')
+## branch evolve/g1-arch-02 (dc.dechunk_slots default 0)
+tiny end_mlp quantile vocab: ('0x1.63ede60000000p+2', '0x1.51993a0000000p+1', '59ad31f3f0c8936c', '38cf22187182')
+L03 hnet_ws: ('0x1.6516b60000000p+2', '0x1.8643d00000000p+1', 'a9e725ecc99241e1', 'd31f57b1b342')
+L03 hnet: ('0x1.6516b60000000p+2', '0x1.8643d00000000p+1', 'a9e725ecc99241e1', 'd31f57b1b342')
+## result: identical (bit-exact logits and gradients, same parameter set)
+## tests: tests/test_dechunk_slots.py::test_default_is_off_and_adds_nothing (default == explicit 0) and
+##        ::test_identity_init_equals_the_plain_dechunker (K = 4 at init == K = 0, bit-exact logits)

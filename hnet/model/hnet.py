@@ -98,6 +98,10 @@ class HNet(nn.Module):
             assert need is None or need == have, (
                 f"chunker {dc['chunker']!r} requires {need!r} boundary semantics, router {dc['router']!r} has {have!r}")
             self.dechunk_layer = registry.build("dechunker", dc["dechunker"])
+            if int(dc["dechunk_slots"] or 0) > 0:  # offset-resolved read-back (HNetConfig.dc.dechunk_slots)
+                from .chunking.dechunk import SlotReadback
+
+                self.dechunk_layer = SlotReadback(d, int(dc["dechunk_slots"]), self.dechunk_layer)
             self.chunk_vocab = None
             if dc["chunk_vocab"]:
                 from .chunk_vocab import ChunkVocab

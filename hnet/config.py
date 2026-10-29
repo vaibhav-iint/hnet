@@ -106,6 +106,15 @@ class DCConfig:
     chunker: Any = "select"  # keep vectors at boundaries (paper default); "pool" = learned summary over the chunk
     chunker_kwargs: Any = field(default_factory=dict)
     dechunker: Any = "ema"  # EMA smoothing (paper default); "repeat" = no smoothing
+    # dechunk_slots: offset-resolved read-back (0 = off, the paper's dechunker). With K > 0 the smoothed chunk vector
+    #   zbar_j is expanded into K offset-specific vectors W_k zbar_j (one learned d x d map per offset, identity-init,
+    #   so at init the model equals the K = 0 model exactly), and byte t reads slot min(k_t, K-1), where k_t = t minus
+    #   the position of the chunk boundary it reads (under "end" semantics: how many bytes of the next chunk it has
+    #   already seen). The main network's output is the prediction of the whole next chunk (as BPE's last hidden state
+    #   is of the whole next token); without slots every byte of that chunk receives the same vector and the 2-layer
+    #   byte decoder has to index it by offset itself. Cost: K d^2 parameters and 2 K d^2 FLOPs per inner position
+    #   (counted in hnet.flops). Scalar or per-stage list.
+    dechunk_slots: Any = 0
     ste: Any = True  # multiply dechunked output by STE(selected_probs)
     aux_loss: Any = "ratio"  # paper ratio loss
     aux_loss_scope: str = "local"  # "local" = per-device then averaged (official code); "global" = all-reduced F,G
@@ -166,7 +175,7 @@ class DCConfig:
     def for_stage(self, s: int, n_stages: int) -> dict:
         out = {}
         for name in ("router", "router_kwargs", "decision", "decision_kwargs", "chunk_vocab", "chunker", "chunker_kwargs", "dechunker", "ste",
-                     "aux_loss", "residual_dropout"):
+                     "aux_loss", "residual_dropout", "dechunk_slots"):
             v = getattr(self, name)
             if isinstance(v, list):
                 assert len(v) == n_stages, f"dc.{name}: expected {n_stages} values"
