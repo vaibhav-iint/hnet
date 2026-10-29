@@ -70,10 +70,20 @@ class DCConfig:
     ste: Any = True  # multiply dechunked output by STE(selected_probs)
     aux_loss: Any = "ratio"  # paper ratio loss
     aux_loss_scope: str = "local"  # "local" = per-device then averaged (official code); "global" = all-reduced F,G
+    # Hierarchy-use interventions (off by default; see logbook EXP-008 and hnet.analysis.diagnose):
+    # residual_dropout: training-time probability (scalar or per stage) of zeroing a whole segment's residual path
+    #   into the decoder, so the decoder must sometimes predict from the dechunked main-network output alone.
+    residual_dropout: Any = 0.0
+    # main_aux_weight: weight of an auxiliary next-byte CE on the stage-0 dechunked main-network output alone
+    #   (before the residual is added), a direct learning signal for everything below stage 0.
+    main_aux_weight: float = 0.0
+    # router_entropy_weight: weight of the mean binary entropy of boundary probabilities (all stages); the ratio
+    #   loss has zero gradient w.r.t. G once F is on target, so nothing else pushes decisions away from p = 0.5.
+    router_entropy_weight: float = 0.0
 
     def for_stage(self, s: int, n_stages: int) -> dict:
         out = {}
-        for name in ("router", "router_kwargs", "chunker", "dechunker", "ste", "aux_loss"):
+        for name in ("router", "router_kwargs", "chunker", "dechunker", "ste", "aux_loss", "residual_dropout"):
             v = getattr(self, name)
             if isinstance(v, list):
                 assert len(v) == n_stages, f"dc.{name}: expected {n_stages} values"

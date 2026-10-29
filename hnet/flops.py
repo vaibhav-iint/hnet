@@ -320,6 +320,9 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
                                              + (len(ns) * d0 if cv.count_elementwise else 0.0))
             comp_p["lm_head"] = 0 if cfg.tie_embeddings else V * d0
             comp_f["lm_head"] = 2 * V * d0 if cv.count_lm_head else 0.0
+            if cfg.dc.main_aux_weight > 0:  # training-only auxiliary head on the dechunked main output
+                comp_p["main_aux_head"] = V * d0
+                comp_f["main_aux_head"] = 2 * V * d0 if cv.count_lm_head else 0.0
         if s > 0 and d > cfg.d_model[s - 1]:
             comp_p["pad_dimension"] = d - cfg.d_model[s - 1]
             comp_f["pad_dimension"] = 0.0

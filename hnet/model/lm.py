@@ -48,6 +48,11 @@ class CausalLMOutput:
     bpred: List[RouterOutput] = field(default_factory=list)
 
 
+def _binary_entropy(p: torch.Tensor) -> torch.Tensor:
+    p = p.float().clamp(1e-6, 1 - 1e-6)
+    return -(p * p.log() + (1 - p) * (1 - p).log())
+
+
 def pack_inputs(
     input_ids: torch.Tensor, cu_seqlens: Optional[torch.Tensor], max_seqlen: Optional[int]
 ) -> Tuple[torch.Tensor, SeqCtx, Optional[Tuple[int, int]]]:
@@ -114,6 +119,7 @@ class HNetForCausalLM(nn.Module):
         self.ngram_embeddings = HashNgramEmbedding(d0, **cfg.ngram_embed) if cfg.ngram_embed else None
         self.backbone = HNet(cfg, stage_idx=0)
         self.lm_head = nn.Linear(d0, cfg.vocab_size, bias=False)
+        self.main_aux_head = nn.Linear(d0, cfg.vocab_size, bias=False) if cfg.dc.main_aux_weight > 0 else None
         if cfg.tie_embeddings:
             self.lm_head.weight = self.embeddings.weight
         self._param_stage = {}
@@ -146,7 +152,18 @@ class HNetForCausalLM(nn.Module):
         out.bpred = bpred
         aux_terms = self.backbone.aux_losses(bpred)
         out.aux_loss = self.config.dc.ratio_loss_alpha * sum(loss for loss, _ in aux_terms)
+        dc = self.config.dc
+        if dc.router_entropy_weight > 0:
+            ent = sum(_binary_entropy(r.p).mean() for r in bpred) / len(bpred)
+            out.aux_loss = out.aux_loss + dc.router_entropy_weight * ent
+        if self.main_aux_head is not None and labels is not None:
+            lab = labels.reshape(-1)
+            n = (lab != IGNORE_INDEX).sum().clamp(min=1)
+            main_ce = chunked_ce_sum(bpred[0].main_out.to(h.dtype), self.main_aux_head, lab) / n
+            out.aux_loss = out.aux_loss + dc.main_aux_weight * main_ce
         stats = {"positions/s0": ids.new_full((), ids.numel(), dtype=torch.float32)}
+        if self.main_aux_head is not None and labels is not None:
+            stats["main_aux_ce"] = main_ce.detach()
         for s, (r, (loss, st)) in enumerate(zip(bpred, aux_terms)):
             n_sel = r.boundary_mask.sum().float()
             stats[f"aux/s{s}"] = loss.detach()
@@ -167,6 +184,8 @@ class HNetForCausalLM(nn.Module):
         depth-scaled Linear init of every stage (``HNet.init_weights``)."""
         std = self.config.initializer_range
         nn.init.normal_(self.lm_head.weight, std=std)
+        if self.main_aux_head is not None:
+            nn.init.normal_(self.main_aux_head.weight, std=std)
         nn.init.normal_(self.embeddings.weight, std=1.0)
         if self.ngram_embeddings is not None:
             self.ngram_embeddings.reset_parameters()
@@ -176,7 +195,7 @@ class HNetForCausalLM(nn.Module):
         """Stage index owning parameter ``name`` (DDP ``module.`` / compile ``_orig_mod.`` prefixes allowed);
         embeddings and lm_head belong to stage 0."""
         name = name.replace("_orig_mod.", "").removeprefix("module.")
-        if name.startswith(("embeddings.", "ngram_embeddings.", "lm_head.")):
+        if name.startswith(("embeddings.", "ngram_embeddings.", "lm_head.", "main_aux_head.")):
             return 0
         return self._param_stage[name]
 

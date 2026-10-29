@@ -1,0 +1,31 @@
+# EXP-008: make the H-Net use its hierarchy (tiny 2M scale, paper 2-stage (3,3) config, same budget as EXP-002/006).
+# Diagnosis (logbook/WORKLOG.md "Deep dive"; hnet/analysis/diagnose.py on EXP-002 checkpoints):
+#   * zeroing the innermost main network (6.0M of 7.9M params, 38% of FLOPs) costs only ~0.02 bpb;
+#   * its gradient norm drops to 1-3% of stage 0's within ~20 steps in every variant;
+#   * the stage-1 router is undecided (56% of p in 0.4-0.6): the ratio loss has zero gradient w.r.t. G at target F.
+# Interventions (HNetConfig.dc): residual path-drop (decoder must sometimes rely on the hierarchy), an auxiliary
+# next-byte head on the dechunked main output (direct learning signal for the hierarchy), a router-entropy penalty
+# (pressure toward confident boundaries), all three together, and all three with the end-of-chunk MLP router.
+# Every run logs the zero-main eval probe (val bpb with each stage's main network silenced) and router confidence.
+name: exp008_hierarchy_use
+out_root: runs/search/exp008_hierarchy_use
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/exp008_hierarchy_use
+seeds: [0, 1, 2]
+set:
+  - train.compile=false
+  - eval.zero_main_probe=true
+  - "eval.downstream={every: 500, suite: paper7, limit: 300, n_boot: 0}"
+report:
+  baseline: base
+  labels: {base: "paper 2-stage", rdrop: "residual path-drop 0.3", mainaux: "main-path aux head 0.3",
+           rent: "router entropy 0.05", combo: "all three", combo_end: "all three + end-of-chunk MLP router"}
+runs:
+  - {name: base,      config: configs/runs/tiny_hnet2_2m.yaml}
+  - {name: rdrop,     config: configs/runs/tiny_hnet2_2m.yaml, set: ["model.dc.residual_dropout=0.3"]}
+  - {name: mainaux,   config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.main_aux_weight=0.3]}
+  - {name: rent,      config: configs/runs/tiny_hnet2_2m.yaml, set: [model.dc.router_entropy_weight=0.05]}
+  - {name: combo,     config: configs/runs/tiny_hnet2_2m.yaml,
+     set: ["model.dc.residual_dropout=0.3", model.dc.main_aux_weight=0.3, model.dc.router_entropy_weight=0.05]}
+  - {name: combo_end, config: configs/runs/tiny_hnet2_2m.yaml,
+     set: [model.dc.router=end_mlp, "model.dc.residual_dropout=0.3", model.dc.main_aux_weight=0.3,
+           model.dc.router_entropy_weight=0.05]}

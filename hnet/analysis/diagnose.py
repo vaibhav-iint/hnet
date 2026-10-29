@@ -228,6 +228,29 @@ def breakdown(bits: torch.Tensor, valid: torch.Tensor, ids: torch.Tensor, starts
     return out
 
 
+def help_breakdown(delta: torch.Tensor, valid: torch.Tensor, ids: torch.Tensor, starts: List[torch.Tensor]) -> dict:
+    """Mean bits saved per predicted byte (zeroed-main loss - normal loss) by byte class and by stage-0 chunk
+    position, plus the share of all saved bits."""
+    raw = ids.tolist()
+    tgt = torch.roll(ids, -1).tolist()
+    dl = delta.tolist()
+    v = valid.tolist()
+    st0 = starts[0].tolist()
+    by = defaultdict(lambda: [0.0, 0])
+    run = 0
+    for t in range(len(raw)):
+        run = 0 if (t + 1 < len(raw) and st0[t + 1]) else run + 1
+        if not v[t]:
+            continue
+        cls = byte_class(raw[t] if raw[t] != BOS_ID else -1, tgt[t])
+        for k in (f"class:{cls}", "chunk0:start" if run == 0 else "chunk0:inside", "ALL"):
+            by[k][0] += dl[t]
+            by[k][1] += 1
+    total = by["ALL"][0]
+    return {k: {"bits_saved": round(x / n, 4), "share_of_saving": round(x / total, 4) if total else None,
+                "share_bytes": round(n / by["ALL"][1], 4)} for k, (x, n) in sorted(by.items())}
+
+
 # ------------------------------------------------------------------------------------------------------ BPE model
 def bpe_token_bits(model, docs: List[bytes], device) -> List[List[tuple]]:
     """Per doc: [(token_byte_start, token_byte_len, bits)] for every GPT-2 token (first token predicted from EOT)."""
@@ -338,12 +361,14 @@ def diagnose(path: str, docs: List[bytes], bpe_path: Optional[str] = None, devic
     rep["alignment"] = boundary_alignment(starts, ids)
     rep["breakdown"] = breakdown(bits, valid, ids, starts)
     rep["zero_main_bpb"] = {}
+    rep["main_help"] = {}  # where the hierarchy below each stage helps: bits saved per predicted byte, by class
     for st in model.backbone.stages():
         if st.is_innermost:
             continue
         with zero_main(st):
             zc, _, _ = _run_docs(model, docs, device)
         rep["zero_main_bpb"][f"s{st.stage_idx}"] = round(float(zc["bits"].sum()) / int(zc["valid"].sum()), 4)
+        rep["main_help"][f"s{st.stage_idx}"] = help_breakdown(zc["bits"] - bits, valid, ids, starts)
     if bpe_path:
         bmodel, bcfg, bmeta = load_run_checkpoint(bpe_path, device=device)
         toks = bpe_token_bits(bmodel, docs, device)

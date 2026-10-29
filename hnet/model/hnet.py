@@ -73,6 +73,7 @@ class HNet(nn.Module):
             self.aux_loss_name = dc["aux_loss"]
             self.aux_loss_scope = cfg.dc.aux_loss_scope
             self.use_ste = bool(dc["ste"])
+            self.residual_dropout = float(dc["residual_dropout"] or 0.0)
             self.encoder = iso(layout[0])
             self.main_network = HNet(cfg, stage_idx + 1)
             self.decoder = iso(layout[2])
@@ -117,6 +118,11 @@ class HNet(nn.Module):
         with torch.no_grad():  # how strongly the hierarchy below speaks to the decoder, vs the residual path
             r.extra["dechunk_rms"] = out.detach().float().pow(2).mean().sqrt()
             r.extra["residual_rms"] = residual.detach().pow(2).mean().sqrt()
+        r.main_out = out  # with grad: read by an optional auxiliary head (HNetConfig.dc.main_aux_weight)
+        if self.training and self.residual_dropout > 0:  # drop the residual path for whole segments
+            n_seg = ctx.cu_seqlens.numel() - 1
+            keep = (torch.rand(n_seg, device=residual.device) >= self.residual_dropout).to(residual.dtype)
+            residual = residual * keep[ctx.seq_idx.reshape(-1).long()].unsqueeze(-1)
         h = (out + residual).to(h.dtype)
         h = self.decoder(h, ctx)
         return h[:, :D_in], [r, *inner_preds]
