@@ -394,3 +394,15 @@ Times are UTC. Experiments (anything with a result) are written up in [EXPERIMEN
 - Verification on GPU: `hnet-ssddbg3` runs paper s0–s3 and end_linear s0–s1.
 - Also found: every healthy H-Net run shows the transient early collapse (it recovers to target by ~10M bytes). To
   look at after EXP-002: ratio-loss warmup or a lower stage-0 LR multiplier during warmup.
+
+### Second failure mode: post-run diagnostics raced in Triton's autotuner (commit 9e9f8c4)
+- VM c: paper_nolrmult_s0 and paper_nosmooth_s0 finished together. The sweep runs each run's chunk-diagnostic
+  forward pass in its worker thread, so two passes ran at once, and Triton's autotuner (fused Mamba kernels) is not
+  thread-safe: `TypeError: 'NoneType' object is not a mapping`.
+- paper_nosmooth_s0 finished training; only its diagnostics and `done.json` are missing.
+- Fix: `diag_lock` in `scripts/search/sweep.py` serializes the diagnostics.
+- VMs b, d and e (still in setup) were moved to the fixed commit by updating their metadata and resetting them, which
+  keeps their spot slots. VM d was preempted in us-central1-a and restarted.
+- New VM f (us-central1-b) runs paper_nosmooth (s0 resumes from its final checkpoint, then diagnostics) and
+  paper_nolrmult (s1).
+- Finished: bpe ×2, paper_r42 ×2, paper_nolrmult_s0.
