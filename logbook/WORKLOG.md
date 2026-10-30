@@ -1221,3 +1221,7 @@ seeds**; g1-alloc-01 1.821 ± 0.007 (-0.008); g1-arch-01 1.825 ± 0.002 (tie); g
 - Paused at the user's request. No compute running: no GCP VMs or disks (hnet-*/hx-*), no Prime pods, no local jobs.
   Next step when resuming: SmolLM2-135M/360M bpb on the mix_v1 validation set as a reference line (CPU, free), then an
   evolve round under the scaling/modality filter. Rotate the Prime and GCP keys.
+- docs/STRATEGY_TOKENIZATION.md: reading of the H-Net author's Chinese chunking video (split characters 2 -> 11 -> 0
+  over 56B -> 500B training bytes; the model discovers UTF-8 character units from data), what it says about our
+  results (our runs saw 30-150x less data than where their segmentation settled; at fixed L05 10x data closes the
+  no-hint gap from 0.046 to 0.007), seven ideas ordered by cost, and the strategy for fixing tokenization.
