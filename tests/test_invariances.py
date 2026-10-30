@@ -41,6 +41,17 @@ VARIANTS = {
                                     "decision_kwargs": {"probe_rank": 8, "feat_point": 1.0}},
     "end_mlp_quantile_feat_region": {"router": "end_mlp", "decision": "quantile",
                                      "decision_kwargs": {"probe_rank": 8, "feat_region": 0.5, "region_window": 16}},
+    # first-byte chunk refresh (evolve g5-compute-01: every chunk; -02: surprise-routed half of the chunks, running
+    # threshold in eval); gain_init != 0 so the refresh is active from the start
+    "end_mlp_quantile_refresh": {"router": "end_mlp", "decision": "quantile",
+                                 "_model": {"refresh": {"layout": "T1", "gain_init": 0.5}}},
+    "end_mlp_quantile_refresh_routed": {
+        "router": "end_mlp", "decision": "quantile",
+        "chunk_vocab": [{"buckets": 4096, "n_hash": 2, "max_len": 16, "pred_weight": 0.5, "n_neg": 256,
+                         "suffix_lens": [2, 3, 4, 6, 8, 12, 16]}],
+        "_model": {"refresh": {"layout": "T1", "capacity": 0.5, "probe_rank": 8, "gain_init": 0.5},
+                   "trie_head": {"rows": 4099, "dim": 16, "n_hash": 2, "max_len": 8, "topk": 8},
+                   "match_model": {"orders": [2, 4, 8], "enc": True, "dec": True, "gate": True}}},
 }
 
 

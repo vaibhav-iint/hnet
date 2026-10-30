@@ -449,6 +449,8 @@ class HNetForCausalLM(nn.Module):
                 out.aux_loss = out.aux_loss + st.decider.probe_weight * r.probe_loss
             if r.teach_loss is not None and self.training:  # decision_kwargs.teach (already weighted, curriculum)
                 out.aux_loss = out.aux_loss + r.teach_loss
+            if r.refresh_loss is not None and self.training:  # HNetConfig.refresh: the surprise probe's own CE
+                out.aux_loss = out.aux_loss + st.main_network.refresh.probe_weight * r.refresh_loss
         if dc.router_entropy_weight > 0:
             ent = sum(_binary_entropy(r.p).mean() for r in bpred) / len(bpred)
             out.aux_loss = out.aux_loss + dc.router_entropy_weight * ent
@@ -580,6 +582,9 @@ class HNetForCausalLM(nn.Module):
             self.chunk_copy.reset_parameters()
         if self.copy_route is not None:
             self.copy_route.reset_parameters()
+        for st in self.backbone.stages():  # HNetConfig.refresh, after every other module (their init is unchanged)
+            if getattr(st, "refresh", None) is not None:
+                st.refresh.reset_parameters(std)
 
     def _router_consistency(self, logit: torch.Tensor, ids: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
         """Within-group variance of the byte-level router logit over positions in the batch that end in the same

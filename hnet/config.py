@@ -262,6 +262,13 @@ class HNetConfig:
     # "max_len": 16, "use_main": true, "prior_scale": 4.0}. Needs a 1-stage H-Net with "end" boundary semantics.
     # Empty = off (the default model is unchanged).
     prefix_head: dict = field(default_factory=dict)
+    # First-byte chunk refresh (hnet.model.refresh.ChunkRefresh, evolve g5-compute-01/02): one query-only extra
+    # main-network position per chunk, one byte after the chunk end (the next chunk's first byte now known): an
+    # isotropic stack at stage-1 widths over zfull_c + W_up e_{b_c+1}, zero-init gain, added to the stage-0 decoder
+    # input of the chunk's remaining bytes. {"layout": "T1", "capacity": 1.0, "probe_rank": 32, "probe_weight": 1.0,
+    # "momentum": 0.99, "gain_init": 0.0}; capacity < 1 refreshes only the chunks whose first byte surprised a
+    # detached next-byte probe on the main output. Needs a 1-stage H-Net with "end" stage-0 semantics. Empty = off.
+    refresh: dict = field(default_factory=dict)
 
     def attn_res_for_stage(self, s: int) -> int:
         return int(_per_stage(self.attn_res, self.n_stages + 1, "attn_res")[s])

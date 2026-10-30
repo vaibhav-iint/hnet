@@ -1,0 +1,39 @@
+g5-compute offline probes (measure before building). Checkpoint: g1-wild-01 seed 1, step 908 (hnet_ws + byte match
+model, val 1.502; the only trained match-model H-Net checkpoint available locally, the g3 .pt files were not readable
+from the bucket). Data: mix_v1 val, 140k en + 40k code + 10k math + 10k ml bytes, documents cut at 4096 bytes
+(bpb 1.545 on this sample). Scripts: probe.py in this directory (structure + mean-ablation + chunk surprise).
+
+1. Where are the bits? (offset = bytes since the last chunk end; offset 0 = the chunk-end byte, whose target is the
+   next chunk's first byte; compression 4.15)
+   off 0 : pos 0.241  bits/byte 2.670  share of bits 0.416
+   off 1 : pos 0.156  bits/byte 1.860  share of bits 0.188
+   off 2 : pos 0.140  bits/byte 1.431  share of bits 0.130
+   off 3 : pos 0.111  bits/byte 1.023  share of bits 0.074
+   off 4+: pos 0.353  bits/byte 0.88   share of bits 0.193
+   share of bits in the top-q positions by: oracle CE 0.42/0.76/0.97 (q = 10/25/50%), own entropy (causal)
+   0.29/0.61/0.90, chunk-end byte first 0.29/0.44/0.85, random 0.10/0.25/0.50.
+
+2. Where does the main network's (deep, chunk-rate) compute pay? Mean-ablation of the dechunked main output
+   (information, not offset): 1.545 -> 1.795, 0.251 bits/byte of hierarchy information.
+   off 0 : main-info 0.392 bits/byte  share of main-info 0.376  (share of bits 0.416)
+   off 1 : main-info 0.298            share 0.185               (0.188)
+   off 2 : main-info 0.254            share 0.142               (0.130)
+   off 3+: main-info 0.16             share 0.297               (0.266)
+   -> 62% of the deep path's information is used at bytes AFTER the first byte of a chunk, by a state computed
+      before that byte was known (never refreshed inside the chunk). Basis of g5-compute-01.
+   top 10/25/50% bytes by own entropy hold 29/61/90% of the bits but only 11/30/63% of the main-info: the deep path
+   pays least where the model is most uncertain. KILLED: entropy-routed byte-level compute (mixture-of-depths over
+   bytes by the model's own uncertainty); it would place compute where the existing deep compute is least used, and a
+   BPE analogue exists (MoD over tokens).
+
+3. Routing signal for g5-compute-02: chunks ranked by the surprise of their revealed first byte (model CE at the
+   chunk-end byte). corr(first-byte surprise, bits in the rest of the chunk) = 0.42.
+   top 25% chunks: 48.5% of the off>=1 bits, 36.0% of the off>=1 main-info, 40.5% of the off>=1 bytes
+   top 50% chunks: 83.9% of the off>=1 bits, 77.5% of the off>=1 main-info, 76.0% of the off>=1 bytes
+   (most of the concentration is chunk length: surprising first bytes start long / novel words.)
+
+4. KILLED as a measurement: frozen-feature add-on (an MLP on [decoder input; decoder output; main output] adding a
+   logit correction, equal add-on FLOPs: width w on all bytes vs w/q on chunk-end / top-entropy / random bytes). On
+   held-out documents AND on held-out random positions every arm is negative (-17 to -80 mbpb) while the train
+   positions gain +50 to +90 mbits: the trained readout is already optimal for its features, a frozen probe measures
+   memorization, not the value of compute. The value of extra compute can only be measured by training with it.

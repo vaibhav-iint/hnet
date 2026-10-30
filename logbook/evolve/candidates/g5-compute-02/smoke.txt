@@ -1,0 +1,9 @@
+CPU smoke (c02): L03 candidate model, mix_v1_small, 8192 bytes/step x 30 steps, Muon 0.02 / Adam 0.003, lr_multiplier_kinds=[embed,head,other], fp32; script scratchpad g5compute/smoke.sh
+  c02     train bpb step 3: 7.261 -> step 30: 3.233  val bpb 3.119  compression 4.13  NaN False  mean step_time 5.31s (shared CPU)
+      refresh/add_rms/s0 = 0.01859
+      refresh/frac/s0 = 0.5
+      refresh/gain_rms/s0 = 0.02196
+      refresh/probe_ce/s0 = 4.037
+      refresh/thr/s0 = 5.306
+      refresh/valid_frac/s0 = 0.7482
+  parent  train bpb step 3: 7.210 -> step 30: 3.076  val bpb 3.030  compression 4.13  NaN False  mean step_time 5.74s (shared CPU)

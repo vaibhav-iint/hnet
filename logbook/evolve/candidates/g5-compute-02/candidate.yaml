@@ -1,0 +1,36 @@
+id: g5-compute-02
+parents: [g4-combo-02]
+track: compute
+hypothesis: >
+  Adaptive per-chunk depth, routed by an H-Net-only signal. Same first-byte refresh as g5-compute-01
+  (hnet/model/refresh.py) but (a) the main network keeps all three layers (chunk-end depth unchanged), (b) only half
+  of the chunks are refreshed: those whose revealed first byte surprised a detached low-rank next-byte probe on the
+  main output (exact top-k in training, running threshold in eval), and (c) it is paid for by MLP width (stage-1
+  d_intermediate 896 -> 512, main and refresh). Measured on a trained H-Net (probe.txt): ranking chunks by the surprise
+  of their first byte, the top 50% hold 84% of the bits and 78% of the main network's information after the first
+  byte (corr(first-byte surprise, bits of the rest of the chunk) = 0.42): when the deep state's guess of the next word
+  is wrong, the rest of the word is where the bits are, and those are exactly the chunks a refresh can help. A BPE
+  model has no first-byte-revealed moment inside a token, hence no such routing signal and no analogue (the nearest
+  thing, mixture-of-depths over tokens, routes on the token as a whole; not built).
+prediction:
+  val_bpb: "1.432 +- 0.010"
+  fitness_vs_parent: "-0.008 (if g5-compute-01 wins, -02 should keep >= half its gain at 1.8% fewer FLOPs than the parent)"
+  mechanism: "refresh/frac in eval within 0.40-0.60; refresh/probe_ce falls below 3 nats by step 300; refreshed chunks' rest-of-chunk bpb improves more than unrefreshed ones'"
+  falsified_if: "val_bpb >= parent (the narrower MLP costs more than the routed refresh buys)"
+branch: evolve/g5-compute
+model: configs/evolve/models/g5-compute-02.yaml
+set: ["model.lr_multiplier_kinds=[embed,head,other]"]
+checks:
+  params: "20,022,443 <= 20,023,040"
+  flops: "20.293 MFLOPs/byte training (hnet arm 20.372: -0.39%; parent -1.76%); training capacity exact (round(0.5 M) chunks per batch), eval capacity logged as refresh/frac"
+  tests: "tests/test_refresh.py, tests/test_invariances.py (routed refresh variant on the match + suffix memory + trie stack), full suite"
+  fairness: logbook/evolve/candidates/g5-compute-02/fairness.md
+  grad_audit: logbook/evolve/candidates/g5-compute-02/grad_audit.txt
+  smoke: logbook/evolve/candidates/g5-compute-02/smoke.txt
+  probe: logbook/evolve/candidates/g5-compute-01/probe.txt
+risks: >
+  (1) MLP width 896 -> 512 in the main network is a large cut; the routed refresh must make up for it. (2) Eval uses a
+  running threshold on the probe's surprise (as the quantile decider does for boundaries): realized eval capacity may
+  drift from 0.5 (logged; FLOPs fairness is defined on training). (3) Selection is batch-coupled in training (top-k
+  over the batch), per-chunk in eval: same pattern as the rank decider. (4) The probe reaches only itself (autograd
+  test); the LM loss cannot game the routing (no path), but it cannot improve it either.
