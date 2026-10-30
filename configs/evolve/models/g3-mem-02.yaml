@@ -1,0 +1,99 @@
+# g3-mem-02 (evolve generation 3, memory track): the fast prefix-trie output head (g3-mem-01) stacked on the best
+# H-Net, g2-match-mem (hnet_ws_L03 + in-context match model + suffix-keyed chunk memory). Copy of
+# configs/evolve/models/g2-match-mem.yaml with two edits:
+#   * dc.chunk_vocab.buckets 25733 -> 12821 (2 x 12912 x 192 = 4,958,208 parameters freed): the
+#     chunk table is ~7x cheaper per parameter to lose than the byte n-gram tables on the trained hnet_ws L03
+#     checkpoint (logbook/evolve/candidates/g3-mem-02/budget_probe.json: halving the chunk table +0.018 bpb for
+#     4.94M parameters, dropping only the 7- and 8-gram tables +0.046 bpb for 1.85M);
+#   * trie_head as in g3-mem-01: 2 x 77383 rows x 32 + query projection 192 x 32 (4,958,656 parameters), keys
+#     hash(chunk prefix . b), query = dechunked main-network output, scoring the top 64 bytes of the logits (LM head
+#     + the match model's copy bonus).
+model:
+  type: hnet
+  arch_layout:
+  - m2
+  - - T3
+  - m2
+  d_model:
+  - 192
+  - 256
+  d_intermediate:
+  - 0
+  - 896
+  vocab_size: 256
+  tie_embeddings: false
+  ssm:
+    d_state: 160
+    d_conv: 4
+    expand: 2
+    headdim: 64
+    ngroups: 1
+    chunk_size: 256
+  attn:
+    num_heads:
+    - 3
+    - 3
+    num_kv_heads: null
+    head_dim:
+    - null
+    - 128
+    rotary_emb_dim:
+    - null
+    - null
+    rope_theta: 10000.0
+    window_size:
+    - -1
+    - -1
+    nope_every: 0
+  dc:
+    target_ratios:
+    - 4.145
+    ratio_loss_alpha: 0.03
+    router: end_mlp
+    router_kwargs: {}
+    decision: quantile
+    chunker: select
+    dechunker: ema
+    ste: true
+    aux_loss: ratio
+    aux_loss_scope: local
+    chunk_vocab:
+    - buckets: 12821
+      n_hash: 2
+      max_len: 16
+      pred_weight: 0.5
+      n_neg: 1024
+      suffix_lens:
+      - 2
+      - 3
+      - 4
+      - 6
+      - 8
+      - 12
+      - 16
+      suffix_gate_init: 0.0
+    router_prior_weight: 1.0
+    router_prior_frac: 0.1
+  ngram_embed:
+    ns:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    buckets: 4483
+  match_model:
+    orders:
+    - 4
+    - 8
+    - 16
+    - 32
+    enc: true
+    dec: true
+    gate: true
+  trie_head: {rows: 77383, dim: 32, n_hash: 2, max_len: 16, query: main, topk: 64}
+  norm_eps: 1.0e-05
+  initializer_range: 0.02
+  lr_multiplier: auto
+  lr_multiplier_n_gpt: 4.145
