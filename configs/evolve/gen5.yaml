@@ -1,0 +1,71 @@
+# evolve generation 5 (scripts/evolve/make_gen.py; benchmark: configs/search/ladder_1e16_L03.yaml)
+name: evolve_g5
+out_root: runs/search/evolve_g5
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/evolve_g5
+seeds:
+- 1
+- 2
+params:
+  best_mlr:
+    bpe: 0.02
+  adam_lr: 0.003
+params_note: best_mlr.bpe = BPE's best Muon LR from ladder_lr_1e16 (report/best_params.yaml); adam_lr = Adam-part LR (embeddings,
+  heads, norms), fixed, not tuned yet
+fairness: strict
+set:
+- train.optimizer=muon
+- train.muon.lr=${best_mlr.bpe}
+- train.muon.lr_embed=${adam_lr}
+- train.muon.lr_head=${adam_lr}
+- train.muon.lr_other=${adam_lr}
+- train.muon.momentum_warmup_steps=90
+- eval.every=90
+- train.ckpt_every=227
+runs:
+- name: g5_compute_01
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g5-compute-01.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+  - model.lr_multiplier_kinds=[embed,head,other]
+- name: g5_compute_02
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g5-compute-02.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+  - model.lr_multiplier_kinds=[embed,head,other]
+- name: g5_output_01
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g5-output-01.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+  - model.lr_multiplier_kinds=[embed,head,other]
+- name: g5_output_02
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g5-output-02.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+  - model.lr_multiplier_kinds=[embed,head,other]
+- name: g5_output_bpe_mem
+  config: configs/ladder/runs/ladder_bpe.yaml
+  model: configs/evolve/models/g5-output-bpe-mem.yaml
+  set:
+  - data.micro_batch=16
+  - data.batch_tokens=131072
+  - train.train_tokens=119013376
+report:
+  baseline: null
+  labels:
+    g5_compute_01: 'Compute only a dynamic-chunking model can place: a deep re-query one byte after each chunk end'
+    g5_compute_02: Adaptive per-chunk depth, routed by an H-Net-only signal
+    g5_output_01: Put the FLOP-free parameters where the bits are decided
+    g5_output_02: Reallocate the parameter budget from the input side to the output side by measurement rather than argument
+    g5_output_bpe_mem: The BPE analogue of g5-output-01
