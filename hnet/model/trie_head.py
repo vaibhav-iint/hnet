@@ -27,6 +27,19 @@ p.b against z. This module adds that score to the byte logits with a hashed tabl
 
 The scores are computed in row chunks under activation checkpointing (the gathered rows, [T, V, dim], are never
 held for the whole batch).
+
+Fast variant (``topk: k > 0``, generation 3): score only the k bytes the model's own logits rank highest at t
+(``base_logits``, detached top-k: the LM head plus any other logit term, e.g. the match model's bonus), with the same
+keys (prefix_t . b), tables and query:
+
+    logit_t[b] += u_t . sum_k P_k[hash_k(prefix_t . b) mod rows]     for b in topk_k(base_logits_t), else 0
+
+k gathered rows per table per byte instead of V (4x fewer at k = 64, V = 256), no activation checkpointing (the
+[T, k, dim] rows fit), so no recomputed gather: the gather and, above all, the embedding backward over T x V indices
+were what made the full head 2.15x slower per step on an A100 (g1 runs: 3.26 vs 1.51 s per step for hnet_ws). The
+candidate set is a deterministic, causal function of the base logits at t (no extra state at inference); bytes
+outside it get no trie score. With k = V it is the full head (same keys, same scores, up to summation order).
+``topk: 0`` (default) keeps the full head bit-identical.
 """
 
 from __future__ import annotations
@@ -55,9 +68,11 @@ def _scores(u: torch.Tensor, H: torch.Tensor, rows: int, cand: torch.Tensor, *we
 
 class TrieHead(nn.Module):
     def __init__(self, d_query: int, vocab_size: int, rows: int, dim: int = 32, n_hash: int = 2, max_len: int = 16,
-                 query: str = "main"):
+                 query: str = "main", topk: int = 0):
         super().__init__()
         assert query in ("main", "final"), query
+        assert 0 <= int(topk) <= int(vocab_size), topk
+        self.topk = int(topk)
         self.rows, self.dim, self.n_hash, self.max_len = int(rows), int(dim), int(n_hash), int(max_len)
         self.vocab_size, self.query = int(vocab_size), query
         self.tables = nn.ModuleList(nn.Embedding(self.rows, self.dim) for _ in range(self.n_hash))
@@ -101,3 +116,21 @@ class TrieHead(nn.Module):
             args = (u[s:s + rows], H[:, s:s + rows], self.rows, cand, *weights)
             outs.append(checkpoint(_scores, *args, use_reentrant=False) if grad else _scores(*args))
         return torch.cat(outs, 0), length
+
+    def rescore(self, q: torch.Tensor, ids: torch.Tensor, ctx: SeqCtx, boundary_mask: torch.Tensor,
+                base_logits: torch.Tensor):
+        """Fast head (``topk`` > 0): q [T, d_query], base_logits [T, V] -> (cand [T, k] int64 = the detached top-k
+        bytes of the base logits, vals [T, k] fp32 trie scores of prefix_t . cand, [T] prefix length). The caller adds
+        ``vals`` at ``cand`` (``base_logits.scatter_add(1, cand, vals)``)."""
+        assert self.topk > 0, "rescore needs topk > 0"
+        H, length = self.prefix_hashes(ids, ctx, boundary_mask)
+        cand = base_logits.detach().topk(self.topk, dim=-1).indices  # [T, k]
+        u = self.query_proj(q.to(self.query_proj.weight.dtype) if not torch.is_autocast_enabled() else q).float()
+        c1 = cand + 1  # the full head's candidate code (byte + 1)
+        s = None
+        for j, t in enumerate(self.tables):
+            key = ((H[j][:, None] * _PRIME) ^ c1) * _MULT
+            e = F.embedding(torch.remainder(key, self.rows), t.weight).float()  # [T, k, dim]
+            s = e if s is None else s + e
+        vals = torch.einsum("tkd,td->tk", s, u)
+        return cand, vals, length

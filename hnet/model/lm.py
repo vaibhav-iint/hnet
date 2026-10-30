@@ -377,14 +377,18 @@ class HNetForCausalLM(nn.Module):
             binfo = ByteInfo(bank, torch.arange(ids.numel(), device=ids.device))
         h, bpred = self.backbone(x, ctx, input_ids=ids, boundaries=boundaries, binfo=binfo, dec_add=dec_add)
         pstats = {}
-        trie_bias = trie_len = None
+        trie_bias = trie_len = trie_sparse = None
         if self.trie_head is not None:
             r0 = bpred[0]
             assert r0.semantics == "end", "trie_head needs 'end' boundary semantics at stage 0"
             q = r0.main_out if self.trie_head.query == "main" else h
-            trie_bias, trie_len = self.trie_head(q, ids, ctx, r0.boundary_mask)
+            if self.trie_head.topk > 0:  # fast head: rescore the top-k bytes of the final logits (below)
+                trie_sparse = (q, r0.boundary_mask)
+            else:
+                trie_bias, trie_len = self.trie_head(q, ids, ctx, r0.boundary_mask)
         if self.prefix_head is not None:  # rescore the top-k bytes against the trie of the learned chunks
-            assert self.match_model is None and trie_bias is None, "prefix_head is not combined with other logit heads"
+            assert self.match_model is None and self.trie_head is None, \
+                "prefix_head is not combined with other logit heads"
             ph = self.prefix_head
             if binfo is not None and binfo.bank.shape[1] >= ph.max_len:
                 pbank = binfo.bank
@@ -407,6 +411,11 @@ class HNetForCausalLM(nn.Module):
             logits = self.lm_head(h).float() + self.match_model.logit_bonus(h, cand, self.config.vocab_size)
             if trie_bias is not None:
                 logits = logits + trie_bias
+            if trie_sparse is not None:
+                logits, pstats, trie_len = self._trie_rescore(logits, trie_sparse, ids, ctx, labels)
+            out = logits_outputs(logits, labels, return_logits, batch_shape)
+        elif trie_sparse is not None:
+            logits, pstats, trie_len = self._trie_rescore(self.lm_head(h).float(), trie_sparse, ids, ctx, labels)
             out = logits_outputs(logits, labels, return_logits, batch_shape)
         else:
             out = lm_outputs(h, self.lm_head, labels, return_logits, batch_shape, logit_bias=trie_bias)
@@ -436,7 +445,8 @@ class HNetForCausalLM(nn.Module):
         if trie_bias is not None:
             with torch.no_grad():
                 stats["trie/bonus_rms"] = trie_bias.detach().pow(2).mean().sqrt()
-                stats["trie/prefix_len"] = trie_len.float().mean()
+        if trie_len is not None:
+            stats["trie/prefix_len"] = trie_len.float().mean()
         stats.update(pstats)
         stats.update({f"chunk_vocab_ce/s{s}": v.detach() for s, v in vocab_ce.items()})
         if dc.router_prior_weight > 0 and self.training and bpred and bpred[0].logit is not None:
@@ -486,6 +496,22 @@ class HNetForCausalLM(nn.Module):
             stats[f"positions/s{s + 1}"] = n_sel
         out.stats = stats
         return out
+
+    def _trie_rescore(self, base, trie_sparse, ids, ctx, labels):
+        """Fast trie head (HNetConfig.trie_head.topk > 0): add the trie scores of the k bytes ranked highest by the
+        base logits [T, V] fp32 (LM head + any other logit term). Returns (logits, stats, prefix length)."""
+        q, mask = trie_sparse
+        cand, vals, length = self.trie_head.rescore(q, ids, ctx, mask, base)
+        logits = base.scatter_add(1, cand, vals)
+        stats = {}
+        with torch.no_grad():
+            stats["trie/bonus_rms"] = vals.detach().pow(2).mean().sqrt()  # over the k rescored bytes
+            if labels is not None:
+                lab = labels.reshape(-1)
+                ok = lab != IGNORE_INDEX
+                hit = (cand == lab[:, None]).any(-1)
+                stats["trie/topk_cov"] = (hit & ok).sum().float() / ok.sum().clamp(min=1)
+        return logits, stats, length
 
     # ------------------------------------------------------------------ utilities
     def init_weights(self):
