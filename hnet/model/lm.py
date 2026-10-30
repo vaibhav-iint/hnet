@@ -444,6 +444,11 @@ class HNetForCausalLM(nn.Module):
         aux_terms = self.backbone.aux_losses(bpred)
         out.aux_loss = self.config.dc.ratio_loss_alpha * sum(loss for loss, _ in aux_terms)
         dc = self.config.dc
+        for st, r in zip(self.backbone.stages(), bpred):  # decision_kwargs.probe_rank: the decider's next-byte probe
+            if r.probe_loss is not None and self.training:  # (reads the encoder output detached: reaches the probe only)
+                out.aux_loss = out.aux_loss + st.decider.probe_weight * r.probe_loss
+            if r.teach_loss is not None and self.training:  # decision_kwargs.teach (already weighted, curriculum)
+                out.aux_loss = out.aux_loss + r.teach_loss
         if dc.router_entropy_weight > 0:
             ent = sum(_binary_entropy(r.p).mean() for r in bpred) / len(bpred)
             out.aux_loss = out.aux_loss + dc.router_entropy_weight * ent

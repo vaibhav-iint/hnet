@@ -51,6 +51,8 @@ def param_groups(model) -> Dict[str, List[torch.nn.Parameter]]:
                 key = f"s{stage}.{parts[i]}"
                 if parts[i] == "chunk_vocab" and i + 1 < len(parts) and parts[i + 1].startswith("suffix"):
                     key += ".suffix_gates"  # dc.chunk_vocab.suffix_lens gates, reported separately from the tables
+                if parts[i] == "decider" and i + 1 < len(parts):  # decision_kwargs score features
+                    key += ".router_probe" if parts[i + 1] == "router_probe" else ".feat_gain"
             else:  # ... except the innermost one, which is that stage's Isotropic main network
                 key = f"s{stage - 1}.main_network"
         groups.setdefault(key, []).append(p)
@@ -67,6 +69,11 @@ def objective_terms(model, out, ids) -> Dict[str, torch.Tensor]:
         cv = getattr(st, "chunk_vocab", None)
         if cv is not None and r.vocab_tgt is not None:
             terms[f"next_chunk_ce/s{st.stage_idx}"] = cv.pred_loss(r.inner_out, r.vocab_tgt)
+    for s, r in enumerate(out.bpred):
+        if getattr(r, "probe_loss", None) is not None:  # decision_kwargs.probe_rank: the decider's next-byte probe
+            terms[f"router_probe_ce/s{s}"] = r.probe_loss
+        if getattr(r, "teach_loss", None) is not None:  # decision_kwargs.teach: the probe teaches the router
+            terms[f"router_teach/s{s}"] = r.teach_loss
     dc = model.config.dc
     if dc.router_prior_weight > 0 and out.bpred and out.bpred[0].logit is not None:
         tgt = ((ids == 0x20) | (ids == 0x0A)).float()
@@ -129,7 +136,8 @@ def grad_table(model, terms: Dict[str, torch.Tensor], groups: Dict[str, List[tor
 
 def mechanism_metrics(out) -> Dict[str, float]:
     keep = ("compression/", "p_mid/", "p_margin/", "dechunk_rms/", "residual_rms/", "score_std/", "tau/", "F/", "G/",
-            "residual_gate/", "trie/", "suffix_gate", "explore_", "chunk_copy", "copy_route/")
+            "residual_gate/", "trie/", "suffix_gate", "explore_", "chunk_copy", "copy_route/", "probe_", "feat_gain",
+            "router_agree", "router_own", "comp_seg", "attn_ctx", "bnd_on_ws")
     m = {k: float(v) for k, v in out.stats.items() if k.startswith(keep)}
     for s, r in enumerate(out.bpred):
         m[f"boundary_frac/s{s}"] = float(r.boundary_mask.float().mean())

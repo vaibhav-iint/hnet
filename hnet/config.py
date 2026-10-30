@@ -73,6 +73,18 @@ class DCConfig:
     #   explore: 0.0 (off), explore_frac: 0.3 -> annealed Gumbel-top-k exploration of the rank decisions in training
     #   (noise scale `explore` in standardized score units, linearly to 0 at explore_frac of training; exact
     #   compression; see routing/decide.py)
+    #   probe_rank: 0 (off), feat_point: 0.0, feat_region: 0.0, region_window: 16, feat_learn: true, probe_weight: 1.0
+    #   -> stage-0 score features: a rank-`probe_rank` next-byte probe on the detached encoder output (own CE, weight
+    #   probe_weight) gives the entropy H_t of p(x_{t+1} | x_<=t); the rank is taken over z + g_pt f(H_t) + g_rg
+    #   f(causal mean of H over region_window bytes), restandardized, with learned gains initialized at feat_point /
+    #   feat_region. Point: prior-free "close the chunk where the next byte is hard" (the word basin, not the suffix
+    #   basin). Region: the exact batch budget of boundaries moves to hard regions and away from predictable ones
+    #   (copies, boilerplate): compression adapts per region / document at unchanged training FLOPs. The region feature
+    #   is the log of the region mean, centred, not divided by its std (an elasticity, not a z-score).
+    #   router_w0: 1.0, router_ramp: 0.0 -> the router's own score enters the mix with weight router_w0 rising linearly
+    #   to 1 at router_ramp of training (a feature-led start). score_floor: 0.0 -> floor of the std that standardizes
+    #   the router score (with router_kwargs.init_scale 0 the scores are constant at init: no 1/std blow-up, and a
+    #   router with no opinion yet has no say).
     # chunk_vocab: a hashed vocabulary for the learned chunks (model/chunk_vocab.py), dict or per-stage list:
     #   {buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 4096}; null = off. Needs "end" routers.
     #   Optional suffix keys: suffix_lens: [2, 3, ...] (each <= max_len), suffix_gate_init: 0.0 -- the chunk vector also

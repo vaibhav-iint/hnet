@@ -1,0 +1,39 @@
+# python -m hnet.analysis.grad_audit configs/evolve/models/g3-route-01.yaml --text <mix_v1_small val-en, 64 kB>
+#   --batch 2 --length 1024 --steps 0 30 --progress 0.0   (the L03 candidate model itself, warm start on)
+# router_probe_ce/s0 reaches s0.decider.router_probe and nothing else (the probe reads the encoder output detached);
+# byte_ce reaches s0.decider.feat_gain (the region gain, through the STE/EMA confidences) and never the probe (the
+# entropy features are detached); router_prior/s0 (the parent's whitespace warm start, unchanged) reaches the router
+# and what feeds it, not the probe. The 30 plain-SGD steps (lr 1e-2) barely train the probe (CE 5.54 -> 5.44): at init
+# the probe's entropy is ~constant (std below the 0.25-nat floor), the region feature is ~0 and the candidate starts as
+# its parent; under the benchmark's Adam LR the probe is informative by step ~30 (smoke.txt: probe_ce 5.5 -> 3.1).
+
+
+== gradient norms by (objective, parameter group) after 0 steps
+                                       embeddings             ngram_embeddings                   s0.encoder             s1.pad_dimension              s1.main_network                   s0.decoder            s0.routing_module         s0.decider.feat_gain      s0.decider.router_probe               s0.chunk_vocab  s0.chunk_vocab.suffix_gates             s0.residual_proj                      lm_head                  match_model
+byte_ce                                  4.99e-02                     2.60e-02                     1.41e+00                     3.50e-03                     4.60e-01                     1.51e+00                     2.54e-01                     1.22e-07                     0 (none)                     2.67e-02                     0 (none)                     1.02e+00                     2.61e+00                     1.97e-01
+ratio/s0                                 7.91e-05                     4.02e-05                     2.20e-03                     0 (none)                     0 (none)                     0 (none)                     1.21e-03                     6.88e-10                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     1.28e-04
+next_chunk_ce/s0                         0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     7.76e-02                     0 (none)                     0 (none)                     0 (none)                     0 (none)
+router_probe_ce/s0                       0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     5.78e-01                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)
+router_prior/s0                          2.33e-01                     7.62e-02                     6.25e+00                     0 (none)                     0 (none)                     0 (none)                     3.40e+00                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     5.36e-01
+
+== mechanism metrics
+  F/s0=0.242  G/s0=0.247  attn_ctx_ratio/s0=1  bnd_on_ws/s0=0.00202  boundary_frac/s0=0.242  comp_seg_corr/s0=-1  comp_seg_cv/s0=0.0171  compression/s0=4.13  dechunk_rms/s0=0.96  feat_gain_rg/s0=0.75  p_margin/s0=0.372  p_mid/s0=0.0659  probe_ce/s0=5.54  probe_entropy/s0=5.54  residual_rms/s0=0.0409  router_agree/s0=1  router_own_on_ws/s0=0  score_std/s0=1.17  suffix_gate/s0=0.5  suffix_gate_n12/s0=0.5  suffix_gate_n16/s0=0.5  suffix_gate_n2/s0=0.5  suffix_gate_n3/s0=0.5  suffix_gate_n4/s0=0.5  suffix_gate_n6/s0=0.5  suffix_gate_n8/s0=0.5  tau/s0=0.58
+
+== warnings
+  - s0.chunk_vocab.suffix_gates: no objective reaches it (zero gradient at init)
+  - next_chunk_ce/s0: sends the router no gradient (dc.chunk_ste=false; the STE sits after dechunking)
+
+== gradient norms by (objective, parameter group) after 30 steps
+                                       embeddings             ngram_embeddings                   s0.encoder             s1.pad_dimension              s1.main_network                   s0.decoder            s0.routing_module         s0.decider.feat_gain      s0.decider.router_probe               s0.chunk_vocab  s0.chunk_vocab.suffix_gates             s0.residual_proj                      lm_head                  match_model
+byte_ce                                  1.97e-02                     2.86e-02                     5.76e-01                     9.21e-04                     1.26e-01                     3.96e-01                     2.68e-01                     1.14e-06                     0 (none)                     1.47e-02                     6.25e-05                     7.97e-01                     1.33e+00                     1.10e-01
+ratio/s0                                 5.40e-06                     7.19e-06                     1.58e-04                     0 (none)                     0 (none)                     0 (none)                     7.57e-05                     8.50e-11                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     6.35e-06
+next_chunk_ce/s0                         7.91e-05                     3.33e-05                     2.19e-03                     3.19e-06                     7.04e-04                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     9.70e-02                     9.15e-09                     0 (none)                     0 (none)                     1.56e-04
+router_probe_ce/s0                       0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     5.93e-01                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)
+router_prior/s0                          1.30e-02                     9.14e-03                     3.99e-01                     0 (none)                     0 (none)                     0 (none)                     1.97e-01                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     8.39e-02
+
+== mechanism metrics
+  F/s0=0.242  G/s0=0.548  attn_ctx_ratio/s0=1  bnd_on_ws/s0=0.712  boundary_frac/s0=0.242  comp_seg_corr/s0=-1  comp_seg_cv/s0=0.0171  compression/s0=4.13  dechunk_rms/s0=1.1  feat_gain_rg/s0=0.75  p_margin/s0=0.135  p_mid/s0=0.701  probe_ce/s0=5.44  probe_entropy/s0=5.54  residual_rms/s0=0.0844  router_agree/s0=1  router_own_on_ws/s0=0.713  score_std/s0=1.64  suffix_gate/s0=0.5  suffix_gate_n12/s0=0.5  suffix_gate_n16/s0=0.5  suffix_gate_n2/s0=0.5  suffix_gate_n3/s0=0.5  suffix_gate_n4/s0=0.5  suffix_gate_n6/s0=0.5  suffix_gate_n8/s0=0.5  tau/s0=0.533
+
+== warnings
+  - next_chunk_ce/s0: sends the router no gradient (dc.chunk_ste=false; the STE sits after dechunking)
+  - p_mid/s0 = 0.70: most boundary decisions undecided (p in 0.4-0.6)

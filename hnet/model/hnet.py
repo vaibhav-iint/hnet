@@ -90,8 +90,10 @@ class HNet(nn.Module):
             from .routing.decide import DECISIONS, QuantileDecider
 
             assert dc["decision"] in DECISIONS, dc["decision"]
-            self.decider = (QuantileDecider(dc["target_ratio"], **(dc["decision_kwargs"] or {}))
+            self.decider = (QuantileDecider(dc["target_ratio"], d_model=d, **(dc["decision_kwargs"] or {}))
                             if dc["decision"] == "quantile" else None)
+            assert self.decider is None or self.decider.router_probe is None or stage_idx == 0, (
+                "decision_kwargs score features (probe_rank) are a stage-0 (byte-level) option")
             self.chunk_layer = registry.build("chunker", dc["chunker"], d, **(dc["chunker_kwargs"] or {}))
             need = getattr(self.chunk_layer, "requires_semantics", None)
             have = self.routing_module.boundary_semantics
@@ -155,8 +157,8 @@ class HNet(nn.Module):
                 residual = self.fuse_bypass(residual)
         r = self.routing_module(h, ctx, input_ids=input_ids, boundaries=boundaries[0] if boundaries else None)
         if self.decider is not None:
-            r = self.decider(r, ctx, progress=self.progress) if z_bias is None else \
-                self.decider(r, ctx, progress=self.progress, z_bias=z_bias)
+            r = self.decider(r, ctx, progress=self.progress, h=h, input_ids=input_ids) if z_bias is None else \
+                self.decider(r, ctx, progress=self.progress, h=h, input_ids=input_ids, z_bias=z_bias)
         else:
             assert z_bias is None, "z_bias (HNetConfig.copy_route) needs the quantile decision"
         x, ctx_inner = self.chunk_layer(h, r.boundary_mask, ctx)
