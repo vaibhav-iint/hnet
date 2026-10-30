@@ -14,6 +14,7 @@ budget, the population database and every GPU launch. Proposer agents own ideas 
   code, held-out code, math, multilingual (`scripts/eval/per_source.py --mix mix_v1`).
 * **Controls** every generation re-runs nothing; the reference numbers live in `logbook/evolve/population.jsonl`
   (`bpe`, `hnet`, `hnet_ws` at 2-3 seeds).
+* **Second rung before stacking** (added after the g4 transfer failure, notes_g5.md): a component that becomes a parent is also run, with its BPE analogue, at L05 1e16 (same 1e16 FLOPs, the larger model; ~20 min per run). If its gain shrinks by more than half between L03 and L05, it is not stacked further until the next ladder budget is checked.
 * **Seeds**: 2 per candidate; a candidate whose mean beats its parent by more than the larger seed spread gets a 3rd
   seed and a transfer check at L05 1e17 before it is promoted to the ladder default.
 
