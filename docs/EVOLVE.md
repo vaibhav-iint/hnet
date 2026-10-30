@@ -84,4 +84,5 @@ ledger below reaches the cap and reports. Generation 1 runs seeds 1 and 2 for ca
 | 3 (6 proposer candidates + orchestrator crossover g3-combo-01, seeds 1-2; 14 runs; branch evolve/g3 @ 7751276) | 1.27 h | $7.38 | 7 | g3-mem-02 1.461 ± 0.001, g3-combo-01 1.462 ± 0.003 (tie the bar); g3-route-02 prior-free 1.503 |
 | 4 (orchestrator crossovers g4-combo-02/03 + seed-3 confirmations of g3-combo-01, g3-mem-02, g2-bpe-match; 8 runs; branch evolve/g4 @ 3c7ad2f) | 0.81 h | $4.73 | 2 | **g4-combo-02 1.433 ± 0.002 (3 seeds), −0.028 vs BPE + copy 1.461 ± 0.001 (3 seeds)**; tokenizer-free g4-combo-03 1.442 ± 0.004 (−0.019) |
 | 4x transfer check at L05 1e17 (g4-combo-02 x2, g4-combo-03 x1, g2-bpe-match x2; branch evolve/g4 @ d8b7c91) | running | cap 2.5 h = $14.6 | | |
-| **total so far** | 5.13 h + 4x | **$30.10 of $50 + 4x** | | |
+| 5 (chunk refresh x2, main-network memory + BPE control, bigger trie; 10 runs; branch evolve/g5 @ ed87aa8) | running | cap 1.5 h = $8.8 | | |
+| **total so far** | 5.13 h + 4x + 5 | **$30.10 of $50 + 4x + 5 (projected ~$46)** | | |
