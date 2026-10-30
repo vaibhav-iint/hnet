@@ -1,0 +1,38 @@
+# g5-output-bpe-mem CPU smoke: the L03 control model itself (configs/evolve/models/g5-output-bpe-mem.yaml, 22,592,836
+# params: g2-bpe-match + the 97^2 x 256 product-key memory before layer 2) through hnet.train.train on mix_v1_small,
+# 4 x 512-token windows/step, 40 steps, Muon 0.02 / Adam 0.003, fp32 (the settings of g2-bpe-match's smoke).
+# Command: python -m hnet.train.train --config configs/ladder/runs/ladder_bpe.yaml --model configs/evolve/models/g5-output-bpe-mem.yaml
+#   --set data.dataset=mix_v1_small data.seq_len=512 data.micro_batch=4 data.batch_tokens=2048 train.train_tokens=81920
+#   eval.every=0 eval.at_end=true eval.downstream=null eval.val_bytes=200000 train.compile=false train.precision=fp32
+#   log.every=4 train.optimizer=muon train.muon.lr=0.02 train.muon.lr_embed=0.003 train.muon.lr_head=0.003
+#   train.muon.lr_other=0.003 train.muon.momentum_warmup_steps=4 train.ckpt_every=0
+# Result: pass. Train bpb 3.44 (step 4) -> 2.32 at step 40 (g2-bpe-match's smoke, same settings: 2.32), no NaN, val
+# 2.404 on 224 kB. memory/slots_used 0.88 at step 4 (BPE's stream at layer 2 starts diverse: 32k N(0,1) token
+# embeddings), falling to 0.34-0.41 from step 20 on (2048-token batches, 65k reads) as the stream trains; out_rms
+# 0.002 -> 0.02 (zero-init values, Adam lr 0.003). The path is wired; says nothing about the size of the gain.
+
+## trainer log
+[train] {"params": 22592836, "params_by_stage": {"0": 22592836}, "lr_multipliers": {"0": 1.0}, "peak_lr_by_group": ["muon/s0/wd0: 0.02", "embed/s0/wd0.1: 0.003", "head/s0/wd0: 0.003", "head/s0/wd0.1: 0.003", "other/s0/wd0: 0.003", "other/s0/wd0.1: 0.003"], "kind": "tokens", "seq_len": 512, "windows_per_step": 4, "micro_batch": 4, "grad_accum": 1, "world_size": 1, "total_steps": 40, "est_tokens_eq_per_step": 2048, "flops_per_byte@bpt": 17943032.207478892}
+step 4 | loss 10.41 | ce 10.41 | bpb 3.436 | aux_loss 0 | grad_norm 0.5825 | lr 0.02 | tokens_eq 8192 | bytes_per_sec 4869 | step_time 1.837
+step 8 | loss 10.1 | ce 10.1 | bpb 3.294 | aux_loss 0 | grad_norm 0.7894 | lr 0.02 | tokens_eq 1.638e+04 | bytes_per_sec 5751 | step_time 1.574
+step 12 | loss 9.324 | ce 9.324 | bpb 3.12 | aux_loss 0 | grad_norm 1.809 | lr 0.02 | tokens_eq 2.458e+04 | bytes_per_sec 5393 | step_time 1.636
+step 16 | loss 8.779 | ce 8.779 | bpb 3.097 | aux_loss 0 | grad_norm 0.9626 | lr 0.02 | tokens_eq 3.277e+04 | bytes_per_sec 5141 | step_time 1.627
+step 20 | loss 7.447 | ce 7.447 | bpb 2.569 | aux_loss 0 | grad_norm 1.754 | lr 0.02 | tokens_eq 4.096e+04 | bytes_per_sec 5073 | step_time 1.688
+step 24 | loss 8.261 | ce 8.261 | bpb 3.269 | aux_loss 0 | grad_norm 1.352 | lr 0.02 | tokens_eq 4.915e+04 | bytes_per_sec 4360 | step_time 1.711
+step 28 | loss 7.669 | ce 7.669 | bpb 2.829 | aux_loss 0 | grad_norm 0.9667 | lr 0.02 | tokens_eq 5.734e+04 | bytes_per_sec 4999 | step_time 1.601
+step 32 | loss 7.992 | ce 7.992 | bpb 2.552 | aux_loss 0 | grad_norm 1.194 | lr 0.02 | tokens_eq 6.554e+04 | bytes_per_sec 5980 | step_time 1.545
+step 36 | loss 7.499 | ce 7.499 | bpb 2.336 | aux_loss 0 | grad_norm 0.8283 | lr 0.005858 | tokens_eq 7.373e+04 | bytes_per_sec 6113 | step_time 1.55
+step 40 | loss 7.074 | ce 7.074 | bpb 2.318 | aux_loss 0 | grad_norm 0.8958 | lr 0 | tokens_eq 8.192e+04 | bytes_per_sec 5887 | step_time 1.53
+[train] saved /tmp/claude-0/-home-user-hnet-smollm3/e0ec0617-4cec-5bc8-abcc-216d4a655704/scratchpad/g5out/smoke_bpemem/ckpt/step_0000040
+
+## mechanism metrics (metrics.jsonl)
+step 4: bpb=3.436 memory/in_rms=1.001 memory/out_rms=0.001727 memory/slots_used=0.8845 memory/top_w=0.04929
+step 8: bpb=3.294 memory/in_rms=1.026 memory/out_rms=0.005555 memory/slots_used=0.8595 memory/top_w=0.05087
+step 12: bpb=3.12 memory/in_rms=1.099 memory/out_rms=0.01088 memory/slots_used=0.6974 memory/top_w=0.05405
+step 16: bpb=3.097 memory/in_rms=1.154 memory/out_rms=0.01905 memory/slots_used=0.4805 memory/top_w=0.06239
+step 20: bpb=2.569 memory/in_rms=1.288 memory/out_rms=0.02257 memory/slots_used=0.3417 memory/top_w=0.0658
+step 24: bpb=3.269 memory/in_rms=1.452 memory/out_rms=0.02118 memory/slots_used=0.4136 memory/top_w=0.06582
+step 28: bpb=2.829 memory/in_rms=1.415 memory/out_rms=0.01824 memory/slots_used=0.4063 memory/top_w=0.07151
+step 32: bpb=2.552 memory/in_rms=1.654 memory/out_rms=0.01754 memory/slots_used=0.3756 memory/top_w=0.07744
+step 36: bpb=2.336 memory/in_rms=1.717 memory/out_rms=0.01848 memory/slots_used=0.3814 memory/top_w=0.07362
+step 40: bpb=2.318 memory/in_rms=1.698 memory/out_rms=0.01891 memory/slots_used=0.3462 memory/top_w=0.07762

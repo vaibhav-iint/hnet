@@ -427,6 +427,8 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
         else:
             assert len(layout) == 1, layout
             comp_p["main"], comp_f["main"] = _iso(cfg, s, layout[0], L, cv)
+            if getattr(cfg, "main_memory", None):  # product-key memory (hnet.model.memory), once per main position
+                comp_p["main_memory"], comp_f["main_memory"] = _memory_counts(d, cfg.main_memory, cv)
         fpp = sum(comp_f.values())
         stages.append(
             dict(
@@ -478,7 +480,21 @@ def _dense(cfg: DenseConfig, seq_len, cv: FlopsConvention):
         comp_p["match_model"] = n_site * (d * d + 2 * k * d + k * d) + ((d + 1) * k if mm["gate"] else 0)
         comp_f["match_model"] = (n_site * (2 * d * d + (3 * k * d if cv.count_elementwise else 0.0))
                                  + ((2 * d * k + (3 * k if cv.count_elementwise else 0)) if mm["gate"] else 0.0))
+    if cfg.memory:  # product-key memory before a layer (hnet.model.memory), once per token
+        comp_p["memory"], comp_f["memory"] = _memory_counts(d, cfg.memory, cv)
     return comp_p, comp_f
+
+
+def _memory_counts(d: int, mem: dict, cv: FlopsConvention):
+    """(params, forward FLOPs per position) of hnet.model.memory.ProductKeyMemory at width d: values are lookups
+    (free, like the embedding); query projection, sub-key scores and the weighted value sum are matmul FLOPs, the
+    k x k candidate sums and the softmax elementwise."""
+    from hnet.model.memory import ProductKeyMemory
+
+    m = {"n_keys": 96, "k_dim": 32, "topk": 32, "center": 0.99, **mem}
+    n, kd, k = int(m["n_keys"]), int(m["k_dim"]), int(m["topk"])
+    params = n * n * d + 2 * n * kd + d * 2 * kd + d
+    return params, ProductKeyMemory.flops_per_position(d, n, kd, k, cv.count_elementwise, float(m["center"]) > 0)
 
 
 # ----------------------------------------------------------------------------- public API
@@ -497,7 +513,7 @@ def count_params_nonembed(cfg) -> int:
         V, d0 = cfg.vocab_size, cfg.d_model[0]
         return count_params(cfg) - V * d0 * (1 if cfg.tie_embeddings else 2)
     p = _dense(cfg, 1, SPEC)[0]
-    return int(p["body"] + p.get("match_model", 0))
+    return int(p["body"] + p.get("match_model", 0) + p.get("memory", 0))
 
 
 def model_flops(
@@ -566,7 +582,7 @@ def model_flops(
             flops_per_token=fpt,
             per_stage=[stage],
             params=int(sum(comp_p.values())),
-            params_nonembed=int(comp_p["body"] + comp_p.get("match_model", 0)),
+            params_nonembed=int(comp_p["body"] + comp_p.get("match_model", 0) + comp_p.get("memory", 0)),
             bytes_per_position=[bpt],
             seq_len=seq_len,
             training=training,

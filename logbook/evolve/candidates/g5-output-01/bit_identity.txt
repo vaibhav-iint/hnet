@@ -1,0 +1,22 @@
+# Bit identity of existing configs: parent origin/evolve/g4 (3c7ad2f, git archive of hnet/) vs this branch, forward +
+# backward. scripts/evolve/fingerprint.py: seed 0, init_weights, one train-mode forward + backward on 2 x 600 bytes of
+# mix_v1 val; sha256 of the logits, of every parameter gradient (sorted by name) and of the stats dict. Covers the
+# H-Net arms (hnet_L03, the g3/g4 stack with match model + suffix memory + fast trie + read-back) and the dense path
+# the change touches (bpe_L03, and g2-bpe-match, whose Isotropic inject path now has a memory-aware twin).
+# Result: diff empty (IDENTICAL).
+## parent
+configs/ladder/models/hnet_L03.yaml: logits 214638963527d671 loss 5.5359625816345215 aux 2.5949666500091553 grads 988d63d05928fe5c stats 7e2619d9e08dbf52 n_params 20010025
+configs/evolve/models/g4-combo-02.yaml: logits 3e73e3d426d2c6af loss 5.619941234588623 aux 2.570709228515625 grads e9978015a42da669 stats 89efcea9a417e1b7 n_params 20022699
+configs/evolve/models/g3-mem-02.yaml: logits 5b2d0783ca25b95e loss 5.559517860412598 aux 2.6264874935150146 grads a1fa155d24ab91de stats d1f94c02432b5683 n_params 20022699
+configs/ladder/models/bpe_L03.yaml: logits 02157bd045c4cadf loss 10.440498352050781 aux 0.0 grads f9a79c958f3617c3 stats 6d01adcc94a65359 n_params 20023040
+configs/evolve/models/g2-bpe-match.yaml: logits 02157bd045c4cadf loss 10.440498352050781 aux 0.0 grads c0980fab3e81dbf0 stats 03c86e141f3a09b3 n_params 20161284
+## this branch
+configs/ladder/models/hnet_L03.yaml: logits 214638963527d671 loss 5.5359625816345215 aux 2.5949666500091553 grads 988d63d05928fe5c stats 7e2619d9e08dbf52 n_params 20010025
+configs/evolve/models/g4-combo-02.yaml: logits 3e73e3d426d2c6af loss 5.619941234588623 aux 2.570709228515625 grads e9978015a42da669 stats 89efcea9a417e1b7 n_params 20022699
+configs/evolve/models/g3-mem-02.yaml: logits 5b2d0783ca25b95e loss 5.559517860412598 aux 2.6264874935150146 grads a1fa155d24ab91de stats d1f94c02432b5683 n_params 20022699
+configs/ladder/models/bpe_L03.yaml: logits 02157bd045c4cadf loss 10.440498352050781 aux 0.0 grads f9a79c958f3617c3 stats 6d01adcc94a65359 n_params 20023040
+configs/evolve/models/g2-bpe-match.yaml: logits 02157bd045c4cadf loss 10.440498352050781 aux 0.0 grads c0980fab3e81dbf0 stats 03c86e141f3a09b3 n_params 20161284
+# In-suite: tests/test_main_memory.py::test_zero_values_leave_the_hnet_unchanged_bit_for_bit (flag on with zero values ==
+# the model without the memory, bit for bit, plain and the full g4 stack, train and eval mode) and
+# ::test_zero_values_leave_the_dense_model_unchanged_bit_for_bit (with and without the token match model);
+# ::test_init_of_every_other_module_is_unchanged (the memory is built and initialized under a forked RNG).

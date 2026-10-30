@@ -1,0 +1,15 @@
+# Fairness check: evolve_g5
+
+Mode: **strict** (all held-equal fields identical across every run)
+
+Held equal across all runs: **data** = `mix_v1 shards=None shuffle=0 xwin=True`; **optimizer** = `muon wd=0.1 clip=1.0 adam_betas=[0.9, 0.95] adam_eps=1e-08 adam_weight_decay=0.1 lr=0.02 lr_embed=0.003 lr_head=0.003 lr_mult_kinds=None lr_other=0.003 momentum=0.95 momentum_warmup_start=0.85 momentum_warmup_steps=90 nesterov=True ns_steps=5 residual_wd=None router=adam weight_decay=0.0`; **schedule** = `wsd warmup=0.1 decay=0.2 shape=inverse_sqrt`; **precision** = `bf16 compile=blocks`; **val** = `standard 10000000B every=90`; **downstream** = `paper7 every=0 limit=1000`
+
+| run | setting | kind | params_M | bytes_per_step | total_bytes_M | gflops_per_byte | lr | router | dechunker | ratios | alpha | lr_mult |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| bpe | - | tokens | 20.02 | 540739 | 491.0 | 0.02037 | 0.02 | - | - | - | - | - |
+| hnet | - | bytes | 20.01 | 544768 | 494.6 | 0.02037 | 0.02 | end_mlp | ema | [4.145] | 0.03 | auto |
+| g5_output_01 | - | bytes | 19.99 | 544768 | 494.6 | 0.0207 | 0.02 | end_mlp | ema | [4.145] | 0.03 | auto |
+| g5_output_02 | - | bytes | 20.02 | 544768 | 494.6 | 0.02066 | 0.02 | end_mlp | ema | [4.145] | 0.03 | auto |
+| g5_output_bpe_mem | - | tokens | 22.59 | 540739 | 491.0 | 0.02062 | 0.02 | - | - | - | - | - |
+
+**Problems:** none

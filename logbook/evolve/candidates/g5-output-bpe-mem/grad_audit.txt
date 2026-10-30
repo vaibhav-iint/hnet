@@ -1,0 +1,18 @@
+# g5-output-bpe-mem step-0 gradient audit: configs/evolve/models/g5-output-bpe-mem.yaml (L03 BPE + token match + product-key memory 97^2, real size), CPU fp32,
+# 2 x 2048 mix_v1 val tokens, init_weights(), SGD lr 1e-2 for the step-3 table (torch.autograd.grad of the token CE per parameter group).
+== gradient norms of token CE by parameter group after 0 SGD steps (loss 10.4203)
+  embeddings           2.958e-02
+  backbone             1.062e-01
+  lm_head              1.489e+00
+  match_model          1.076e+00
+  memory.addressing    0.000e+00   <- exactly 0
+  memory.values        5.309e-03
+  stats: {'memory/slots_used': 0.9191, 'memory/top_w': 0.0488, 'memory/out_rms': 0.0, 'memory/in_rms': 1.0023}
+== gradient norms of token CE by parameter group after 3 SGD steps (loss 10.3187)
+  embeddings           2.956e-02
+  backbone             1.061e-01
+  lm_head              1.489e+00
+  match_model          1.073e+00
+  memory.addressing    1.319e-07
+  memory.values        5.272e-03
+  stats: {'memory/slots_used': 0.9205, 'memory/top_w': 0.0487, 'memory/out_rms': 0.0, 'memory/in_rms': 1.0024}

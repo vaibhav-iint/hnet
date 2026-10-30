@@ -474,6 +474,9 @@ class HNetForCausalLM(nn.Module):
         if trie_len is not None:
             stats["trie/prefix_len"] = trie_len.float().mean()
         stats.update(pstats)
+        for st in self.backbone.stages():  # product-key memory (HNetConfig.main_memory): slots read, read sharpness
+            if st.memory is not None:
+                stats.update(st.memory.last_stats)
         if cstate is not None:  # where the boundaries went: out of verified copies, onto copy breaks, into novel text
             with torch.no_grad():
                 m0 = bpred[0].boundary_mask.reshape(-1)
@@ -580,6 +583,10 @@ class HNetForCausalLM(nn.Module):
             self.chunk_copy.reset_parameters()
         if self.copy_route is not None:
             self.copy_route.reset_parameters()
+        for st in self.backbone.stages():  # product-key memory (HNetConfig.main_memory): last, under a forked RNG,
+            if st.memory is not None:  # so every other initialization is identical with and without it
+                with torch.random.fork_rng(devices=[]):
+                    st.memory.reset_parameters()
 
     def _router_consistency(self, logit: torch.Tensor, ids: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
         """Within-group variance of the byte-level router logit over positions in the batch that end in the same

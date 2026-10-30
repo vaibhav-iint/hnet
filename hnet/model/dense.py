@@ -55,6 +55,16 @@ class LlamaLM(nn.Module):
             assert cfg.attn_res == 0, "match_model is not combined with attn_res"
             with torch.random.fork_rng(devices=[]):
                 self.match_model = TokenMatchModel(cfg.d_model, cfg.vocab_size, cfg.n_layers, **cfg.match_model)
+        # product-key memory before layer ``memory.layer`` (hnet.model.memory; the BPE control of the H-Net's
+        # HNetConfig.main_memory), zero-init values, built under a forked RNG like the match model
+        self.memory = None
+        if cfg.memory:
+            from .memory import ProductKeyMemory
+
+            assert cfg.attn_res == 0, "memory is not combined with attn_res"
+            with torch.random.fork_rng(devices=[]):
+                self.memory = ProductKeyMemory(cfg.d_model, norm_eps=cfg.norm_eps, **cfg.memory)
+            assert self.memory.layer <= cfg.n_layers, "memory.layer > n_layers"
 
     def forward(
         self,
@@ -67,11 +77,16 @@ class LlamaLM(nn.Module):
         ids, ctx, batch_shape = pack_inputs(input_ids, cu_seqlens, max_seqlen)
         if self.match_model is not None:
             return self._forward_match(ids, ctx, batch_shape, labels, return_logits)
-        h = self.backbone(self.embeddings(ids), ctx)
+        h = self.backbone(self.embeddings(ids), ctx, memory=self._memory_arg())
         out = lm_outputs(h, self.lm_head, labels, return_logits, batch_shape)
         out.aux_loss = torch.zeros((), device=ids.device)
         out.stats = {"positions/s0": ids.new_full((), ids.numel(), dtype=torch.float32)}
+        if self.memory is not None:
+            out.stats.update(self.memory.last_stats)
         return out
+
+    def _memory_arg(self):
+        return (self.memory.layer, self.memory) if self.memory is not None else None
 
     def _forward_match(self, ids, ctx, batch_shape, labels, return_logits) -> CausalLMOutput:
         """``forward`` with the token match model: copy candidates (no gradient) enter at the embedding, before
@@ -82,7 +97,7 @@ class LlamaLM(nn.Module):
         if mm.has("enc"):
             x = x + mm.site_embed("enc", cand, self.embeddings).to(x.dtype)
         inject = (mm.dec_layer, mm.site_embed("dec", cand, self.embeddings)) if mm.has("dec") else None
-        h = self.backbone(x, ctx, inject=inject)
+        h = self.backbone(x, ctx, inject=inject, memory=self._memory_arg())
         if mm.gate is not None:
             cols, vals = mm.gate_values(h, cand)
             out = lm_outputs_sparse_bonus(h, self.lm_head, labels, return_logits, batch_shape, cols, vals)
@@ -90,6 +105,8 @@ class LlamaLM(nn.Module):
             out = lm_outputs(h, self.lm_head, labels, return_logits, batch_shape)
         out.aux_loss = torch.zeros((), device=ids.device)
         out.stats = {"positions/s0": ids.new_full((), ids.numel(), dtype=torch.float32)}
+        if self.memory is not None:
+            out.stats.update(self.memory.last_stats)
         with torch.no_grad():  # mechanism metrics: match coverage / accuracy per order, gate biases
             hit = cand != mm.vocab_size
             lab = labels.reshape(-1) if labels is not None else None
@@ -111,6 +128,9 @@ class LlamaLM(nn.Module):
         self.backbone.init_linear_weights(std, self.backbone.height)
         if self.match_model is not None:
             self.match_model.reset_parameters()
+        if self.memory is not None:  # last, under a forked RNG: every other initialization is unchanged
+            with torch.random.fork_rng(devices=[]):
+                self.memory.reset_parameters()
 
     def stage_of_param(self, name: str) -> int:
         return 0

@@ -1,0 +1,34 @@
+# g5-output-02 CPU smoke: the L03 candidate model itself (configs/evolve/models/g5-output-02.yaml, 20,022,699 params:
+# g4-combo-02 with the chunk table at 6410 buckets and the trie at 115849 rows per table) through hnet.train.train on
+# mix_v1_small, 2 x 2048-byte windows/step, 30 steps, Muon 0.02 / Adam 0.003, lr_multiplier_kinds [embed, head, other],
+# WSD, fp32. Command: as g5-output-01/smoke.txt with --model configs/evolve/models/g5-output-02.yaml.
+# Result: pass. Train bpb 7.18 (step 3) -> 3.26 (step 30; parent g4-combo-02 with the same settings: 3.25), no NaN,
+# compression 4.13-4.14 (target 4.145), trie/topk_cov 0.97-0.99, trie/bonus_rms rising as in the parent. Step-30
+# checkpoint on 8 x 2048 bytes of mix_v1 val: 3.046 (g4-combo-02 3.023; 30-step differences are early-training noise).
+# Config-only candidate: the smoke checks that the resized tables train, not the size of the gain.
+
+## trainer log
+[train] {"params": 20022699, "params_by_stage": {"0": 16776811, "1": 3245888}, "lr_multipliers": {"0": 2.3509, "1": 1.0}, "peak_lr_by_group": ["muon/s0/wd0: 0.02", "muon/s1/wd0: 0.02", "embed/s0/wd0.1: 0.007053", "head/s0/wd0: 0.007053", "head/s0/wd0.1: 0.007053", "other/s0/wd0: 0.007053", "other/s0/wd0.1: 0.007053", "other/s1/wd0: 0.003"], "kind": "bytes", "seq_len": 2048, "windows_per_step": 2, "micro_batch": 2, "grad_accum": 1, "world_size": 1, "total_steps": 30, "est_tokens_eq_per_step": 988.1785283474067, "flops_per_byte@target": 18040427.00100547}
+step 3 | loss 8.25 | ce 4.976 | bpb 7.179 | aux_loss 3.274 | grad_norm 5.231 | lr 0.02 | tokens_eq 2962 | bytes_per_sec 2648 | step_time 1.545 | comp 4.14
+step 6 | loss 5.701 | ce 2.682 | bpb 3.869 | aux_loss 3.019 | grad_norm 1.358 | lr 0.02 | tokens_eq 5925 | bytes_per_sec 2599 | step_time 1.576 | comp 4.14
+step 9 | loss 5.499 | ce 2.469 | bpb 3.561 | aux_loss 3.03 | grad_norm 1.002 | lr 0.02 | tokens_eq 8888 | bytes_per_sec 2732 | step_time 1.498 | comp 4.14
+step 12 | loss 5.146 | ce 2.179 | bpb 3.143 | aux_loss 2.967 | grad_norm 2.115 | lr 0.02 | tokens_eq 1.185e+04 | bytes_per_sec 2377 | step_time 1.723 | comp 4.14
+step 15 | loss 5.871 | ce 2.946 | bpb 4.25 | aux_loss 2.925 | grad_norm 0.9547 | lr 0.02 | tokens_eq 1.481e+04 | bytes_per_sec 419 | step_time 9.767 | comp 4.13
+step 18 | loss 5.171 | ce 2.262 | bpb 3.263 | aux_loss 2.91 | grad_norm 1.412 | lr 0.02 | tokens_eq 1.778e+04 | bytes_per_sec 2635 | step_time 1.554 | comp 4.14
+step 21 | loss 5.109 | ce 2.24 | bpb 3.232 | aux_loss 2.869 | grad_norm 1.209 | lr 0.02 | tokens_eq 2.074e+04 | bytes_per_sec 2647 | step_time 1.546 | comp 4.13
+step 24 | loss 4.908 | ce 2.08 | bpb 3.001 | aux_loss 2.828 | grad_norm 0.7017 | lr 0.02 | tokens_eq 2.37e+04 | bytes_per_sec 2818 | step_time 1.453 | comp 4.14
+step 27 | loss 4.35 | ce 2.038 | bpb 2.94 | aux_loss 2.313 | grad_norm 1.18 | lr 0.005858 | tokens_eq 2.667e+04 | bytes_per_sec 2790 | step_time 1.467 | comp 4.14
+step 30 | loss 5.098 | ce 2.26 | bpb 3.261 | aux_loss 2.838 | grad_norm 0.7762 | lr 0 | tokens_eq 2.963e+04 | bytes_per_sec 2925 | step_time 1.399 | comp 4.14
+[train] saved /tmp/claude-0/-home-user-hnet-smollm3/e0ec0617-4cec-5bc8-abcc-216d4a655704/scratchpad/g5out/smoke02/ckpt/step_0000030
+
+## mechanism metrics (metrics.jsonl)
+step 3: bpb=7.179 bnd_on_ws/s0=0.7 chunk_vocab_ce/s0=5.949 compression/s0=4.137 trie/bonus_rms=0.2388 trie/topk_cov=0.9641
+step 6: bpb=3.869 bnd_on_ws/s0=0.6717 chunk_vocab_ce/s0=5.919 compression/s0=4.137 trie/bonus_rms=1.227 trie/topk_cov=0.9717
+step 9: bpb=3.561 bnd_on_ws/s0=0.7152 chunk_vocab_ce/s0=5.929 compression/s0=4.137 trie/bonus_rms=1.628 trie/topk_cov=0.9929
+step 12: bpb=3.143 bnd_on_ws/s0=0.7182 chunk_vocab_ce/s0=5.804 compression/s0=4.137 trie/bonus_rms=1.839 trie/topk_cov=0.9895
+step 15: bpb=4.25 bnd_on_ws/s0=0.6226 chunk_vocab_ce/s0=5.996 compression/s0=4.133 trie/bonus_rms=1.887 trie/topk_cov=0.988
+step 18: bpb=3.263 bnd_on_ws/s0=0.7384 chunk_vocab_ce/s0=5.529 compression/s0=4.137 trie/bonus_rms=1.467 trie/topk_cov=0.9807
+step 21: bpb=3.232 bnd_on_ws/s0=0.6993 chunk_vocab_ce/s0=5.877 compression/s0=4.133 trie/bonus_rms=1.667 trie/topk_cov=0.9724
+step 24: bpb=3.001 bnd_on_ws/s0=0.7152 chunk_vocab_ce/s0=5.661 compression/s0=4.137 trie/bonus_rms=1.908 trie/topk_cov=0.9897
+step 27: bpb=2.94 bnd_on_ws/s0=0.6273 chunk_vocab_ce/s0=5.5 compression/s0=4.137 trie/bonus_rms=1.873 trie/topk_cov=0.9937
+step 30: bpb=3.261 bnd_on_ws/s0=0.6697 chunk_vocab_ce/s0=5.633 compression/s0=4.137 trie/bonus_rms=1.711 trie/topk_cov=0.9836

@@ -1,0 +1,73 @@
+id: g5-output-01
+parents: [g4-combo-02]
+track: output
+hypothesis: >-
+  Put the FLOP-free parameters where the bits are decided. On the trained g1-wild-01 checkpoint (hnet_ws + byte match
+  model; probes.json) the first byte of a chunk is 24% of the bytes and 42% of the bits (2.70 bits each; 3.50 where
+  the match model has no right candidate, 38% of all bits), and the first three bytes of a chunk carry 74% of them.
+  Three offline probes say these bits are limited neither by the output path nor by a missing lookup at the byte
+  level: a linear / MLP correction head on the frozen main-network output and decoder state recovers <= 0.056 bits
+  per chunk-start byte (<= 0.013 bpb), a chunk-keyed in-context copy adds 0.0005 bpb, and count-based output memories
+  keyed by the previous chunk or by the last 4-12 bytes add <= 0.002. What predicts the next chunk is the main
+  network's state; the main network is the only module that runs at chunk level and it has 3.2M of the 20.0M
+  parameters, while all 15M FLOP-free parameters (n-gram tables, chunk table, trie) are looked up at the byte level.
+  A product-key memory (Lample et al. 2019; Berges et al. 2024) gives the main network lookup parameters at a few dot
+  products per chunk: 97^2 = 9409 value rows of width 256 read (top 32 of the product keys, softmax-weighted) from the
+  residual stream before main layer 2 of 3 and added to it; query centering by a running mean (the trained stream
+  shares a common direction: a fresh 96^2 memory reads 4510 of 9216 slots on the trained stream, 8119 centered). Funded by
+  the table that both ablation probes rank least load-bearing per parameter: the chunk table is halved again (12821 ->
+  6410 buckets per hash, -2.46M), mean-ablated on g1-wild-01 it costs 0.0045 bpb/M vs 0.010/M for the 7- and 8-gram
+  tables and 0.02-0.17/M for the 3- to 6-gram tables (g5-output-02/budget_probe.json); the memory takes 2.43M of the
+  2.46M, all else as g4-combo-02. +0.23% training FLOPs (query 2x256x64, sub-key scores 2x2x97x32, weighted sum
+  2x32x256, per chunk). Zero-init values: identical to the parent model at init.
+prediction:
+  fitness: "val bpb = g4-combo-02 - 0.012 +- 0.010 at equal seeds (g4-combo-02 predicted ~1.44: so ~1.428); falsified if
+    >= g4-combo-02 + 0.003 (the memory buys less than the halved chunk table loses)"
+  mechanism: >-
+    memory/slots_used (share of the 9409 slots read in one micro-batch: 8 x 8512 bytes, ~16k chunks, ~525k reads;
+    uniform reads would touch ~100%) >= 0.3 by step 300 (0.07 at init on 1k bytes, 0.03-0.16 in the 4 kB-batch CPU
+    smoke: the fresh main network's stream is low-rank); memory/out_rms / memory/in_rms >= 0.1 by the end (the
+    memory is used, not a bias); the gain over g4-combo-02 concentrated on chunk-start bytes (bits by prefix length,
+    scratch probe where_bits.py on the final checkpoints): >= 60% of the gain at prefix length 0-1. If slots_used stays
+    < 0.1 the memory collapsed into a bias (rule 4): look at the stream's rank before blaming the idea.
+branch: evolve/g5-output
+model: configs/evolve/models/g5-output-01.yaml
+set: ["model.lr_multiplier_kinds=[embed,head,other]"]
+checks:
+  params: "19,992,427 <= 20,023,040 (built model == hnet.flops count)"
+  flops: "0.020702 GFLOPs/byte training vs hnet 0.020372 (+1.62%; g4-combo-02 +1.39%), at target compression"
+  tests: "pass: tests/test_main_memory.py (20 tests: default configs have no memory and unchanged state dicts; every other
+    module's init unchanged; zero values == the model without the memory bit for bit, H-Net (plain and the g4 stack:
+    match + suffix memory + fast trie + read-back) in train and eval mode, and dense with / without the token match
+    model; the memory reads the stream at layers 1..n_layers; out-of-range layer rejected; product-key top-k == exact
+    top-k over all n^2 slots; output == softmax-weighted values; gradient paths; only read slots get value gradient;
+    params / FLOPs == built models; candidate configs within budget; stats logged; query centering reads earlier steps
+    only (no within-batch coupling, eval leaves it alone); centering spreads the reads of a stream with a common
+    direction; dense causality and packed == separate) + tests/test_invariances.py variant
+    end_mlp_quantile_suffix_match_trie_topk_memory (causality and packed == separate, with and without n-grams,
+    memory values N(0, 0.5)). Full suite (python -m pytest tests, CPU): 999 passed, 44 skipped, 1 deselected
+    (tests/test_eval_smoke_gpt2.py::test_gpt2_hellaswag_50, network)."
+  bit_identity: logbook/evolve/candidates/g5-output-01/bit_identity.txt
+  grad_audit: logbook/evolve/candidates/g5-output-01/grad_audit.txt
+  grad_paths: >-
+    byte CE -> values from step 0 (8.9e-3 at init on real text); query / sub-keys / norm get exactly 0 at init (values
+    are 0, so the read does not depend on the addressing) and nonzero from step 1 (1.8e-6 after 3 SGD steps; Adam
+    normalizes); next-chunk CE and the trie's CE reach the memory through the main network once values != 0; ratio
+    loss and router prior never reach it (they act upstream of the main network). Upstream: the memory output adds to
+    the residual stream, so with values != 0 the byte CE reaches the lower main layers, the chunk vectors and the
+    encoder also through the memory read (tests/test_main_memory.py::test_gradient_paths).
+  smoke: logbook/evolve/candidates/g5-output-01/smoke.txt
+  probes: logbook/evolve/candidates/g5-output-01/probes.json
+  fairness: logbook/evolve/candidates/g5-output-01/fairness.md
+bpe_analogue: >-
+  Exists: a product-key memory in the BPE Transformer at the same depth (before layer 2 of 3), read once per token as
+  the H-Net's is once per chunk (tokens and chunks have the same rate, 4.145 bytes). Control built:
+  g5-output-bpe-mem = g2-bpe-match (the bar, 1.461) + the same memory (+2.43M params on top: BPE has no FLOP-free
+  table it could shrink without changing its tokenizer, so the control is an upper bound for BPE). If BPE gains as
+  much, the memory is a generic small-model win and the H-Net's margin over the bar is unchanged.
+author: output / parameter-budget proposer (generation 5)
+next_if_fails: >-
+  If slots_used stays low: BatchNorm-style standardization of the query (offline: 8407 vs 8119 slots on the trained
+  stream, 1860 vs 1305 on the fresh one) or reading the memory after the last layer. If the memory is used but the
+  gain is < 0.005: the chunk-start bits are data-limited, not capacity-limited, at 1e16 FLOPs; stop adding
+  chunk-level parameters and test the memory at L05 / 1e17 before discarding it.

@@ -47,7 +47,10 @@ def param_groups(model) -> Dict[str, List[torch.nn.Parameter]]:
             while i < len(parts) and parts[i] == "main_network":  # each HNet.main_network is the next stage ...
                 stage += 1
                 i += 1
-            if i < len(parts) and parts[i] in roles:
+            if i < len(parts) and parts[i] == "memory":  # HNetConfig.main_memory: values vs addressing (query/keys)
+                key = f"s{stage}.memory." + ("values" if i + 1 < len(parts) and parts[i + 1] == "values"
+                                             else "addressing")
+            elif i < len(parts) and parts[i] in roles:
                 key = f"s{stage}.{parts[i]}"
                 if parts[i] == "chunk_vocab" and i + 1 < len(parts) and parts[i + 1].startswith("suffix"):
                     key += ".suffix_gates"  # dc.chunk_vocab.suffix_lens gates, reported separately from the tables
@@ -137,7 +140,7 @@ def grad_table(model, terms: Dict[str, torch.Tensor], groups: Dict[str, List[tor
 def mechanism_metrics(out) -> Dict[str, float]:
     keep = ("compression/", "p_mid/", "p_margin/", "dechunk_rms/", "residual_rms/", "score_std/", "tau/", "F/", "G/",
             "residual_gate/", "trie/", "suffix_gate", "explore_", "chunk_copy", "copy_route/", "probe_", "feat_gain",
-            "router_agree", "router_own", "comp_seg", "attn_ctx", "bnd_on_ws")
+            "router_agree", "router_own", "comp_seg", "attn_ctx", "bnd_on_ws", "memory/")
     m = {k: float(v) for k, v in out.stats.items() if k.startswith(keep)}
     for s, r in enumerate(out.bpred):
         m[f"boundary_frac/s{s}"] = float(r.boundary_mask.float().mean())

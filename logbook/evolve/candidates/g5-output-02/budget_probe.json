@@ -1,0 +1,74 @@
+{
+ "checkpoint": "g1-wild-01 seed 1 (scratchpad copy of runs/search/evolve_g1/g1_wild_01_s1)",
+ "windows": 24,
+ "base_bpb": 1.510668018244472,
+ "ablations": {
+  "ngram3": {
+   "bpb": 1.6588373917519252,
+   "delta": 0.14816937350745318,
+   "params_M": 0.858816,
+   "delta_per_M": 0.172527495420967
+  },
+  "ngram4": {
+   "bpb": 1.5870793431680006,
+   "delta": 0.07641132492352853,
+   "params_M": 0.858816,
+   "delta_per_M": 0.08897287070050923
+  },
+  "ngram5": {
+   "bpb": 1.5465810886806195,
+   "delta": 0.03591307043614744,
+   "params_M": 0.858816,
+   "delta_per_M": 0.04181695547841149
+  },
+  "ngram6": {
+   "bpb": 1.5275161211501511,
+   "delta": 0.016848102905679063,
+   "params_M": 0.858816,
+   "delta_per_M": 0.01961782606015615
+  },
+  "ngram7": {
+   "bpb": 1.5196417005667264,
+   "delta": 0.008973682322254373,
+   "params_M": 0.858816,
+   "delta_per_M": 0.010448899790239554
+  },
+  "ngram8": {
+   "bpb": 1.5189942239517216,
+   "delta": 0.008326205707249512,
+   "params_M": 0.858816,
+   "delta_per_M": 0.009694982053489353
+  },
+  "chunk_vocab": {
+   "bpb": 1.555181732836606,
+   "delta": 0.044513714592133935,
+   "params_M": 9.881472,
+   "delta_per_M": 0.004504765544256355
+  },
+  "match_enc": {
+   "bpb": 1.6087269012458316,
+   "delta": 0.09805888300135956,
+   "params_M": 0.197376,
+   "delta_per_M": 0.49681259626985835
+  },
+  "match_dec": {
+   "bpb": 1.5410598897399956,
+   "delta": 0.03039187149552358,
+   "params_M": 0.197376,
+   "delta_per_M": 0.1539795694285201
+  },
+  "ngram78": {
+   "bpb": 1.5431369705351266,
+   "delta": 0.032468952290654496,
+   "params_M": 1.717632,
+   "delta_per_M": 0.018903322883280293
+  },
+  "ngram678": {
+   "bpb": 1.5836090322940914,
+   "delta": 0.07294101404961939,
+   "params_M": 2.576448,
+   "delta_per_M": 0.02831068744629016
+  }
+ },
+ "method": "mean-ablation in place (every row of the table replaced by the table mean row; zero-ablation would also remove a constant offset), no retraining; bpb on 24 mix_v1 val windows x 8512 bytes, first 512 bytes of each unscored; checkpoint g1-wild-01 seed 1 (hnet_ws + byte match model, chunk table 2 x 25733 x 192, n-gram tables 6 x 4473 x 192)"
+}

@@ -66,8 +66,15 @@ class HNet(nn.Module):
             return Isotropic(lay, d, cfg.d_intermediate[stage_idx], codes, mixer_kwargs, cfg.norm_eps,
                              attn_res=cfg.attn_res_for_stage(stage_idx))
 
+        self.memory = None
         if self.is_innermost:
             self.main_network = iso(layout[0])
+            if getattr(cfg, "main_memory", None):  # product-key memory (HNetConfig.main_memory), zero-init values;
+                from .memory import ProductKeyMemory  # built under a forked RNG: every other init is unchanged
+
+                with torch.random.fork_rng(devices=[]):
+                    self.memory = ProductKeyMemory(d, norm_eps=cfg.norm_eps, **cfg.main_memory)
+                assert self.memory.layer <= len(self.main_network.layers), "main_memory.layer > main network depth"
         else:
             n_stages = cfg.n_stages
             dc = cfg.dc.for_stage(stage_idx, n_stages)
@@ -148,6 +155,8 @@ class HNet(nn.Module):
         if self.pad_dimension is not None:
             h = torch.cat((h, self.pad_dimension.to(h.dtype).expand(h.shape[0], -1)), dim=-1)
         if self.is_innermost:
+            if self.memory is not None:
+                return self.main_network(h, ctx, memory=(self.memory.layer, self.memory))[:, :D_in], []
             return self.main_network(h, ctx)[:, :D_in], []
 
         h = self.encoder(h, ctx)

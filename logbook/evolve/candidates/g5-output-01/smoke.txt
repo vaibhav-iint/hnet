@@ -1,0 +1,43 @@
+# g5-output-01 CPU smoke: the L03 candidate model itself (configs/evolve/models/g5-output-01.yaml, 19,992,427 params:
+# g4-combo-02 with the chunk table at 6410 buckets + a 97^2 x 256 product-key memory before main layer 2) through
+# hnet.train.train on mix_v1_small, 2 x 2048-byte windows/step, 30 steps, Muon 0.02 / Adam 0.003 (the benchmark's
+# LRs), lr_multiplier_kinds [embed, head, other] (as g4-combo-02), WSD, fp32.
+# Command: python -m hnet.train.train --config configs/ladder/runs/ladder_hnet.yaml --model configs/evolve/models/g5-output-01.yaml
+#   --set data.dataset=mix_v1_small data.seq_len=2048 data.micro_batch=2 data.batch_bytes=4096 train.train_tokens=null
+#   train.train_bytes=122880 eval.every=0 eval.at_end=false eval.downstream=null train.compile=false train.precision=fp32
+#   log.every=3 train.optimizer=muon train.muon.lr=0.02 train.muon.lr_embed=0.003 train.muon.lr_head=0.003
+#   train.muon.lr_other=0.003 train.muon.momentum_warmup_steps=3 train.ckpt_every=0 "model.lr_multiplier_kinds=[embed,head,other]"
+# Result: pass. Train bpb 7.26 (step 3) -> 3.22 (step 30; parent g4-combo-02 with the same settings: 3.25; g5-output-02: 3.26),
+# no NaN, compression 4.13-4.14 (target 4.145). Step-30 checkpoints on 8 x 2048 bytes of mix_v1 val: g5-output-01 2.965,
+# g4-combo-02 3.023, g5-output-02 3.046 (30-step differences are early-training noise: the same config with the n-gram
+# tables at 4424 buckets gave 3.18 with and 3.19 without the memory). Memory values zeroed at eval: 2.964, i.e. the
+# memory carries ~0 after 30 steps (out_rms 0.0075 vs in_rms 1.08), as expected from zero-init values at Adam lr 0.003.
+# memory/slots_used 0.05-0.11 on the 4 kB training batches (~1k chunks, ~32k reads), 0.27 on the 16 kB val batch at step 30: the fresh main network's
+# stream is low-rank (the chunk vectors are boundary states, most ending on a space) and diversifies as it trains;
+# the BPE control reads 0.92 of its slots from step 0. Says the path works and is wired, not the size of the gain.
+
+## trainer log
+[train] {"params": 19992427, "params_by_stage": {"0": 14314987, "1": 5677440}, "lr_multipliers": {"0": 2.3509, "1": 1.0}, "peak_lr_by_group": ["muon/s0/wd0: 0.02", "muon/s1/wd0: 0.02", "embed/s0/wd0.1: 0.007053", "embed/s1/wd0.1: 0.003", "head/s0/wd0: 0.007053", "head/s0/wd0.1: 0.007053", "other/s0/wd0: 0.007053", "other/s0/wd0.1: 0.007053", "other/s1/wd0: 0.003", "other/s1/wd0.1: 0.003"], "kind": "bytes", "seq_len": 2048, "windows_per_step": 2, "micro_batch": 2, "grad_accum": 1, "world_size": 1, "total_steps": 30, "est_tokens_eq_per_step": 988.1785283474067, "flops_per_byte@target": 18085983.575191237}
+step 3 | loss 8.303 | ce 5.032 | bpb 7.259 | aux_loss 3.272 | grad_norm 5.379 | lr 0.02 | tokens_eq 2962 | bytes_per_sec 2730 | step_time 1.499 | comp 4.14
+step 6 | loss 5.67 | ce 2.655 | bpb 3.83 | aux_loss 3.015 | grad_norm 1.617 | lr 0.02 | tokens_eq 5925 | bytes_per_sec 3317 | step_time 1.234 | comp 4.14
+step 9 | loss 5.467 | ce 2.441 | bpb 3.522 | aux_loss 3.026 | grad_norm 1.012 | lr 0.02 | tokens_eq 8888 | bytes_per_sec 2107 | step_time 1.943 | comp 4.14
+step 12 | loss 5.102 | ce 2.151 | bpb 3.103 | aux_loss 2.952 | grad_norm 1.955 | lr 0.02 | tokens_eq 1.185e+04 | bytes_per_sec 2728 | step_time 1.501 | comp 4.14
+step 15 | loss 5.797 | ce 2.886 | bpb 4.163 | aux_loss 2.911 | grad_norm 1.061 | lr 0.02 | tokens_eq 1.481e+04 | bytes_per_sec 3062 | step_time 1.337 | comp 4.13
+step 18 | loss 5.115 | ce 2.227 | bpb 3.213 | aux_loss 2.888 | grad_norm 1.531 | lr 0.02 | tokens_eq 1.778e+04 | bytes_per_sec 3049 | step_time 1.343 | comp 4.14
+step 21 | loss 5.075 | ce 2.224 | bpb 3.208 | aux_loss 2.851 | grad_norm 1.237 | lr 0.02 | tokens_eq 2.074e+04 | bytes_per_sec 3378 | step_time 1.212 | comp 4.13
+step 24 | loss 4.793 | ce 2.032 | bpb 2.932 | aux_loss 2.761 | grad_norm 0.9055 | lr 0.02 | tokens_eq 2.37e+04 | bytes_per_sec 3184 | step_time 1.287 | comp 4.14
+step 27 | loss 4.609 | ce 2.031 | bpb 2.931 | aux_loss 2.578 | grad_norm 1.294 | lr 0.005858 | tokens_eq 2.667e+04 | bytes_per_sec 3189 | step_time 1.284 | comp 4.14
+step 30 | loss 5.031 | ce 2.233 | bpb 3.221 | aux_loss 2.799 | grad_norm 0.8272 | lr 0 | tokens_eq 2.963e+04 | bytes_per_sec 3214 | step_time 1.273 | comp 4.14
+[train] saved /tmp/claude-0/-home-user-hnet-smollm3/e0ec0617-4cec-5bc8-abcc-216d4a655704/scratchpad/g5out/smoke01/ckpt/step_0000030
+
+## mechanism metrics (metrics.jsonl)
+step 3: bpb=7.259 bnd_on_ws/s0=0.7 chunk_vocab_ce/s0=5.885 compression/s0=4.137 memory/in_rms=0.8734 memory/out_rms=0.001921 memory/slots_used=0.06908 memory/top_w=0.04711 trie/bonus_rms=0.2063 trie/topk_cov=0.9717
+step 6: bpb=3.83 bnd_on_ws/s0=0.6616 chunk_vocab_ce/s0=5.918 compression/s0=4.137 memory/in_rms=0.9175 memory/out_rms=0.004444 memory/slots_used=0.1053 memory/top_w=0.05462 trie/bonus_rms=1.251 trie/topk_cov=0.9722
+step 9: bpb=3.522 bnd_on_ws/s0=0.7152 chunk_vocab_ce/s0=5.896 compression/s0=4.137 memory/in_rms=0.968 memory/out_rms=0.003757 memory/slots_used=0.0525 memory/top_w=0.05182 trie/bonus_rms=1.715 trie/topk_cov=0.9883
+step 12: bpb=3.103 bnd_on_ws/s0=0.7182 chunk_vocab_ce/s0=5.765 compression/s0=4.137 memory/in_rms=1.001 memory/out_rms=0.003376 memory/slots_used=0.04974 memory/top_w=0.05231 trie/bonus_rms=1.79 trie/topk_cov=0.9839
+step 15: bpb=4.163 bnd_on_ws/s0=0.6226 chunk_vocab_ce/s0=5.94 compression/s0=4.133 memory/in_rms=1.014 memory/out_rms=0.004668 memory/slots_used=0.09236 memory/top_w=0.05645 trie/bonus_rms=1.937 trie/topk_cov=0.9846
+step 18: bpb=3.213 bnd_on_ws/s0=0.7343 chunk_vocab_ce/s0=5.511 compression/s0=4.137 memory/in_rms=1.031 memory/out_rms=0.005204 memory/slots_used=0.08502 memory/top_w=0.05826 trie/bonus_rms=1.538 trie/topk_cov=0.979
+step 21: bpb=3.208 bnd_on_ws/s0=0.6993 chunk_vocab_ce/s0=5.782 compression/s0=4.133 memory/in_rms=1.053 memory/out_rms=0.006194 memory/slots_used=0.1084 memory/top_w=0.0574 trie/bonus_rms=1.64 trie/topk_cov=0.9695
+step 24: bpb=2.932 bnd_on_ws/s0=0.7212 chunk_vocab_ce/s0=5.5 compression/s0=4.137 memory/in_rms=1.084 memory/out_rms=0.006748 memory/slots_used=0.08715 memory/top_w=0.05979 trie/bonus_rms=1.763 trie/topk_cov=0.99
+step 27: bpb=2.931 bnd_on_ws/s0=0.6465 chunk_vocab_ce/s0=5.421 compression/s0=4.137 memory/in_rms=1.089 memory/out_rms=0.007654 memory/slots_used=0.108 memory/top_w=0.06264 trie/bonus_rms=1.916 trie/topk_cov=0.9958
+step 30: bpb=3.221 bnd_on_ws/s0=0.6737 chunk_vocab_ce/s0=5.537 compression/s0=4.137 memory/in_rms=1.104 memory/out_rms=0.007807 memory/slots_used=0.09948 memory/top_w=0.05993 trie/bonus_rms=1.768 trie/topk_cov=0.9822
