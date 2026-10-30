@@ -1174,3 +1174,21 @@ BPE + Muon at LR 0.025: 1.5257 / 1.5237 / 1.5259 (1.525 ± 0.001), against BPE +
 (warm start + Muon 0.025) 1.631. Every "the H-Net matches BPE at tiny scale" statement in this log compared against
 AdamW BPE at an untuned LR; against the Muon-trained BPE the tiny H-Net trails by 0.106. EXP-027 rgate seed 2: 1.653
 (arm mean 1.700 over three seeds, still a lottery). The evolve benchmark (L03, mix_v1) already uses Muon for both.
+
+### Evolve g1: the match model beats BPE on seed 1, and the leak checks pass; generation 2 launched
+g1-wild-01 (in-context match model: copy candidates from the most recent earlier occurrence of the last 4/8/16/32
+bytes in the same document, entering as encoder/decoder embeddings and a gated logit bonus): **1.502** at step 908
+(seed 1), against BPE 1.656 (-0.154) and its warm-start parent 1.827 (-0.325). Leak checks on the trained checkpoint
+(`$S2/leak_check.py`, real validation text): changing every byte after position 1000 moves earlier logits by at most
+7.6e-6; the same document packed after a copy of itself in a separate segment differs by at most 1.8e-5; on 12 English
+FineWeb-Edu docs it scores 1.480 vs 1.657 for the parent; a document repeated inside one segment drops to 0.815 (parent
+1.742). So the gain is causal, document-local, and present on English, not only code.
+Other seed-1 finals: g1-mem-01 1.737, g1-mem-02 1.779, g1-opt-01 1.797, g1-arch-02 1.798, g1-arch-01 1.826,
+g1-alloc-01 1.826, g1-opt-02 1.836, g1-router-02 1.852, g1-alloc-02 1.867 (controls hnet 1.825, hnet_ws 1.827).
+Two GPU-only failures fixed (autocast-unsafe BCE in g1-router-01; resume crashed on a half-written checkpoint after a
+preemption, killing bpe_s2). Generation-1 VM preempted twice in us-central1-a (the watcher's gcloud filter used a regex
+alternation that matched nothing; fixed).
+Generation 2 (branch evolve/g2 @ 19043df, us-central1-f): the decisive fairness control **g2-bpe-match** (BPE with the
+same copy mechanism at token level: orders 1/2/4/8 tokens ≈ 4-33 bytes; +0.96% FLOPs, +0.69% params; offline the token
+index correctly proposes 81-87% of the tokens the byte index copies whole), the match model combined with g1-arch-02 /
+g1-mem-02 / g1-opt-01 and on the prior-free parent, the fixed g1-router-01, and mem-02 × arch-02; seeds 1-2.
