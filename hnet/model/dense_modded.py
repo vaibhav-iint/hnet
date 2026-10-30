@@ -203,6 +203,7 @@ class ModdedBlock(nn.Module):
 class ModdedGPT(nn.Module):
     def __init__(self, cfg: DenseConfig):
         super().__init__()
+        assert not cfg.match_model, "match_model is implemented for the 'llama' dense variant only"
         unknown = set(cfg.extra) - set(DEFAULT_EXTRA)
         assert not unknown, f"unknown modded extra keys: {sorted(unknown)}"
         x = {**DEFAULT_EXTRA, **cfg.extra}

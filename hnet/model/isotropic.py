@@ -105,18 +105,29 @@ class Isotropic(nn.Module):
         if self.attn_res_block > 0:  # one operator per sub-layer + one for the output
             self.attn_res = nn.ModuleList(DepthAttention(d_model, norm_eps) for _ in range(self.height + 1))
 
-    def forward(self, h: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
+    def forward(self, h: torch.Tensor, ctx: SeqCtx, inject=None) -> torch.Tensor:
+        """``inject``: optional ``(i, x)``, x [T, D] (or [1, T, D]) added to the residual stream (fp32) right before
+        layer i, 0 < i < len(layers) (DenseConfig.match_model's decoder-side candidates)."""
         squeeze = h.dim() == 2
         for layer in self.layers:  # shared per-stage tables (rotary, masks) built eagerly, outside compiled blocks
             prep = getattr(layer.mixer, "prepare_ctx", None)
             if prep is not None:
                 prep(ctx)
         if self.attn_res_block > 0:
+            assert inject is None, "inject is not supported with attn_res"
             out = self._forward_attn_res(h.unsqueeze(0) if squeeze else h, ctx)
             return out.squeeze(0) if squeeze else out
         hidden, residual = (h.unsqueeze(0) if squeeze else h), None
-        for layer in self.layers:
-            hidden, residual = layer(hidden, residual, ctx)
+        if inject is not None:
+            at, extra = inject
+            assert 0 < at < len(self.layers), at
+            for i, layer in enumerate(self.layers):
+                if i == at:  # residual + hidden is what layer i normalizes: add to the fp32 residual stream
+                    residual = residual + extra.float().reshape(residual.shape)
+                hidden, residual = layer(hidden, residual, ctx)
+        else:
+            for layer in self.layers:
+                hidden, residual = layer(hidden, residual, ctx)
         residual = hidden.float() if residual is None else residual + hidden.float()
         out = self.rmsnorm(residual, out_dtype=hidden.dtype)
         return out.squeeze(0) if squeeze else out

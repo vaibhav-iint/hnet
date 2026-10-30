@@ -1,0 +1,32 @@
+# g2-bpe-match step-0 gradient audit: configs/evolve/models/g2-bpe-match.yaml (L03, real size), CPU fp32,
+# 2 x 2048 mix_v1 val-code tokens, init_weights(), SGD lr 1e-2 for the step-3 table.
+
+== gradient norms of token CE by parameter group after 0 SGD steps (loss 10.4361)
+  embeddings             1.151e-02
+  backbone               4.779e-02
+  lm_head                5.767e-01
+  mm.proj.enc            4.652e-01
+  mm.offset.enc          4.345e-02
+  mm.gain.enc            0.000e+00   <- exactly 0
+  mm.proj.dec            4.652e-01
+  mm.offset.dec          4.347e-02
+  mm.gain.dec            0.000e+00   <- exactly 0
+  mm.gate(lm_head)       7.745e-01
+  stats: match_cov/o1=0.763  match_acc/o1=0.346  match_gate_b/o1=0.000  match_cov/o2=0.460  match_acc/o2=0.536  match_gate_b/o2=0.000  match_cov/o4=0.226  match_acc/o4=0.733  match_gate_b/o4=0.000  match_cov/o8=0.089  match_acc/o8=0.784  match_gate_b/o8=0.000
+  enc-site embedding rms 0.000e+00  vs token embedding rms 1.000
+
+== gradient norms of token CE by parameter group after 3 SGD steps (loss 10.3949)
+  embeddings             1.152e-02
+  backbone               4.816e-02
+  lm_head                5.768e-01
+  mm.proj.enc            4.657e-01
+  mm.offset.enc          4.507e-02
+  mm.gain.enc            2.376e-04
+  mm.proj.dec            4.657e-01
+  mm.offset.dec          4.505e-02
+  mm.gain.dec            2.377e-04
+  mm.gate(lm_head)       7.749e-01
+  stats: match_cov/o1=0.763  match_acc/o1=0.346  match_gate_b/o1=0.008  match_cov/o2=0.460  match_acc/o2=0.536  match_gate_b/o2=0.007  match_cov/o4=0.226  match_acc/o4=0.733  match_gate_b/o4=0.005  match_cov/o8=0.089  match_acc/o8=0.784  match_gate_b/o8=0.002
+  enc-site embedding rms 3.772e-03  vs token embedding rms 1.000
+
+Expected exact zeros at step 0: mm.gain.* (the gain multiplies the input of the zero-initialised projection P_s, so d loss / d gain = (P_s^T g) * E[c] = 0); they are nonzero after one step.
