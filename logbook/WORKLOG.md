@@ -1152,3 +1152,19 @@ at 1e17 before fitting multipliers (the iso-FLOP minimum is at the grid edge).
 Evolve generation 1, seed-1 finals so far: g1-arch-02 (offset-resolved read-back of chunk vectors) 1.798 vs the warm-start
 control 1.827 (-0.029); g1-arch-01 and g1-alloc-01 tie the control (1.826); g1-alloc-02 (8 bytes/chunk) 1.867. At 6-8
 bytes/chunk 90-98% of boundaries land on whitespace (controls at 4.15: 63-69%), so word alignment alone does not help.
+
+### 1e17 ladder complete; first two-budget fit (`logbook/tables/ladder_1e16_1e17_*_fit.json`, figures `ladder2_*`)
+L08: BPE 1.312, H-Net 1.789 (+0.48), ws 1.683 (+0.37); L09: BPE 1.333, H-Net 1.853 (+0.52), ws 1.753 (+0.42).
+Compute-optimal losses (iso-FLOP minima at the small edge of the grid for every arm and budget):
+| | 1e16 | 1e17 | exponent α | compute multiplier vs BPE (95% CI) |
+|---|---|---|---|---|
+| BPE | 1.660 | 1.224 | 0.132 | 1 |
+| H-Net prior-free | 1.887 | 1.355 | 0.144 | 0.43× [0.30, 0.63] |
+| H-Net warm start | 1.836 | 1.353 | 0.133 | 0.47× [0.31, 0.60] |
+At 1e16-1e17 the H-Net needs ~2.1-2.3× BPE's compute for the same loss. The prior-free arm's steeper exponent narrows the
+gap (+0.23 → +0.13); a naive extrapolation crosses BPE near 6e20 FLOPs, which two budgets and one seed cannot support.
+Caveats: BPE's Muon LR transferred to the H-Nets (costs them ~0.04), the `auto` LR multipliers stacked on Muon (g1-opt-01
+shows dropping them is worth ~0.03 at L03), prior-free arms in the losing basin at L03/L04 (interp audit), iso-FLOP
+minima at the grid edge (add L02/L03 at 1e17). The ladder VM shut down after finishing its queue (4.1 h, $24.3).
+Generation 1 of the evolve loop was preempted at 23:13 UTC and stayed down during a session pause; resumed 05:10 UTC with
+a 3.5-hour cap. EXP-026 KDA abandoned (its VM stopped at its time cap; the kernel is 10× slower and it trailed SWA).
