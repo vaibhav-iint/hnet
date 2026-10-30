@@ -476,7 +476,8 @@ class HNetForCausalLM(nn.Module):
             tgt = torch.zeros_like(H)
             tgt[idx[top]] = 1.0
         p = r.p.float().clamp(1e-6, 1 - 1e-6)
-        loss = F.binary_cross_entropy(p[free], tgt[free])
+        with torch.autocast(device_type=p.device.type, enabled=False):  # CUDA autocast refuses binary_cross_entropy
+            loss = F.binary_cross_entropy(p[free], tgt[free])
         with torch.no_grad():
             sel = r.boundary_mask.reshape(-1) & free
             ws = (ids.reshape(-1) == 0x20) | (ids.reshape(-1) == 0x0A)  # diagnostic only, never an input

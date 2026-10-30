@@ -47,9 +47,24 @@ def list_checkpoints(out_dir: str):
     out = []
     for n in os.listdir(d):
         m = _STEP_RE.match(n)
-        if m and os.path.exists(os.path.join(d, n, "meta.json")):
+        if m and _complete(os.path.join(d, n)):
             out.append((int(m.group(1)), os.path.join(d, n)))
     return sorted(out)
+
+
+def _complete(path: str) -> bool:
+    """A checkpoint dir is usable only if meta.json parses and model.pt exists: a preemption during a save can leave
+    an empty meta.json (evolve g1, bpe_s2), which must fall back to the previous checkpoint, not crash the resume."""
+    meta = os.path.join(path, "meta.json")
+    if not (os.path.exists(meta) and os.path.exists(os.path.join(path, "model.pt"))):
+        return False
+    try:
+        with open(meta) as f:
+            json.load(f)
+        return True
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+        print(f"[ckpt] skipping incomplete checkpoint {path} (unreadable meta.json)", flush=True)
+        return False
 
 
 def latest_checkpoint(out_dir: str) -> Optional[str]:
