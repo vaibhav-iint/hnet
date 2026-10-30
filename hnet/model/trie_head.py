@@ -36,7 +36,7 @@ keys (prefix_t . b), tables and query:
 
 k gathered rows per table per byte instead of V (4x fewer at k = 64, V = 256), no activation checkpointing (the
 [T, k, dim] rows fit), so no recomputed gather: the gather and, above all, the embedding backward over T x V indices
-were what made the full head 2.15x slower per step on an A100 (g1 runs: 3.26 vs 1.51 s per step for hnet_ws). The
+were what made the full head ~1.8x slower per step on an A100 (g1 runs: 1.88 vs 1.02 s mean step time). The
 candidate set is a deterministic, causal function of the base logits at t (no extra state at inference); bytes
 outside it get no trie score. With k = V it is the full head (same keys, same scores, up to summation order).
 ``topk: 0`` (default) keeps the full head bit-identical.

@@ -3,8 +3,10 @@ the full head (every byte scored) against the top-k head, on the same real mix_v
 
     OMP_NUM_THREADS=2 PYTHONPATH=. python scripts/evolve/bench_trie_head.py --bytes 8512 --ks 16 32 64
 
-Projection to the A100: the g1 runs measured hnet_ws at 1.51 s/step and g1-mem-01 (full head) at 3.26 s/step, i.e.
-1.75 s/step of head overhead; a head that costs a fraction x of the full head's time projects to 1.51 + 1.75 x.
+Projection to the A100: in the g1 runs (seed 1, step_time averaged over the 91 logged steps) hnet_ws took 1.02 s/step
+and g1-mem-01 (full head) 1.88 s/step (fastest steps: 0.73 vs 1.66 s), i.e. 0.86 s/step of head overhead; a head that
+costs a fraction x of the full head's CPU time projects to 1.02 + 0.86 x (assumes the head's GPU cost scales like its
+CPU cost; the full head also re-gathers under activation checkpointing, so this overstates the top-k head's cost).
 """
 
 from __future__ import annotations
@@ -20,7 +22,7 @@ from hnet.model.ctx import SeqCtx
 from hnet.model.trie_head import TrieHead
 
 VAL = "data/mix_v1/bytes/mix_v1_val_000000.bytes.bin"
-GPU_BASE, GPU_FULL = 1.51, 3.26  # s/step on an A100, hnet_ws and g1-mem-01 (logbook g1 runs, step_time)
+GPU_BASE, GPU_FULL = 1.02, 1.88  # mean s/step on an A100, hnet_ws and g1-mem-01 (g1 runs, seed 1, step_time)
 
 
 def main():
