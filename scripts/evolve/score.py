@@ -99,11 +99,10 @@ def main(argv=None):
     for e in rows:
         print(f"{e['id']:28s} {e['mean']:7.4f} {e['sd'] or 0:6.3f} {e['fitness'] if e['fitness'] is not None else float('nan'):8.4f}  {e['seeds']}")
     if a.write:
-        known = {(e["id"], e["gen"]) for e in db}
-        with open(DB, "a") as f:
-            for e in rows:
-                if (e["id"], e["gen"]) not in known:
-                    f.write(json.dumps(e) + "\n")
+        new = {(e["id"], e["gen"]) for e in rows}  # a rescore replaces the interim rows of the same id and gen
+        with open(DB, "w") as f:
+            for e in [e for e in db if (e["id"], e["gen"]) not in new] + rows:
+                f.write(json.dumps(e) + "\n")
 
 
 if __name__ == "__main__":
