@@ -1,0 +1,77 @@
+id: g3-mem-01
+parents: [g1-mem-01]
+track: memory
+hypothesis: >-
+  The prefix-trie output vocabulary (g1-mem-01: 1.7375 / 1.7305 on seeds 1 / 2, mean 1.734 vs hnet_ws 1.829, the
+  largest gain of generation 1) loses nothing by scoring only the bytes the model already finds plausible, and that
+  makes it cheap. The full head scores all 256 bytes at every position: per byte it gathers 2 x 256 table rows of 32
+  numbers and, in the backward pass, scatters 2 x 256 row gradients into the tables (under activation checkpointing,
+  so the gather runs twice); on the A100 its mean step took 1.88 s vs 1.02 s for hnet_ws (1.84x; fastest steps 1.66 vs
+  0.73 s, 2.3x). This candidate keeps the
+  trie's keys (hash(chunk prefix . b)), tables, sizes and main-network query unchanged and adds the score only for the
+  k = 64 bytes ranked highest by the LM head (detached top-k; hnet/model/trie_head.py TrieHead.rescore, flag
+  trie_head.topk). Measured fact it builds on: on the trained hnet_ws L03 checkpoint the target byte is among the LM
+  head's top 64 at 99.88% of positions, and the positions where it is not carry 1.1% of the model's bits (0.018 bpb);
+  at top 16 (the g1-wild-02 prefix head, 1.770) it is 3.1% of positions and 14% of the bits (0.245 bpb), at top 32
+  0.8% / 4.6% (0.081 bpb) (logbook/evolve/candidates/g3-mem-02/budget_probe.json). That is a plausible reason the
+  prefix head kept only 60% of the trie's gain (it also differed in query and table shape), and why k = 64, not 16:
+  the bits a top-k head cannot reach sit mostly on chunk-initial bytes, where the LM head is least sure (top-16
+  coverage 0.90 there vs 0.99 inside chunks), and the chunk-initial byte is where the main network's next-chunk
+  prediction, the trie's query, carries the most information. With
+  k = V the head is exactly the full trie (tested). Everything else is g1-mem-01 (same parameter layout, same
+  budget: the chunk-vocabulary table halved to 12853 buckets pays for 2 x 77383 x 32 trie rows).
+prediction:
+  fitness: "val bpb 1.734-1.745 (g1-mem-01 1.734 mean of 2 seeds; parent hnet_ws 1.829): keeps >= 90% of the trie's gain"
+  speed: "A100 step time <= 1.3x hnet_ws (mean step; the full head was 1.84x)"
+  mechanism: >-
+    trie/topk_cov >= 0.995 from step 300 on (fraction of positions whose next byte is among the 64 rescored ones);
+    trie/bonus_rms (rms over the 64 rescored bytes) grows past 1.0 by step 300; bnd_on_ws/s0 at the end ~0.47 as in
+    g1-mem-01 (hnet_ws 0.61: the trie moves cuts off whitespace). Falsified if val bpb > 1.75 (keeps < 80% of the
+    gain), or if the gain sits on the 0.1% of positions outside the top 64 (then the full head's value was in
+    promoting bytes the LM head ranks low, and k must grow).
+branch: evolve/g3-mem-01
+model: configs/evolve/models/g3-mem-01.yaml
+set: []
+checks:
+  tests: "pass: tests/test_trie_topk.py (12: topk 0 is the full head; zero tables == the model without the head bit
+    for bit, with and without the match model; topk = V == the full head in logits and gradients; rescored bytes ==
+    top-k of the base logits with the full head's scores; the copy candidate is always rescored; gradient paths;
+    only candidate rows get gradient; causality and packed == separate with N(0, 0.3) trie tables, with and
+    without the match model; params / FLOPs / training, with and without the match model) +
+    tests/test_invariances.py with two new variants (fast trie; fast trie + match model + suffix memory), causality and
+    packed == separate, with and without n-grams + tests/test_trie_head.py tests/test_prefix_head.py
+    tests/test_match_model.py tests/test_chunk_vocab_suffix.py tests/test_model_hnet.py tests/test_flops.py:
+    205 passed, 4 skipped. Full suite (python -m pytest tests, CPU): 917 passed, 44 skipped, 1 deselected
+    (tests/test_eval_smoke_gpt2.py::test_gpt2_hellaswag_50 downloads GPT-2 / HellaSwag and hangs behind this box's
+    proxy; unrelated to the change). The 2 large-table invariance tests were added after that run: 12/12 pass."
+  fairness: "pass (scripts/search/fairness.py on a make_gen spec with hnet, hnet_ws, g3-mem-01, g3-mem-02;
+    logbook/evolve/candidates/g3-mem-01/fairness.md): problems none; GFLOPs/byte 0.02043 (g3-mem-01) / 0.02044
+    (g3-mem-02) vs 0.02037 for hnet (+0.29% / +0.34%; the full trie was +0.55%); params 20,022,761 / 20,022,699 <=
+    BPE 20,023,040"
+  grad_audit: logbook/evolve/candidates/g3-mem-01/grad_audit.txt
+  bit_identity: logbook/evolve/candidates/g3-mem-01/bit_identity.txt
+  smoke: "pass: the L03 candidate model through hnet.train.train on CPU, mix_v1_small, 2 x 2048-byte windows/step,
+    30 steps, Muon 0.02 / Adam 0.003, fp32: train bpb 7.23 -> 3.11-3.54, no NaN, compression 4.14 on target,
+    trie/topk_cov 0.96-0.99, trie/bonus_rms 1.4-2.1; step-30 checkpoint on mix_v1 val: 3.237 bpb with the trie vs
+    3.757 with its tables zeroed (the trie path carries 0.52 bpb after 30 steps)"
+  smoke_log: logbook/evolve/candidates/g3-mem-01/smoke.txt
+  step_time: "CPU, L03, same batch, interleaved medians (step_time.txt): fast head 1.137x / 1.100x of hnet_ws in two
+    runs vs 1.341x / 1.313x for the full head (g1-mem-01): target < 1.3x met. A100 projection from the head-alone
+    benchmark: 1.18-1.25x of hnet_ws (the full head measured 1.84x)"
+  step_time_log: logbook/evolve/candidates/g3-mem-01/step_time.txt
+bpe_analogue: >-
+  None beyond the BPE arm itself. Read with chunk = unit, the trie scores "the current unit's prefix + the next
+  symbol" against the main network's prediction. A BPE model emits a whole token per prediction, so its prefix is
+  always empty and the key is the token itself: the analogue is u . P[w] over the 32k tokens, a second rank-32
+  output embedding on the same hidden state, which BPE's 32768 x 256 LM head (8.4M parameters, 42% of its budget)
+  already subsumes (two linear heads on one hidden state are one linear head). BPE already spends 1.7x the trie's 5M
+  parameters on exactly this string-keyed output memory; the trie gives the byte model the same kind of memory. What
+  the trie scores that BPE's head does not -- partial chunks, byte by byte -- BPE never has to predict. A memory keyed
+  across units (previous token + candidate, an output n-gram memory) is a different mechanism whose H-Net counterpart
+  would be a trie keyed across chunk ends; the trie's prefix resets at every chunk end. So no new BPE control.
+author: memory proposer (generation 3)
+next_if_fails: >-
+  If val bpb > 1.75: check trie/topk_cov; if < 0.995 raise k to 96-128 (still < 1.3x by the head micro-benchmark's
+  scaling); if coverage is high but the gain is gone, the full head's value was in the softmax over all 256 bytes
+  (pushing every implausible byte down) and a cheap full-vocabulary term (a context-free per-prefix bias over 256
+  bytes, 1 number per row) should be added.
