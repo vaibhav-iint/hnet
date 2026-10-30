@@ -239,7 +239,8 @@ def plot_val(sweep, arms):
     ax.set_xlabel("step")
     ax.set_ylabel("val bpb")
     ax.set_title(f"{sweep}: validation bpb")
-    lo = min(list(_refs(sweep).values()) + [e["val/bpb"] for runs in arms.values() for r in runs for e in r["evals"]])
+    lo = min(list(_refs(sweep).values()) + [e["val/bpb"] for runs in arms.values() for r in runs for e in r["evals"]]
+             or [1.0])  # a sweep whose runs have no evals yet still gets an (empty) panel
     ax.set_ylim(lo - 0.05, min(3.0, lo + 1.2))
     ax.grid(alpha=0.3)
     ax.legend(fontsize=7)
