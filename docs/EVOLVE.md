@@ -82,4 +82,5 @@ ledger below reaches the cap and reports. Generation 1 runs seeds 1 and 2 for ca
 | 1 (12 candidates + bpe/hnet/hnet_ws controls, seeds 1-2; 30 runs; branch evolve/g1a @ efe1625) | 1.97 h | $11.68 | 12 | g1-wild-01 match model 1.505 ± 0.003 (−0.32 vs hnet_ws) |
 | 2 (7 candidates + bpe, seeds 1-2; 16 runs; branch evolve/g2 @ 19043df) | 1.08 h | $6.31 | 7 | g2-match-mem 1.486 ± 0.004; bar g2-bpe-match 1.461 ± 0.001 |
 | 3 (6 proposer candidates + orchestrator crossover g3-combo-01, seeds 1-2; 14 runs; branch evolve/g3 @ 7751276) | 1.27 h | $7.38 | 7 | g3-mem-02 1.461 ± 0.001, g3-combo-01 1.462 ± 0.003 (tie the bar); g3-route-02 prior-free 1.503 |
-| **total so far** | 4.32 h | **$25.37 of $50** | | |
+| 4 (orchestrator crossovers g4-combo-02/03 + seed-3 confirmations of g3-combo-01, g3-mem-02, g2-bpe-match; 8 runs; branch evolve/g4 @ 3c7ad2f) | running | cap 2 h = $11.6 | | |
+| **total so far** | 4.32 h + g4 | **$25.37 of $50 + g4** | | |
