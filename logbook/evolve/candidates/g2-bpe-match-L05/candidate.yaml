@@ -1,0 +1,9 @@
+id: g2-bpe-match-L05
+parents: [g2-bpe-match]
+base: bpe
+track: control
+hypothesis: >
+  The bar at L05 1e17: bpe_L05 + the g2-bpe-match token-level match model (orders 1/2/4/8, encoder and last-block
+  decoder sites, gated logit bonus). 38.50M params (+0.8% over BPE L05, in BPE's favour).
+model: configs/evolve/models/g2-bpe-match-L05.yaml
+set: []

@@ -1,0 +1,23 @@
+# g2-bpe-match-L05: bpe_L05 + the g2-bpe-match token-level match model (decoder site at the last block).
+model:
+  type: dense
+  variant: llama
+  vocab_size: 32768
+  d_model: 384
+  n_layers: 5
+  d_intermediate: 1408
+  num_heads: 5
+  num_kv_heads: null
+  head_dim: 128
+  rope_theta: 10000.0
+  nope_every: 0
+  tie_embeddings: false
+  norm_eps: 1.0e-05
+  initializer_range: 0.02
+  match_model:
+    orders: [1, 2, 4, 8]
+    enc: true
+    dec: true
+    gate: true
+matching: {seq_len_bytes: 8512, seq_len_tokens: 2048, bytes_per_token: 4.145, reference: null}
+ladder: {rung: L05, variant: bpe, bytes_per_token: 4.145, vocab: 32768}

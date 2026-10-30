@@ -1,0 +1,59 @@
+# evolve generation 4x (scripts/evolve/make_gen.py; benchmark: configs/search/ladder_1e17_L05.yaml)
+name: evolve_g4x
+out_root: runs/search/evolve_g4x
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/evolve_g4x
+seeds:
+- 1
+params:
+  best_mlr:
+    bpe: 0.02
+  adam_lr: 0.003
+params_note: best_mlr.bpe = BPE's best Muon LR from ladder_lr_1e16 (report/best_params.yaml); adam_lr = Adam-part LR (embeddings,
+  heads, norms), fixed, not tuned yet
+fairness: strict
+set:
+- train.optimizer=muon
+- train.muon.lr=${best_mlr.bpe}
+- train.muon.lr_embed=${adam_lr}
+- train.muon.lr_head=${adam_lr}
+- train.muon.lr_other=${adam_lr}
+- train.muon.momentum_warmup_steps=197
+- eval.every=197
+- train.ckpt_every=493
+runs:
+- name: g4_combo_02_L05
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g4-combo-02-L05.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=1089536
+  - train.train_bytes=2150744064
+  - model.lr_multiplier_kinds=[embed,head,other]
+  seeds:
+  - 1
+  - 2
+- name: g4_combo_03_L05
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g4-combo-03-L05.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=1089536
+  - train.train_bytes=2150744064
+  - model.lr_multiplier_kinds=[embed,head,other]
+- name: g2_bpe_match_L05
+  config: configs/ladder/runs/ladder_bpe.yaml
+  model: configs/evolve/models/g2-bpe-match-L05.yaml
+  set:
+  - data.micro_batch=16
+  - data.batch_tokens=262144
+  - train.train_tokens=517472256
+  seeds:
+  - 1
+  - 2
+report:
+  baseline: null
+  labels:
+    g4_combo_02_L05: Transfer check (docs/EVOLVE
+    g4_combo_03_L05: Transfer check (docs/EVOLVE
+    g2_bpe_match_L05: 'The bar at L05 1e17: bpe_L05 + the g2-bpe-match token-level match model (orders 1/2/4/8, encoder and
+      last-block decoder '

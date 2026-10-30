@@ -1,0 +1,10 @@
+id: g4-combo-03-L05
+parents: [g4-combo-03]
+track: transfer
+hypothesis: >
+  Transfer check (docs/EVOLVE.md promotion rule) of g4-combo-03 at rung L05, 1e17 training FLOPs (1974 steps x 1,089,536
+  bytes): the L03 model edits applied to hnet_ws_L05, chunk table halved, n-gram buckets refitted to BPE L05's
+  parameter count. Does the margin over BPE + copy survive a 10x larger budget and a 1.9x larger model?
+prediction: {margin_vs_g2_bpe_match_L05: "negative (H-Net ahead); L03 margin -0.019"}
+model: configs/evolve/models/g4-combo-03-L05.yaml
+set: ["model.lr_multiplier_kinds=[embed,head,other]"]
