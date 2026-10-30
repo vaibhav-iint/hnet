@@ -26,6 +26,22 @@ explores, a decided (bimodal) one is left alone. Why: the only counterfactual cr
 router that fell into the suffix basin never tries a boundary after the space and can never learn that it would be
 worth more (the hierarchy's gain is 6x larger at word starts in the word basin).
 
+Score features (``probe_rank`` > 0 with ``feat_point`` and/or ``feat_region``; off by default, stage 0 only): the rank
+is taken over a learned mix of the router's standardized score and causal, prior-free features of the model's own
+next-byte uncertainty, c_t = z_t + g_pt f_pt + g_rg f_rg, restandardized over the batch (in the graph, so a common
+scale of c is not a direction the forward pass depends on: the gains g set relative weights only, and growing a gain
+cannot saturate the confidences). The features come from a low-rank next-byte probe on the stage's DETACHED encoder
+output (trained by its own CE, ``probe_loss``, on the next byte of the same segment): Ĥ_t = entropy of the probe's
+p(x_{t+1} | x_<=t), detached. ``feat_point``: f = standardized Ĥ_t. Under "end" semantics a chunk should close at t
+when byte t+1 is hard to predict from the bytes so far: after "word<space>" (the next word's first letter), not on
+the last letter before the space (the suffix basin's guess; there the next byte, the space, is easy). ``feat_region``:
+f = standardized causal mean of Ĥ over the last ``region_window`` bytes of the segment: a region-level difficulty
+offset, so that the exact batch budget of k = n / N boundaries is spent where the text is hard (novel text, scripts
+with high entropy per byte) and not where it is predictable (in-document copies the match model already predicts,
+boilerplate). The batch total stays exactly k (training FLOPs unchanged); what varies is the compression per region
+and per document. The gains are learned (Adam), init ``feat_point`` / ``feat_region``; ``feat_learn=False`` freezes
+them. Eval: running statistics of Ĥ, of its region mean and of c serve the threshold, so decisions stay causal.
+
 Why normalize (EXP-014): with the threshold on p and the batch quantile detached, nothing anchors the scale of the
 router's logits. The STE confidence gradient pushes selected logits up and unselected ones down forever, so in ~70
 steps at lr 1.5e-3 the end_mlp router's logits exceed 17 and p saturates at exactly 1.0 in fp32 for more than 1/N
@@ -39,21 +55,70 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from ..ctx import SeqCtx
 from .base import RouterOutput, router_output
 
 DECISIONS = ("threshold", "quantile")
 EPS = 1e-6
+H_FLOOR = 0.25  # nats: floor of the std of the entropy features (an uninformative, near-constant probe gives f ~ 0)
+F_CLIP = 3.0  # standardized features are clipped to +-F_CLIP
+
+
+def trimmed_stats(x: torch.Tensor, trim: float):
+    """(mean, std) over the central 1 - 2 trim of x, in the graph (the trimming mask is not). Not median / MAD: with a
+    word tokenizer 5/6 of the scores are near-identical, the MAD is ~0 and 1 / sigma blows up (EXP-021)."""
+    with torch.no_grad():
+        lo, hi = torch.quantile(x, torch.tensor([trim, 1 - trim], device=x.device, dtype=x.dtype))
+        keep = (x >= lo) & (x <= hi)
+    xt = x[keep] if int(keep.sum()) >= 2 else x
+    return xt.mean(), xt.std() + 1e-3
+
+
+def causal_window_mean(x: torch.Tensor, ctx: SeqCtx, window: int) -> torch.Tensor:
+    """[T]: mean of x over the last ``window`` positions of the same segment, ending at t (inclusive). Shifted adds in
+    a fixed order, so a packed batch gives exactly the values of its segments run separately."""
+    pos = ctx.position_ids.reshape(-1)
+    acc = x.clone()
+    for j in range(1, window):
+        sh = torch.zeros_like(x)
+        sh[j:] = x[:-j]
+        acc = acc + sh * (pos >= j).to(x.dtype)
+    return acc / torch.clamp(pos + 1, max=window).to(x.dtype)
+
+
+class NextByteProbe(nn.Module):
+    """Low-rank next-byte probe on a stage's detached encoder output (``QuantileDecider`` score features). The name
+    contains "router", so the Muon optimizer trains it with Adam (``hnet.optim.muon.classify_params``)."""
+
+    def __init__(self, d_model: int, rank: int, vocab: int = 256):
+        super().__init__()
+        self.down = nn.Linear(d_model, rank, bias=False)
+        self.up = nn.Linear(rank, vocab)
+        with torch.no_grad():
+            nn.init.normal_(self.down.weight, std=d_model ** -0.5)
+            nn.init.normal_(self.up.weight, std=0.02)
+            self.up.bias.zero_()
+        for p in self.parameters():
+            p._no_reinit = True
+
+    def forward(self, h: torch.Tensor) -> torch.Tensor:
+        with torch.autocast(device_type=h.device.type, enabled=False):
+            return self.up(self.down(h.detach().float()))
 
 
 class QuantileDecider(nn.Module):
     """``temp`` sets the confidence margins (std of temp * z is temp); ``normalize=False`` keeps the raw score
-    scale (the EXP-014 behaviour, apart from the rank selection), for ablation."""
+    scale (the EXP-014 behaviour, apart from the rank selection), for ablation. ``probe_rank`` / ``feat_point`` /
+    ``feat_region``: score features from a next-byte probe (module docstring); ``d_model`` is the stage width (passed
+    by ``HNet``)."""
 
     def __init__(self, target_ratio: float, momentum: float = 0.99, temp: float = 2.0, normalize: bool = True,
                  robust: bool = True, z_clip: float = 4.0, trim: float = 0.01, explore: float = 0.0,
-                 explore_frac: float = 0.3):
+                 explore_frac: float = 0.3, d_model: int = None, probe_rank: int = 0, feat_point: float = 0.0,
+                 feat_region: float = 0.0, region_window: int = 16, feat_learn: bool = True,
+                 probe_weight: float = 1.0):
         super().__init__()
         assert target_ratio > 1, target_ratio
         self.ratio = float(target_ratio)
@@ -69,10 +134,29 @@ class QuantileDecider(nn.Module):
         self.register_buffer("sigma", torch.tensor(1.0))
         self.register_buffer("z_tau", torch.tensor(0.0))
         self.register_buffer("initialized", torch.tensor(False))
+        # score features (off by default: no parameters, no buffers, and the forward pass is the plain rank decision)
+        self.feat_names = [n for n, g in (("pt", feat_point), ("rg", feat_region)) if g != 0]
+        self.router_probe = None
+        self.probe_weight = float(probe_weight)
+        self.region_window = int(region_window)
+        if self.feat_names or int(probe_rank) > 0:
+            assert int(probe_rank) > 0 and d_model, "score features need probe_rank > 0 and d_model"
+            assert self.feat_names, "probe_rank > 0 without feat_point / feat_region does nothing"
+            assert self.normalize, "score features are mixed in standardized units (normalize=True)"
+            assert self.region_window >= 1
+            with torch.random.fork_rng(devices=[]):  # every other module's init is unchanged by the probe
+                self.router_probe = NextByteProbe(int(d_model), int(probe_rank))
+            init = torch.tensor([float(g) for g in (feat_point, feat_region) if g != 0])
+            if feat_learn:
+                self.feat_gain = nn.Parameter(init)
+            else:
+                self.register_buffer("feat_gain", init)
+            self.register_buffer("feat_stats", torch.tensor([[0.0, 1.0]] * len(self.feat_names)))  # running mean, std
+            self.register_buffer("comb_stats", torch.tensor([0.0, 1.0]))  # running mean, std of the mixed score
 
     @property
     def tau(self) -> torch.Tensor:
-        """Eval-time decision threshold in score (logit) space."""
+        """Eval-time decision threshold in score (logit) space (without score features)."""
         return self.mu + self.sigma * self.z_tau
 
     def _update(self, buf: torch.Tensor, value: torch.Tensor):
@@ -89,10 +173,45 @@ class QuantileDecider(nn.Module):
             return self.explore
         return self.explore * max(0.0, 1.0 - float(progress) / self.explore_frac)
 
-    def forward(self, r: RouterOutput, ctx: SeqCtx, progress: float = 1.0) -> RouterOutput:
+    def _features(self, h: torch.Tensor, ctx: SeqCtx, input_ids):
+        """(raw features [n_feat, T] detached, probe CE or None, probe entropy [T] detached). The probe reads h
+        detached; its CE (next byte of the same segment, training only) is its only training signal."""
+        assert h is not None, "score features need the stage's encoder output (HNet passes h)"
+        logp = torch.log_softmax(self.router_probe(h), dim=-1)  # fp32 [T, V]
+        loss = None
+        if self.training and input_ids is not None and torch.is_grad_enabled():
+            ids = input_ids.reshape(-1).long()
+            pos = ctx.position_ids.reshape(-1)
+            tgt = torch.full_like(ids, -100)
+            tgt[:-1] = torch.where(pos[1:] != 0, ids[1:], torch.full_like(ids[1:], -100))  # same segment only
+            if bool((tgt != -100).any()):
+                loss = F.nll_loss(logp, tgt, ignore_index=-100)
+        with torch.no_grad():
+            H = -(logp.exp() * logp).sum(-1)
+            raw = torch.stack([H if n == "pt" else causal_window_mean(H, ctx, self.region_window)
+                               for n in self.feat_names])
+        return raw, loss, H
+
+    def _standardize_features(self, raw: torch.Tensor, free: torch.Tensor, batch_stats: bool):
+        """(standardized clipped features [n_feat, T], mean, std): batch statistics over the free positions in
+        training, running ones in eval. The std is floored at H_FLOOR nats (a near-constant probe gives f ~ 0)."""
+        if batch_stats:
+            rf = raw[:, free]
+            m, sd = rf.mean(1), rf.std(1)
+        else:
+            m, sd = self.feat_stats[:, 0], self.feat_stats[:, 1]
+        f = (raw - m[:, None]) / sd.clamp(min=H_FLOOR)[:, None]
+        return f.clamp(-F_CLIP, F_CLIP), m, sd
+
+    def forward(self, r: RouterOutput, ctx: SeqCtx, progress: float = 1.0, h: torch.Tensor = None,
+                input_ids: torch.Tensor = None) -> RouterOutput:
         s = (r.logit if r.logit is not None else torch.logit(r.p.clamp(EPS, 1 - EPS))).float()
         free = ctx.position_ids != 0  # the first position of every segment is forced selected (as in router_output)
         n_free = int(free.sum())
+        feats = self.router_probe is not None
+        probe_loss = None
+        if feats:
+            raw, probe_loss, H = self._features(h, ctx, input_ids)
         if self.training and n_free >= 2:
             sf = s[free]
             if self.normalize and self.robust:
@@ -112,6 +231,12 @@ class QuantileDecider(nn.Module):
             else:
                 mu, sigma = s.new_zeros(()), s.new_ones(())
             z = (s - mu) / sigma
+            if feats:  # learned mix with the probe's features, restandardized in the graph (scale anchored)
+                z_router = z.detach()
+                f, f_mu, f_sd = self._standardize_features(raw, free, True)
+                c = z + (self.feat_gain.float()[:, None] * f).sum(0)
+                c_mu, c_sd = trimmed_stats(c[free], self.trim)
+                z = (c - c_mu) / c_sd
             k = max(1, min(n_free - 1, int(round(n_free / self.ratio))))
             with torch.no_grad():
                 zf = z[free]
@@ -131,9 +256,24 @@ class QuantileDecider(nn.Module):
                 self._update(self.mu, mu.detach())
                 self._update(self.sigma, sigma.detach())
                 self._update(self.z_tau, z_tau)
+                if feats:
+                    self._update(self.feat_stats, torch.stack([f_mu, f_sd], 1))
+                    self._update(self.comb_stats, torch.stack([c_mu.detach(), c_sd.detach()]))
+                    # has the router itself adopted the mixed ranking? (its own top k vs the decided top k)
+                    own = torch.zeros_like(free)
+                    own[torch.nonzero(free).squeeze(1)[torch.topk(z_router[free], k).indices]] = True
+                    r.extra["router_agree"] = (own & mask).sum().float() / k
+                    if input_ids is not None:  # diagnostic only, never an input: the router's own basin
+                        ids_ = input_ids.reshape(-1)
+                        ws = (ids_ == 0x20) | (ids_ == 0x0A) | (ids_ == 0x09)
+                        r.extra["router_own_on_ws"] = (own & ws).sum().float() / k
                 self.initialized.fill_(True)
         else:
             z = (s - self.mu) / self.sigma
+            if feats:
+                f, _, _ = self._standardize_features(raw, free, False)
+                c = z + (self.feat_gain.float()[:, None] * f).sum(0)
+                z = (c - self.comb_stats[0]) / self.comb_stats[1]
             z_tau = self.z_tau
             mask = (z > z_tau) & free
         zc = z - z_tau.detach()
@@ -142,6 +282,8 @@ class QuantileDecider(nn.Module):
         p2 = torch.sigmoid(self.temp * zc)
         out = router_output(p2, ctx, r.semantics, logit=s, mask=mask)
         out.extra = dict(r.extra)
+        if feats:
+            out.probe_loss = probe_loss
         with torch.no_grad():
             out.extra["tau"] = torch.sigmoid(self.tau).float()  # threshold in p space, for the logs
             out.extra["score_mu"] = self.mu.clone()
@@ -149,4 +291,33 @@ class QuantileDecider(nn.Module):
             if self.training and self.explore > 0 and n_free >= 2:
                 out.extra["explore_tau"] = s.new_tensor(tau_x)
                 out.extra["explore_swap"] = swapped if tau_x > 0 else s.new_zeros(())
+            if feats:
+                out.extra.update(self._feature_stats(H, out.boundary_mask, ctx, probe_loss))
         return out
+
+    def _feature_stats(self, H: torch.Tensor, mask: torch.Tensor, ctx: SeqCtx, probe_loss) -> dict:
+        """Detached diagnostics: probe entropy and CE, the gains, and how unevenly the budget is spent per segment:
+        ``comp_seg_cv`` = coefficient of variation of bytes per chunk over segments of >= 64 bytes; ``comp_seg_corr``
+        = correlation of a segment's chunks per byte with its mean probe entropy; ``attn_ctx_ratio`` = sum over
+        segments of chunks^2 relative to the same total spread uniformly over the bytes, i.e. the main network's
+        realized attention-context FLOPs relative to uniform compression (uncounted by hnet.flops)."""
+        d = {"probe_entropy": H.mean()}
+        if probe_loss is not None:
+            d["probe_ce"] = probe_loss.detach()
+        for i, n in enumerate(self.feat_names):
+            d[f"feat_gain_{n}"] = self.feat_gain.detach()[i].float()
+        seg = ctx.seq_idx.reshape(-1).long()
+        n_seg = int(ctx.cu_seqlens.numel() - 1)
+        nb = torch.zeros(n_seg, device=H.device).index_add_(0, seg, torch.ones_like(H))
+        nc = torch.zeros(n_seg, device=H.device).index_add_(0, seg, mask.reshape(-1).float())
+        hs = torch.zeros(n_seg, device=H.device).index_add_(0, seg, H.float()) / nb.clamp(min=1)
+        big = nb >= 64
+        if int(big.sum()) >= 2:
+            rate = nc[big] / nb[big]  # chunks per byte
+            bpc = nb[big] / nc[big].clamp(min=1)
+            d["comp_seg_cv"] = bpc.std() / bpc.mean()
+            a, b = rate - rate.mean(), hs[big] - hs[big].mean()
+            d["comp_seg_corr"] = (a * b).sum() / ((a.pow(2).sum() * b.pow(2).sum()).sqrt() + 1e-12)
+        uni = nb * (nc.sum() / nb.sum().clamp(min=1))
+        d["attn_ctx_ratio"] = nc.pow(2).sum() / uni.pow(2).sum().clamp(min=1e-6)
+        return d

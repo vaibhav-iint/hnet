@@ -23,6 +23,11 @@ VARIANTS = {
     "end_mlp_quantile_vocab_suffix": {"router": "end_mlp", "decision": "quantile",
                                       "chunk_vocab": [{"buckets": 4096, "n_hash": 2, "max_len": 16, "pred_weight": 0.5,
                                                        "n_neg": 256, "suffix_lens": [2, 3, 4, 6, 8, 12, 16]}]},
+    # decision_kwargs score features (evolve g3-route-01 / -02): next-byte-probe entropy, pointwise and region mean
+    "end_mlp_quantile_feat_point": {"router": "end_mlp", "decision": "quantile",
+                                    "decision_kwargs": {"probe_rank": 8, "feat_point": 1.0}},
+    "end_mlp_quantile_feat_region": {"router": "end_mlp", "decision": "quantile",
+                                     "decision_kwargs": {"probe_rank": 8, "feat_region": 0.5, "region_window": 16}},
 }
 
 

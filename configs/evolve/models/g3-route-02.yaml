@@ -1,0 +1,97 @@
+# g3-route-02 (evolve g3, router track): g2-match-mem made prior-free (no whitespace warm start) + a learned, prior-free
+# boundary feature. The rank decider ranks the router's standardized score plus a learned gain (init 1.0) times the
+# standardized entropy H_t of a rank-32 next-byte probe on the detached stage-0 encoder output
+# (hnet/model/routing/decide.py): under end semantics a chunk should close at t when byte t+1 is hard to predict
+# (after the space: the word basin), not where the next byte is an easy space (the suffix basin's guess). Permanent,
+# learned, names no byte class. n-gram buckets 4483 -> 4471 pay for the probe (total 20,023,020 <= BPE 20,023,040).
+model:
+  type: hnet
+  arch_layout:
+  - m2
+  - - T3
+  - m2
+  d_model:
+  - 192
+  - 256
+  d_intermediate:
+  - 0
+  - 896
+  vocab_size: 256
+  tie_embeddings: false
+  ssm:
+    d_state: 160
+    d_conv: 4
+    expand: 2
+    headdim: 64
+    ngroups: 1
+    chunk_size: 256
+  attn:
+    num_heads:
+    - 3
+    - 3
+    num_kv_heads: null
+    head_dim:
+    - null
+    - 128
+    rotary_emb_dim:
+    - null
+    - null
+    rope_theta: 10000.0
+    window_size:
+    - -1
+    - -1
+    nope_every: 0
+  dc:
+    target_ratios:
+    - 4.145
+    ratio_loss_alpha: 0.03
+    router: end_mlp
+    router_kwargs: {}
+    decision: quantile
+    decision_kwargs:
+      probe_rank: 32
+      feat_point: 1.0
+    chunker: select
+    dechunker: ema
+    ste: true
+    aux_loss: ratio
+    aux_loss_scope: local
+    chunk_vocab:
+    - buckets: 25733
+      n_hash: 2
+      max_len: 16
+      pred_weight: 0.5
+      n_neg: 1024
+      suffix_lens:
+      - 2
+      - 3
+      - 4
+      - 6
+      - 8
+      - 12
+      - 16
+      suffix_gate_init: 0.0
+    router_prior_weight: 0.0
+    router_prior_frac: 0.1
+  ngram_embed:
+    ns:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    buckets: 4471
+  match_model:
+    orders:
+    - 4
+    - 8
+    - 16
+    - 32
+    enc: true
+    dec: true
+    gate: true
+  norm_eps: 1.0e-05
+  initializer_range: 0.02
+  lr_multiplier: auto
+  lr_multiplier_n_gpt: 4.145

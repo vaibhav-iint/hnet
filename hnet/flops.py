@@ -375,6 +375,14 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
             rp, rf = _router_counts(dcs["router"], d, rk, dcs["target_ratio"])
             comp_p["router"] = rp
             comp_f["router"] = rf if cv.count_dc else 0.0
+            dk = dcs.get("decision_kwargs") or {}
+            pr = int(dk.get("probe_rank", 0) or 0)
+            if dcs.get("decision") == "quantile" and pr > 0:  # score features: low-rank next-byte probe + gains
+                nf = int(float(dk.get("feat_point", 0.0)) != 0) + int(float(dk.get("feat_region", 0.0)) != 0)
+                comp_p["router_probe"] = d * pr + pr * V + V + nf
+                comp_f["router_probe"] = (2 * (d * pr + pr * V)
+                                          + ((5 * V + int(dk.get("region_window", 16)) + 4 * nf)
+                                             if cv.count_elementwise else 0.0))
             comp_p["residual_proj"] = d * d + d
             comp_f["residual_proj"] = 2 * d * d if cv.count_residual_proj else 0.0
             if cfg.dc.fusion == "balanced":  # two RMSNorm gains on the decoder input (norms: no counted FLOPs)
