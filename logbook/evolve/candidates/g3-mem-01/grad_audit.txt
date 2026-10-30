@@ -1,0 +1,53 @@
+# g3-mem-01 step-0 / step-10 gradient audit (tiny_hnet1_2m + end_mlp + quantile + chunk vocab + n-grams 3..8 + ws prior
+# + fast trie head: rows 8191, dim 32, n_hash 2, max_len 16, query main, topk 64), real mix_v1 val bytes.
+# command: python -m hnet.analysis.grad_audit configs/runs/tiny_hnet1_2m.yaml --set model.dc.router=end_mlp
+#   --set model.dc.decision=quantile --set 'model.dc.chunk_vocab=[{buckets: 4096, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 256}]'
+#   --set 'model.ngram_embed={ns: [3,4,5,6,7,8], buckets: 1021}' --set model.dc.router_prior_weight=1.0
+#   --set 'model.trie_head={rows: 8191, dim: 32, n_hash: 2, max_len: 16, query: main, topk: 64}'
+#   --text data/mix_v1/bytes/mix_v1_val_000000.bytes.bin --steps 0 10
+# byte_ce_via_trie = the byte CE with the base logits detached and the trie scores added at the detached top-64 bytes
+# of the base logits (hnet/analysis/grad_audit.py), i.e. the trie path alone.
+# Gradient graph (written before the run, then verified here and in tests/test_trie_topk.py::test_gradient_paths):
+#   byte CE -> vals = u . sum_k P_k[key(prefix, cand)] -> tables (rows of the candidates only), query_proj (once rows != 0),
+#   main_out = dechunked main-network output -> main network, encoder, chunk vocab (input side), router (EMA p);
+#   NOT the decoder, residual_proj or lm_head (cand = topk(base.detach()) carries no gradient). The LM head and the
+#   decoder are trained by the same byte CE through the base logits (unchanged from the parent).
+# Verified: step 0 -> only trie_head (zero-init rows, u != 0); step 10 -> main network, encoder, router, chunk vocab,
+# n-grams, embeddings; decoder / residual_proj / lm_head exactly 0.
+# Equilibrium / lazy-optimizer notes: the head is a logit term with no auxiliary objective, so its only controller is
+# the byte CE; a lazy solution would be to put all mass on a context-free per-node prior (u constant) -- that is still a
+# valid spelling prior (the full head's g1 run had bonus_rms 1.4-1.55, i.e. it was used). The candidate set is chosen by
+# the base logits, so the base head must keep the target in its top 64: positions where it does not are exactly where
+# the fast head cannot help (hnet_ws L03 final: 0.12% of positions, 1.1% of the bits; budget_probe.json in g3-mem-02).
+# (The next_chunk_ce router warning is pre-existing behaviour of the parent, unchanged by this candidate. trie/topk_cov
+# here is measured against labels = ids, the audit's convention, not the next byte.)
+
+
+== gradient norms by (objective, parameter group) after 0 steps
+                             embeddings   ngram_embeddings         s0.encoder   s1.pad_dimension    s1.main_network         s0.decoder  s0.routing_module     s0.chunk_vocab   s0.residual_proj            lm_head          trie_head
+byte_ce                        2.18e-01           3.06e-01           6.13e+00           1.82e-02           3.24e+00           3.75e+00           1.54e-02           3.00e-01           1.28e+00           9.61e+00           3.91e-01
+ratio/s0                       2.41e-04           6.23e-03           1.65e-02           0 (none)           0 (none)           0 (none)           2.07e-03           0 (none)           0 (none)           0 (none)           0 (none)
+next_chunk_ce/s0               0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           1.61e+00           0 (none)           0 (none)           0 (none)
+router_prior/s0                3.42e-01           8.16e-01           9.74e+00           0 (none)           0 (none)           0 (none)           3.21e+00           0 (none)           0 (none)           0 (none)           0 (none)
+byte_ce_via_trie               0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           0 (none)           3.91e-01
+
+== mechanism metrics
+  F/s0=0.168  G/s0=0.493  boundary_frac/s0=0.168  compression/s0=5.95  dechunk_rms/s0=1.63  p_margin/s0=0.0261  p_mid/s0=0.951  residual_rms/s0=0.052  score_std/s0=0.0159  tau/s0=0.315  trie/bonus_rms=0  trie/prefix_len=172  trie/topk_cov=0.00488
+
+== warnings
+  - next_chunk_ce/s0: sends the router no gradient (dc.chunk_ste=false; the STE sits after dechunking)
+  - p_mid/s0 = 0.95: most boundary decisions undecided (p in 0.4-0.6)
+
+== gradient norms by (objective, parameter group) after 10 steps
+                             embeddings   ngram_embeddings         s0.encoder   s1.pad_dimension    s1.main_network         s0.decoder  s0.routing_module     s0.chunk_vocab   s0.residual_proj            lm_head          trie_head
+byte_ce                        1.70e-02           5.91e-01           1.68e+00           1.05e-03           1.10e-01           1.48e-01           1.33e-01           1.03e-02           5.02e-02           6.48e-01           6.52e-01
+ratio/s0                       1.21e-04           9.14e-03           1.09e-02           0 (none)           0 (none)           0 (none)           8.12e-04           0 (none)           0 (none)           0 (none)           0 (none)
+next_chunk_ce/s0               9.59e-03           2.14e-02           2.71e-01           1.15e-03           1.45e-01           0 (none)           0 (none)           1.46e+00           0 (none)           0 (none)           0 (none)
+router_prior/s0                3.06e-01           7.30e-01           8.79e+00           0 (none)           0 (none)           0 (none)           3.06e+00           0 (none)           0 (none)           0 (none)           0 (none)
+byte_ce_via_trie               1.60e-02           2.99e-01           9.93e-01           1.51e-03           1.95e-01           0 (none)           7.29e-02           1.83e-02           0 (none)           0 (none)           6.52e-01
+
+== mechanism metrics
+  F/s0=0.168  G/s0=0.223  boundary_frac/s0=0.168  compression/s0=5.95  dechunk_rms/s0=1.63  p_margin/s0=0.379  p_mid/s0=0.0537  residual_rms/s0=0.0583  score_std/s0=0.0161  tau/s0=0.308  trie/bonus_rms=0.563  trie/prefix_len=171  trie/topk_cov=0.985
+
+== warnings
+  - next_chunk_ce/s0: sends the router no gradient (dc.chunk_ste=false; the STE sits after dechunking)

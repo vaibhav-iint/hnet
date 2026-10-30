@@ -1,0 +1,41 @@
+# g3-mem-01 CPU smoke: the L03 candidate model itself (configs/evolve/models/g3-mem-01.yaml, 20,022,761 params) through
+# hnet.train.train on mix_v1_small, 2 x 2048-byte windows/step (the full 8512-byte windows OOM-killed g1-mem-01's smoke
+# on this shared 15 GB box), 30 steps, Muon 0.02 / Adam 0.003 (the benchmark's LRs), WSD, fp32, no compile.
+# Command: python -m hnet.train.train --config configs/ladder/runs/ladder_hnet.yaml --model configs/evolve/models/g3-mem-01.yaml
+#   --set data.dataset=mix_v1_small data.seq_len=2048 data.micro_batch=2 data.batch_bytes=4096 train.train_tokens=null
+#   train.train_bytes=122880 eval.every=0 eval.at_end=false eval.downstream=null train.compile=false train.precision=fp32
+#   log.every=3 train.optimizer=muon train.muon.lr=0.02 train.muon.lr_embed=0.003 train.muon.lr_head=0.003
+#   train.muon.lr_other=0.003 train.muon.momentum_warmup_steps=3 train.ckpt_every=0
+# Result: pass. Train bpb 7.23 (step 3) -> 3.11-3.54 (steps 24-30), no NaN, compression 4.13-4.14 (target 4.145),
+# whitespace warm start active (bnd_on_ws 0.62-0.72). trie/topk_cov (share of next bytes among the 64 rescored ones)
+# 0.96-0.99 from step 3 on; trie/bonus_rms 1.4 by step 6, 1.5-2.1 after.
+# Ablation on the step-30 checkpoint (8 x 2048 bytes of mix_v1 val, scratch ablate.py: trie tables zeroed at eval):
+#   bpb with the trie 3.2374 (topk_cov 0.9962, bonus_rms 1.46); trie tables zeroed 3.7573: the fast trie path already
+#   carries 0.52 bpb after 30 steps (g1-mem-01's full head: 0.32 bpb after 30 tiny-config steps). As for every smoke,
+#   this says the path works and is used, not how large the final gain is.
+
+## trainer log
+[train] {"params": 20022761, "params_by_stage": {"0": 16776873, "1": 3245888}, "lr_multipliers": {"0": 2.3509, "1": 1.0}, "peak_lr_by_group": ["muon/s0/wd0: 0.04702", "muon/s1/wd0: 0.02", "embed/s0/wd0.1: 0.007053", "head/s0/wd0.1: 0.007053", "other/s0/wd0: 0.007053", "other/s0/wd0.1: 0.007053", "other/s1/wd0: 0.003"], "kind": "bytes", "seq_len": 2048, "windows_per_step": 2, "micro_batch": 2, "grad_accum": 1, "world_size": 1, "total_steps": 30, "est_tokens_eq_per_step": 988.1785283474067, "flops_per_byte@target": 17811866.67772441}
+step 3 | loss 8.24 | ce 5.008 | bpb 7.225 | aux_loss 3.232 | grad_norm 3.609 | lr 0.02 | tokens_eq 2962 | bytes_per_sec 346.8 | step_time 11.8 | comp 4.14
+step 6 | loss 6.066 | ce 3.037 | bpb 4.382 | aux_loss 3.029 | grad_norm 2.094 | lr 0.02 | tokens_eq 5925 | bytes_per_sec 289 | step_time 14.17 | comp 4.14
+step 9 | loss 5.818 | ce 2.774 | bpb 4.001 | aux_loss 3.045 | grad_norm 0.9806 | lr 0.02 | tokens_eq 8888 | bytes_per_sec 341.1 | step_time 12 | comp 4.14
+step 12 | loss 5.425 | ce 2.446 | bpb 3.529 | aux_loss 2.978 | grad_norm 1.49 | lr 0.02 | tokens_eq 1.185e+04 | bytes_per_sec 322.5 | step_time 12.7 | comp 4.14
+step 15 | loss 6.283 | ce 3.359 | bpb 4.846 | aux_loss 2.924 | grad_norm 1.143 | lr 0.02 | tokens_eq 1.481e+04 | bytes_per_sec 305.5 | step_time 13.4 | comp 4.13
+step 18 | loss 5.617 | ce 2.646 | bpb 3.818 | aux_loss 2.97 | grad_norm 1.862 | lr 0.02 | tokens_eq 1.778e+04 | bytes_per_sec 368.2 | step_time 11.12 | comp 4.14
+step 21 | loss 5.677 | ce 2.807 | bpb 4.05 | aux_loss 2.87 | grad_norm 1.205 | lr 0.02 | tokens_eq 2.074e+04 | bytes_per_sec 397.7 | step_time 10.29 | comp 4.13
+step 24 | loss 4.942 | ce 2.156 | bpb 3.111 | aux_loss 2.786 | grad_norm 0.9024 | lr 0.02 | tokens_eq 2.37e+04 | bytes_per_sec 435.3 | step_time 9.409 | comp 4.14
+step 27 | loss 4.722 | ce 2.452 | bpb 3.538 | aux_loss 2.27 | grad_norm 0.9307 | lr 0.005858 | tokens_eq 2.667e+04 | bytes_per_sec 316.3 | step_time 12.94 | comp 4.14
+step 30 | loss 5.224 | ce 2.443 | bpb 3.524 | aux_loss 2.781 | grad_norm 0.7986 | lr 0 | tokens_eq 2.963e+04 | bytes_per_sec 341.6 | step_time 11.98 | comp 4.14
+[train] saved /tmp/claude-0/-home-user-hnet-smollm3/e0ec0617-4cec-5bc8-abcc-216d4a655704/scratchpad/smoke01/ckpt/step_0000030
+
+## per-step mechanism metrics (metrics.jsonl)
+  step  3: bpb=7.225  compression/s0=4.137  bnd_on_ws/s0=0.700  trie/topk_cov=0.957  trie/bonus_rms=0.217  trie/prefix_len=2.673  p_margin/s0=0.211  dechunk_rms/s0=1.093  residual_rms/s0=0.061
+  step  6: bpb=4.382  compression/s0=4.137  bnd_on_ws/s0=0.627  trie/topk_cov=0.967  trie/bonus_rms=1.400  trie/prefix_len=2.541  p_margin/s0=0.221  dechunk_rms/s0=1.076  residual_rms/s0=0.164
+  step  9: bpb=4.001  compression/s0=4.137  bnd_on_ws/s0=0.697  trie/topk_cov=0.988  trie/bonus_rms=1.502  trie/prefix_len=2.490  p_margin/s0=0.333  dechunk_rms/s0=1.065  residual_rms/s0=0.268
+  step 12: bpb=3.529  compression/s0=4.137  bnd_on_ws/s0=0.717  trie/topk_cov=0.978  trie/bonus_rms=1.464  trie/prefix_len=2.754  p_margin/s0=0.328  dechunk_rms/s0=1.065  residual_rms/s0=0.368
+  step 15: bpb=4.846  compression/s0=4.133  bnd_on_ws/s0=0.622  trie/topk_cov=0.990  trie/bonus_rms=1.653  trie/prefix_len=2.914  p_margin/s0=0.312  dechunk_rms/s0=1.065  residual_rms/s0=0.470
+  step 18: bpb=3.818  compression/s0=4.137  bnd_on_ws/s0=0.717  trie/topk_cov=0.968  trie/bonus_rms=1.212  trie/prefix_len=3.644  p_margin/s0=0.312  dechunk_rms/s0=1.062  residual_rms/s0=0.556
+  step 21: bpb=4.050  compression/s0=4.133  bnd_on_ws/s0=0.696  trie/topk_cov=0.956  trie/bonus_rms=1.359  trie/prefix_len=2.743  p_margin/s0=0.314  dechunk_rms/s0=1.091  residual_rms/s0=0.648
+  step 24: bpb=3.111  compression/s0=4.137  bnd_on_ws/s0=0.720  trie/topk_cov=0.992  trie/bonus_rms=2.149  trie/prefix_len=2.534  p_margin/s0=0.321  dechunk_rms/s0=1.116  residual_rms/s0=0.745
+  step 27: bpb=3.538  compression/s0=4.137  bnd_on_ws/s0=0.630  trie/topk_cov=0.993  trie/bonus_rms=1.530  trie/prefix_len=2.897  p_margin/s0=0.320  dechunk_rms/s0=1.094  residual_rms/s0=0.806
+  step 30: bpb=3.524  compression/s0=4.137  bnd_on_ws/s0=0.675  trie/topk_cov=0.981  trie/bonus_rms=1.533  trie/prefix_len=2.611  p_margin/s0=0.319  dechunk_rms/s0=1.093  residual_rms/s0=0.825

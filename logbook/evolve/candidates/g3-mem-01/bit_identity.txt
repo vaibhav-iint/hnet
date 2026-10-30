@@ -1,0 +1,23 @@
+# Bit identity of existing configs: parent origin/evolve/g2 (19043df, git archive of hnet/) vs this branch,
+# forward + backward. scripts/evolve/fingerprint.py: seed 0, init_weights, one train-mode forward + backward on
+# 2 x 600 bytes of mix_v1 val; sha256 of the logits, of every parameter gradient (sorted by name) and of the stats dict;
+# loss and aux loss as reprs. Covers the trie head with topk 0 (g1-mem-01: the full head, unchanged code path), the
+# prefix head (g1-wild-02, whose assertion was tightened), the match model's logit-gate path (g1-wild-01,
+# g2-match-mem) and the plain parents. Result: diff empty (IDENTICAL).
+## parent
+configs/ladder/models/hnet_L03.yaml: logits 214638963527d671 loss 5.5359625816345215 aux 2.5949666500091553 grads 988d63d05928fe5c stats 7e2619d9e08dbf52 n_params 20010025
+configs/ladder/models/hnet_ws_L03.yaml: logits 214638963527d671 loss 5.5359625816345215 aux 2.5949666500091553 grads 988d63d05928fe5c stats 7e2619d9e08dbf52 n_params 20010025
+configs/evolve/models/g1-mem-01.yaml: logits 87bb34b25354b15e loss 5.512646198272705 aux 2.600846529006958 grads aa6726d752cce439 stats 9557d895bb67542f n_params 20022761
+configs/evolve/models/g1-wild-01.yaml: logits 4c1d70c41a9c3982 loss 5.612195014953613 aux 2.6095364093780518 grads a62e36017d0a9664 stats 8ffda6270fc24ca2 n_params 20009261
+configs/evolve/models/g1-wild-02.yaml: logits da86f2c5a31295c4 loss 5.552346229553223 aux 2.594970703125 grads c0f34075d156a5a5 stats 907e99d6be4b3d1b n_params 20008745
+configs/evolve/models/g2-match-mem.yaml: logits bb2ec3c8e51bbd1d loss 5.602138996124268 aux 2.567598819732666 grads ba18520b4e3883b7 stats c1d1aba03e620203 n_params 20022251
+## this branch
+configs/ladder/models/hnet_L03.yaml: logits 214638963527d671 loss 5.5359625816345215 aux 2.5949666500091553 grads 988d63d05928fe5c stats 7e2619d9e08dbf52 n_params 20010025
+configs/ladder/models/hnet_ws_L03.yaml: logits 214638963527d671 loss 5.5359625816345215 aux 2.5949666500091553 grads 988d63d05928fe5c stats 7e2619d9e08dbf52 n_params 20010025
+configs/evolve/models/g1-mem-01.yaml: logits 87bb34b25354b15e loss 5.512646198272705 aux 2.600846529006958 grads aa6726d752cce439 stats 9557d895bb67542f n_params 20022761
+configs/evolve/models/g1-wild-01.yaml: logits 4c1d70c41a9c3982 loss 5.612195014953613 aux 2.6095364093780518 grads a62e36017d0a9664 stats 8ffda6270fc24ca2 n_params 20009261
+configs/evolve/models/g1-wild-02.yaml: logits da86f2c5a31295c4 loss 5.552346229553223 aux 2.594970703125 grads c0f34075d156a5a5 stats 907e99d6be4b3d1b n_params 20008745
+configs/evolve/models/g2-match-mem.yaml: logits bb2ec3c8e51bbd1d loss 5.602138996124268 aux 2.567598819732666 grads ba18520b4e3883b7 stats c1d1aba03e620203 n_params 20022251
+# In-suite: tests/test_trie_topk.py::test_zero_tables_leave_the_logits_of_the_model_without_the_head_unchanged
+# (flag on with zero tables == the model without the head, bit for bit, with and without the match model) and
+# ::test_topk_equal_to_the_vocabulary_is_the_full_head (topk 256 == the g1 full head in logits and gradients).
