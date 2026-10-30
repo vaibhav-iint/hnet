@@ -1,0 +1,11 @@
+id: g2-match-opt
+parents: [g1-wild-01, g1-opt-01]
+track: crossover
+hypothesis: >-
+  The match model with the Muon-native LR transfer (g1-opt-01, -0.030 vs its control): drop the Adam-derived x2.35 stage-0 multiplier stacked on Muon.
+prediction: {fitness: "<= g1-wild-01 (1.502, seed 1) - 0.01 if the parts add"}
+branch: evolve/g2
+model: configs/evolve/models/g1-wild-01.yaml
+set: ["model.lr_multiplier_kinds=[embed,head,other]"]
+checks: {tests: "components tested in g1", fairness: "make_gen + scripts/search/fairness.py", smoke: "components smoke-tested in g1"}
+author: orchestrator

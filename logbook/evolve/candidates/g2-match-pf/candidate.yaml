@@ -1,0 +1,11 @@
+id: g2-match-pf
+parents: [g1-wild-01, hnet]
+track: crossover
+hypothesis: >-
+  The match model without the whitespace warm start: does it also carry the prior-free H-Net, which loses the basin lottery on some seeds?
+prediction: {fitness: "<= g1-wild-01 (1.502, seed 1) - 0.01 if the parts add"}
+branch: evolve/g2
+model: configs/evolve/models/g2-match-pf.yaml
+set: []
+checks: {tests: "components tested in g1", fairness: "make_gen + scripts/search/fairness.py", smoke: "components smoke-tested in g1"}
+author: orchestrator

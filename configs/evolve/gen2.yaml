@@ -1,0 +1,96 @@
+# evolve generation 2 (scripts/evolve/make_gen.py; benchmark: configs/search/ladder_1e16_L03.yaml)
+name: evolve_g2
+out_root: runs/search/evolve_g2
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/evolve_g2
+seeds:
+- 1
+- 2
+params:
+  best_mlr:
+    bpe: 0.02
+  adam_lr: 0.003
+params_note: best_mlr.bpe = BPE's best Muon LR from ladder_lr_1e16 (report/best_params.yaml); adam_lr = Adam-part LR (embeddings,
+  heads, norms), fixed, not tuned yet
+fairness: strict
+set:
+- train.optimizer=muon
+- train.muon.lr=${best_mlr.bpe}
+- train.muon.lr_embed=${adam_lr}
+- train.muon.lr_head=${adam_lr}
+- train.muon.lr_other=${adam_lr}
+- train.muon.momentum_warmup_steps=90
+- eval.every=90
+- train.ckpt_every=227
+runs:
+- name: bpe
+  config: configs/ladder/runs/ladder_bpe.yaml
+  model: configs/ladder/models/bpe_L03.yaml
+  set:
+  - data.micro_batch=16
+  - data.batch_tokens=131072
+  - train.train_tokens=119013376
+- name: g2_bpe_match
+  config: configs/ladder/runs/ladder_bpe.yaml
+  model: configs/evolve/models/g2-bpe-match.yaml
+  set:
+  - data.micro_batch=16
+  - data.batch_tokens=131072
+  - train.train_tokens=119013376
+- name: g2_match_arch
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g2-match-arch.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g2_match_mem
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g2-match-mem.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g2_match_pf
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g2-match-pf.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g2_match_opt
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g1-wild-01.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+  - model.lr_multiplier_kinds=[embed,head,other]
+- name: g2_router_01
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/ladder/models/hnet_L03.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+  - model.dc.router_surprise_weight=1.0
+  - model.dc.router_surprise_frac=0.3
+- name: g2_combo_02
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g2-combo-02.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+report:
+  baseline: bpe
+  labels:
+    bpe: 'control: bpe'
+    g2_bpe_match: If the byte match model's gain is a copying gain, BPE gains comparably
+    g2_match_arch: The match model (copy candidates from earlier in the document; 1
+    g2_match_mem: The match model plus the suffix-keyed chunk memory (g1-mem-02, -0
+    g2_match_pf: 'The match model without the whitespace warm start: does it also carry the prior-free H-Net, which loses
+      the basin lotter'
+    g2_match_opt: The match model with the Muon-native LR transfer (g1-opt-01, -0
+    g2_router_01: Self-surprise tokenizer teacher (prior-free; a decaying curriculum, labelled as such)
+    g2_combo_02: 'The two seed-1 winners of generation 1 act on different ends of the hierarchy and should add: g1-mem-02
+      makes the chunk-'

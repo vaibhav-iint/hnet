@@ -1,0 +1,11 @@
+id: g2-match-mem
+parents: [g1-wild-01, g1-mem-02]
+track: crossover
+hypothesis: >-
+  The match model plus the suffix-keyed chunk memory (g1-mem-02, -0.046 vs its control): copying covers repeats inside the document, the memory covers recurring strings across documents.
+prediction: {fitness: "<= g1-wild-01 (1.502, seed 1) - 0.01 if the parts add"}
+branch: evolve/g2
+model: configs/evolve/models/g2-match-mem.yaml
+set: []
+checks: {tests: "components tested in g1", fairness: "make_gen + scripts/search/fairness.py", smoke: "components smoke-tested in g1"}
+author: orchestrator
