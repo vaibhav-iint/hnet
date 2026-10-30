@@ -68,6 +68,14 @@ class HNet(nn.Module):
 
         if self.is_innermost:
             self.main_network = iso(layout[0])
+            self.refresh = None  # first-byte chunk refresh (HNetConfig.refresh), owned by the main stage (its LR group)
+            self.keep_full = False  # set by the enclosing stage: keep the full-width main output (``full_out``)
+            if cfg.refresh and stage_idx == 1:
+                from .refresh import ChunkRefresh
+
+                with torch.random.fork_rng(devices=[]):  # every other module's init is unchanged
+                    self.refresh = ChunkRefresh(cfg, **cfg.refresh)
+                self.keep_full = True
         else:
             n_stages = cfg.n_stages
             dc = cfg.dc.for_stage(stage_idx, n_stages)
@@ -148,7 +156,10 @@ class HNet(nn.Module):
         if self.pad_dimension is not None:
             h = torch.cat((h, self.pad_dimension.to(h.dtype).expand(h.shape[0], -1)), dim=-1)
         if self.is_innermost:
-            return self.main_network(h, ctx)[:, :D_in], []
+            out = self.main_network(h, ctx)
+            if self.keep_full:
+                self.full_out = out
+            return out[:, :D_in], []
 
         h = self.encoder(h, ctx)
         with _no_autocast(h.device):
@@ -209,6 +220,14 @@ class HNet(nn.Module):
             keep = (torch.rand(n_seg, device=residual.device) >= self.residual_dropout).to(residual.dtype)
             residual = residual * keep[ctx.seq_idx.reshape(-1).long()].unsqueeze(-1)
         r.residual_in = residual.detach()  # read by HNetForCausalLM for the router gain objective (stage 0)
+        rf = getattr(self.main_network, "refresh", None)
+        if rf is not None:  # first-byte chunk refresh: a deep re-query once the next chunk's first byte is known
+            assert r.semantics == "end", "refresh needs 'end' boundary semantics"
+            zfull = self.main_network.full_out
+            self.main_network.full_out = None
+            add, r.refresh_loss, rstats = rf(zfull, h, input_ids, r.boundary_mask, ctx, ctx_inner)
+            out = out + add
+            r.extra.update(rstats)
         h = (out + residual).to(h.dtype)
         if dec_add is not None:
             h = h + dec_add.to(h.dtype)

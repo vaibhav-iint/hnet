@@ -427,6 +427,16 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
         else:
             assert len(layout) == 1, layout
             comp_p["main"], comp_f["main"] = _iso(cfg, s, layout[0], L, cv)
+            if cfg.refresh and s == 1:  # first-byte chunk refresh (hnet.model.refresh): per main position
+                rf = {"layout": "T1", "capacity": 1.0, "probe_rank": 32, **cfg.refresh}
+                cap, d0, V = float(rf["capacity"]), cfg.d_model[0], cfg.vocab_size
+                ip, ifl = _iso(cfg, s, rf["layout"], L * cap, cv)  # runs on the packed refreshed sub-sequence
+                comp_p["refresh"] = ip + d0 * d + 2 * d0  # stack, W_up, input RMSNorm, gain
+                comp_f["refresh"] = cap * (ifl + 2 * d0 * d + (2 * d0 if cv.count_elementwise else 0.0))
+                if cap < 1.0:  # surprise probe on every chunk (low rank d -> r -> V, bias), its CE and the top-k
+                    r = int(rf["probe_rank"])
+                    comp_p["refresh"] += d * r + r * V + V
+                    comp_f["refresh"] += 2 * (d * r + r * V) + (5 * V if cv.count_elementwise else 0.0)
         fpp = sum(comp_f.values())
         stages.append(
             dict(

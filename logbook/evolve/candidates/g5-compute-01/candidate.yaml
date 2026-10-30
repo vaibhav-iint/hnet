@@ -1,0 +1,39 @@
+id: g5-compute-01
+parents: [g4-combo-02]
+track: compute
+hypothesis: >
+  Compute only a dynamic-chunking model can place: a deep re-query one byte after each chunk end. Under "end"
+  semantics the main network's state for chunk c is computed before the next chunk's first byte is known, and the
+  rest of that chunk is predicted by the byte decoder from a stale deep state. Measured on a trained H-Net (g1-wild-01,
+  mix_v1 val, probe.txt): the bytes after the first byte of a chunk carry 58% of the bits and 62% of the main
+  network's mean-ablation information (0.25 bits/byte in total; 0.30 bits/byte at the 2nd byte of a chunk, 0.25 at the
+  3rd), i.e. the deep state is used there but never refreshed. The candidate moves one of the three main-network
+  layers to a query-only extra position per chunk placed at byte b_c+1 (hnet/model/refresh.py): stream zfull_c +
+  W_up RMSNorm(enc_{b_c+1}), one T layer (stage-1 widths, causal attention over chunks), zero-init gain, added to the
+  decoder input of the chunk's remaining bytes. Same FLOPs (+0.35% vs parent), same params (n-gram buckets 4355 ->
+  4312). The chunk-end byte (42% of the bits) loses one layer of depth; the 58% after it gain a layer that knows
+  which word started. BPE has no analogue: a token is predicted whole from one deep state; there is no position inside
+  a token at which the first byte is known and deep compute can run (so no base: bpe control).
+prediction:
+  val_bpb: "1.425 +- 0.010 (parent g4-combo-02 predicted ~1.44; measure the gap to the parent run in the same generation)"
+  fitness_vs_parent: "-0.015 (bytes at offset >= 1 of a chunk: -0.03 bits/byte on 58% of bits; chunk-end bytes +0.01)"
+  mechanism: "refresh/gain_rms > 0.1 by step 300; per-offset bpb (scripts/eval/per_source or the probe) improves at offsets 1-3 and is within +0.02 at offset 0"
+  falsified_if: "val_bpb >= parent - 0.003 (the refresh does not pay for the main layer it took)"
+branch: evolve/g5-compute
+model: configs/evolve/models/g5-compute-01.yaml
+set: ["model.lr_multiplier_kinds=[embed,head,other]"]
+checks:
+  params: "20,022,955 <= 20,023,040"
+  flops: "20.728 MFLOPs/byte training (hnet arm 20.372: +1.74%; parent g4-combo-02 +1.39%); realized = nominal (one refresh per chunk, the quantile decider's exact compression)"
+  tests: "tests/test_refresh.py, tests/test_invariances.py (refresh variants: causality, packed == separate), full suite"
+  fairness: logbook/evolve/candidates/g5-compute-01/fairness.md
+  grad_audit: logbook/evolve/candidates/g5-compute-01/grad_audit.txt
+  smoke: logbook/evolve/candidates/g5-compute-01/smoke.txt
+  probe: logbook/evolve/candidates/g5-compute-01/probe.txt
+risks: >
+  (1) Depth at the chunk end: the chunk-end byte carries 42% of the bits and now gets a 2-layer main network; if depth
+  there is worth more than the refresh, the candidate loses (falsifier above). (2) Zero-init gain: the refresh layers
+  get CE gradient only once the gain opens (grad_audit: gain 4.6e-2 at step 0, layers exactly 0; after 3 SGD steps
+  3e-5); under Muon the matrices move at full step size anyway, Adam opens the gain in ~10 steps. (3) Redundancy with
+  the byte decoder + trie + match model, which already condition on the revealed bytes (but shallowly). (4) Wall clock:
+  one extra attention pass over the chunk sequence per step (same FLOPs as the removed layer; +1 small gather).

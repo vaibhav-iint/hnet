@@ -53,6 +53,9 @@ def param_groups(model) -> Dict[str, List[torch.nn.Parameter]]:
                     key += ".suffix_gates"  # dc.chunk_vocab.suffix_lens gates, reported separately from the tables
                 if parts[i] == "decider" and i + 1 < len(parts):  # decision_kwargs score features
                     key += ".router_probe" if parts[i + 1] == "router_probe" else ".feat_gain"
+            elif i < len(parts) and parts[i] == "refresh":  # HNetConfig.refresh, owned by the innermost stage
+                key = f"s{stage}.refresh" + (".probe" if i + 1 < len(parts) and parts[i + 1] == "probe"
+                                             else ".gain" if i + 1 < len(parts) and parts[i + 1] == "gain" else "")
             else:  # ... except the innermost one, which is that stage's Isotropic main network
                 key = f"s{stage - 1}.main_network"
         groups.setdefault(key, []).append(p)
@@ -74,6 +77,8 @@ def objective_terms(model, out, ids) -> Dict[str, torch.Tensor]:
             terms[f"router_probe_ce/s{s}"] = r.probe_loss
         if getattr(r, "teach_loss", None) is not None:  # decision_kwargs.teach: the probe teaches the router
             terms[f"router_teach/s{s}"] = r.teach_loss
+        if getattr(r, "refresh_loss", None) is not None:  # HNetConfig.refresh: the surprise probe's own CE
+            terms[f"refresh_probe_ce/s{s}"] = r.refresh_loss
     dc = model.config.dc
     if dc.router_prior_weight > 0 and out.bpred and out.bpred[0].logit is not None:
         tgt = ((ids == 0x20) | (ids == 0x0A)).float()

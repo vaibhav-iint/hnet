@@ -49,6 +49,7 @@ class RouterOutput:
     residual_in: Optional[torch.Tensor] = None  # [T, D] the detached residual bypass (dc.router_gain_weight)
     probe_loss: Optional[torch.Tensor] = None  # CE of the decider's next-byte probe (decision_kwargs.probe_rank)
     teach_loss: Optional[torch.Tensor] = None  # weighted router teacher of the decider (decision_kwargs.teach)
+    refresh_loss: Optional[torch.Tensor] = None  # CE of the refresh's surprise probe (HNetConfig.refresh)
 
     @property
     def p(self) -> torch.Tensor:
