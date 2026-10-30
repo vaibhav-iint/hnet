@@ -1,0 +1,13 @@
+id: g4-combo-03
+parents: [g4-combo-02, g3-route-02]
+track: crossover
+hypothesis: >
+  The fully tokenizer-free version of g4-combo-02: no whitespace warm start. g3-route-02's router (a causal next-byte
+  probe whose entropy leads the rank decision early, a probe-to-router teacher and the feature lead both decaying to 0
+  at 30% of training: a labelled curriculum, guardrail 4) put both seeds in the word basin and cost only +0.017 vs
+  the warm-started parent (1.503 vs 1.486), against +0.069 for the plain prior-free router (g2-match-pf 1.555).
+prediction: {val_bpb: "g4-combo-02 + 0.017 +- 0.01", mechanism: "bnd_on_ws/s0 >= 0.5 at step 300 on both seeds", falsified_if: "suffix basin on either seed, or > g4-combo-02 + 0.035"}
+branch: evolve/g4
+model: configs/evolve/models/g4-combo-03.yaml
+set: ["model.lr_multiplier_kinds=[embed,head,other]"]
+checks: {flops: "+1.9% vs hnet (limit 2%)", params: "20,022,316 <= 20,023,040", grad_audit: logbook/evolve/candidates/g4-combo-03/grad_audit.txt}

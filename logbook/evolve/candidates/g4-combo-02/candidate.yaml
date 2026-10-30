@@ -1,0 +1,13 @@
+id: g4-combo-02
+parents: [g3-mem-02, g3-combo-01]
+track: crossover
+hypothesis: >
+  The two g3 arms that tie BPE + copy (1.461) got there by disjoint additions to g2-match-mem (1.486): g3-mem-02 added
+  the fast prefix-trie output head (paid by halving the chunk table), g3-combo-01 added the offset read-back
+  (dechunk_slots 4) and Muon-native LR. Neither touches the other's parameters or path (trie: output head on the main
+  network's dechunked output; read-back: dechunker; LR: stage-0 Muon matrices), so the gains should add.
+prediction: {val_bpb: "1.440 +- 0.01 (sum of both gains 1.486 - 0.025 - 0.024 = 1.437, minus overlap)", falsified_if: ">= 1.455 (less than half the second gain survives)"}
+branch: evolve/g4
+model: configs/evolve/models/g4-combo-02.yaml
+set: ["model.lr_multiplier_kinds=[embed,head,other]"]
+checks: {params: "20,022,699 <= 20,023,040", grad_audit: logbook/evolve/candidates/g4-combo-02/grad_audit.txt}
