@@ -342,6 +342,10 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
                 comp_p["match_model"] = n_tab * k * 257 * d0 + ((d0 + 1) * k if mm["gate"] else 0)
                 comp_f["match_model"] = ((n_tab * k * d0 if cv.count_elementwise else 0.0)
                                          + ((2 * d0 * k + (3 * k if cv.count_elementwise else 0)) if mm["gate"] else 0.0))
+            if cfg.chunk_copy:  # chunk pointer copy (hnet.model.chunk_copy): one d0 x d0 projection + 2 adds per chunk
+                k = len({"orders": [8, 16, 32], **cfg.chunk_copy}["orders"])
+                comp_p["chunk_copy"] = d0 * d0 + (k + 1) * d0
+                comp_f["chunk_copy"] = (2 * d0 * d0 + (2 * d0 if cv.count_elementwise else 0.0)) / bpp[1]
             if cfg.prefix_head:  # prefix output dictionary (hnet.model.prefix_head): table lookups are free
                 from hnet.model.prefix_head import PrefixHead
 

@@ -229,6 +229,12 @@ class HNetConfig:
     # embeddings at the encoder input (enc) and decoder input (dec) and as a gated logit bonus (gate). {"orders":
     # [4, 8, 16, 32], "enc": true, "dec": true, "gate": true}. Empty = off (the default model is unchanged).
     match_model: dict = field(default_factory=dict)
+    # Chunk pointer copy (hnet.model.chunk_copy.ChunkCopy, evolve g3-copy-01): at every stage-0 chunk end the most
+    # recent earlier chunk end of the same document with the same n bytes ending there (longest of ``orders``) is
+    # found, and the vector of the chunk that FOLLOWED it (its main-network input) is added, through a zero-init d x d
+    # projection, to the current chunk's main-network input: the main network is told the whole next chunk. {"orders":
+    # [8, 16, 32]}. Empty = off (the default model is unchanged). Needs a 1+-stage H-Net with "end" stage-0 semantics.
+    chunk_copy: dict = field(default_factory=dict)
     # Prefix output dictionary (hnet.model.prefix_head): the k bytes ranked highest by the LM head are rescored by
     # q_t . K[hash(current chunk prefix + b)], q_t from the final hidden state and the dechunked main-network output: a
     # BPE-style output embedding over the trie of the learned chunks. {"buckets": 65536, "rank": 64, "k": 16,

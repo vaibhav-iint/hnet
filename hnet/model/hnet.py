@@ -134,9 +134,12 @@ class HNet(nn.Module):
         boundaries: Optional[List[torch.Tensor]] = None,
         binfo=None,
         dec_add: Optional[torch.Tensor] = None,
+        chunk_hook=None,
     ) -> Tuple[torch.Tensor, List[RouterOutput]]:
         """h [T, D_in] -> ([T, D_in], router outputs of this and all inner stages, outer first). ``dec_add``: optional
-        [T, D] tensor added to this stage's decoder input (the match model's decoder-side candidates)."""
+        [T, D] tensor added to this stage's decoder input (the match model's decoder-side candidates). ``chunk_hook``:
+        optional ``(x [M, D], input_ids, ctx, ctx_inner) -> (x', stats)`` applied to this stage's chunk vectors just
+        before the main network (HNetConfig.chunk_copy); not passed to inner stages."""
         D_in = h.shape[-1]
         if self.pad_dimension is not None:
             h = torch.cat((h, self.pad_dimension.to(h.dtype).expand(h.shape[0], -1)), dim=-1)
@@ -172,6 +175,10 @@ class HNet(nn.Module):
                     for i, n in enumerate(self.chunk_vocab.suffix_lens):
                         r.extra[f"suffix_gate_n{n}"] = g[:, i].sum() / used[:, i].sum().clamp(min=1)
             r.vocab_tgt = self.chunk_vocab.next_targets(bucket[0], ctx_inner)
+        if chunk_hook is not None:  # chunk pointer copy: the main network is told the whole next chunk
+            assert r.semantics == "end" and input_ids is not None, "chunk_hook needs 'end' semantics and the ids"
+            x, cstats = chunk_hook(x, input_ids, ctx, ctx_inner)
+            r.extra.update(cstats)
         z, inner_preds = self.main_network(x, ctx_inner, input_ids=inner_ids, boundaries=inner_boundaries,
                                            binfo=inner_binfo)
         out = self.dechunk_layer(z, r, ctx, ctx_inner)

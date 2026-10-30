@@ -341,6 +341,15 @@ class HNetForCausalLM(nn.Module):
             assert self.backbone.routing_module.boundary_semantics == "end", "prefix_head needs 'end' semantics"
             with torch.random.fork_rng(devices=[]):
                 self.prefix_head = PrefixHead(d0, **cfg.prefix_head)
+        # chunk pointer copy (evolve g3-copy-01): zero-initialized, built under a forked RNG like the match model
+        self.chunk_copy = None
+        if cfg.chunk_copy:
+            from .chunk_copy import ChunkCopy
+
+            assert cfg.n_stages > 0, "chunk_copy needs a hierarchy"
+            assert self.backbone.routing_module.boundary_semantics == "end", "chunk_copy needs 'end' semantics"
+            with torch.random.fork_rng(devices=[]):
+                self.chunk_copy = ChunkCopy(d0, **cfg.chunk_copy)
 
     @property
     def n_stages(self) -> int:
@@ -375,7 +384,8 @@ class HNetForCausalLM(nn.Module):
             bank = hash_bank(ids, ctx, max(st.chunk_vocab.n_hash for st in vocab_stages),
                              max(st.chunk_vocab.max_len for st in vocab_stages))
             binfo = ByteInfo(bank, torch.arange(ids.numel(), device=ids.device))
-        h, bpred = self.backbone(x, ctx, input_ids=ids, boundaries=boundaries, binfo=binfo, dec_add=dec_add)
+        h, bpred = self.backbone(x, ctx, input_ids=ids, boundaries=boundaries, binfo=binfo, dec_add=dec_add,
+                                 chunk_hook=self.chunk_copy)
         pstats = {}
         trie_bias = trie_len = None
         if self.trie_head is not None:
@@ -510,6 +520,8 @@ class HNetForCausalLM(nn.Module):
             self.match_model.reset_parameters()
         if self.prefix_head is not None:
             self.prefix_head.reset_parameters()
+        if self.chunk_copy is not None:
+            self.chunk_copy.reset_parameters()
 
     def _router_consistency(self, logit: torch.Tensor, ids: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
         """Within-group variance of the byte-level router logit over positions in the batch that end in the same
@@ -630,7 +642,7 @@ class HNetForCausalLM(nn.Module):
         embeddings and lm_head belong to stage 0."""
         name = name.replace("_orig_mod.", "").removeprefix("module.")
         if name.startswith(("embeddings.", "ngram_embeddings.", "lm_head.", "main_aux_head.", "chunk_pred_head.",
-                            "trie_head.", "match_model.", "prefix_head.")):
+                            "trie_head.", "match_model.", "prefix_head.", "chunk_copy.")):
             return 0
         return self._param_stage[name]
 
