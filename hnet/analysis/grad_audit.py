@@ -72,6 +72,8 @@ def objective_terms(model, out, ids) -> Dict[str, torch.Tensor]:
     for s, r in enumerate(out.bpred):
         if getattr(r, "probe_loss", None) is not None:  # decision_kwargs.probe_rank: the decider's next-byte probe
             terms[f"router_probe_ce/s{s}"] = r.probe_loss
+        if getattr(r, "teach_loss", None) is not None:  # decision_kwargs.teach: the probe teaches the router
+            terms[f"router_teach/s{s}"] = r.teach_loss
     dc = model.config.dc
     if dc.router_prior_weight > 0 and out.bpred and out.bpred[0].logit is not None:
         tgt = ((ids == 0x20) | (ids == 0x0A)).float()

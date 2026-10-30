@@ -1,5 +1,5 @@
 # g3-route-01 (evolve g3, router track): g2-match-mem + adaptive compression. The rank decider ranks the router's
-# standardized score plus a learned gain (init 0.5) times a region-difficulty feature: the causal 16-byte mean of the
+# standardized score plus a learned gain (init 0.75) times a region-difficulty feature: the log causal 16-byte mean of the
 # entropy of a rank-32 next-byte probe on the detached stage-0 encoder output (hnet/model/routing/decide.py). The batch
 # budget stays exactly 1/4.145 of the positions; the compression varies per region and per document. n-gram buckets
 # 4483 -> 4471 pay for the probe's 14,593 parameters (total 20,023,020 <= BPE 20,023,040).
@@ -49,7 +49,7 @@ model:
     decision: quantile
     decision_kwargs:
       probe_rank: 32
-      feat_region: 0.5
+      feat_region: 0.75
       region_window: 16
     chunker: select
     dechunker: ema

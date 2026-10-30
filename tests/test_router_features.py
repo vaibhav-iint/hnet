@@ -68,7 +68,8 @@ def test_default_is_off():
 def test_explicit_defaults_are_bit_identical(train):
     ids = _text()
     outs = []
-    for kw in (None, {"probe_rank": 0, "feat_point": 0.0, "feat_region": 0.0}):
+    for kw in (None, {"probe_rank": 0, "feat_point": 0.0, "feat_region": 0.0, "router_w0": 1.0, "router_ramp": 0.0,
+                      "score_floor": 0.0}):
         m = _model(kw).train(train)
         torch.manual_seed(1)
         o = m(ids, labels=ids)
@@ -304,3 +305,86 @@ def test_params_and_flops_accounted(kw):
     nf = int(kw.get("feat_point", 0) != 0) + int(kw.get("feat_region", 0) != 0)
     fwd = 2 * (d * r + r * V) + 5 * V + kw.get("region_window", 16) + 4 * nf  # matmuls + softmax / entropy / mix
     assert new - base == pytest.approx(3 * fwd, rel=1e-6)  # training = 3x forward (convention), once per byte
+
+
+def test_router_weight_ramp_feature_led_start():
+    """router_w0 / router_ramp: the router's weight in the mix rises linearly from router_w0 to 1; default 1 (off)."""
+    d = QuantileDecider(4.0, d_model=8, probe_rank=4, feat_point=1.0, router_w0=0.1, router_ramp=0.3)
+    assert d.router_weight(0.0) == pytest.approx(0.1) and d.router_weight(0.15) == pytest.approx(0.55)
+    assert d.router_weight(0.3) == 1.0 and d.router_weight(1.0) == 1.0
+    assert QuantileDecider(4.0, d_model=8, probe_rank=4, feat_point=1.0).router_weight(0.0) == 1.0
+    torch.manual_seed(0)
+    T = 2000
+    ctx = SeqCtx.single(T)
+    s, raw = torch.randn(T), torch.rand(1, T) * 3
+    top_feat = set(torch.topk(raw[0, 1:], 499).indices.add(1).tolist())
+    d.train()
+    d._features = lambda h, c, i: (raw, None, raw[0])
+    r = router_output(torch.sigmoid(s), ctx, "end", logit=s)
+    early = d(r, ctx, progress=0.0, h=torch.zeros(1))
+    late = d(r, ctx, progress=1.0, h=torch.zeros(1))
+    sel_e = set(torch.nonzero(early.boundary_mask[1:]).squeeze(1).add(1).tolist())
+    sel_l = set(torch.nonzero(late.boundary_mask[1:]).squeeze(1).add(1).tolist())
+    assert len(sel_e & top_feat) / len(top_feat) > 0.85  # the feature leads at the start
+    assert len(sel_l & top_feat) / len(top_feat) < 0.75  # equal weights at the end
+
+
+def test_zero_init_router_head_with_features():
+    """g3-route-02 starts the router's output layer at zero (router_kwargs.init_scale 0: no byte value has a preferred
+    score at init). The decider must survive the constant scores (no NaN, exact budget), and the head gets a gradient
+    at step 0 (fc1 only from step 1 on: a zero-initialised layer passes no gradient upstream at init)."""
+    cfg = _cfg({"probe_rank": 8, "feat_point": 1.0, "router_w0": 0.1, "router_ramp": 0.3, "score_floor": 0.1})
+    cfg.dc.router_kwargs = {"init_scale": 0.0}
+    torch.manual_seed(0)
+    m = build_model(cfg)
+    m.init_weights()
+    m.train()
+    m.set_progress(0.0)
+    ids = _text()
+    o = m(ids, labels=ids)
+    r = o.bpred[0]
+    assert float(r.logit.std()) < 1e-5 and torch.isfinite(r.p).all()  # constant up to fp32 rounding
+    free = (torch.arange(ids.numel()) % ids.shape[1]) != 0
+    assert int(r.boundary_mask[free].sum()) == round(int(free.sum()) / cfg.dc.target_ratios[0])
+    (o.loss + o.aux_loss).backward()
+    rm = m.backbone.routing_module
+    assert float(rm.fc2.weight.grad.abs().sum()) > 0 and float(rm.fc1.weight.grad.abs().sum()) == 0.0
+    # score_floor: the 1 / std gain of standardizing near-constant scores is capped (here 0.4 vs 40 without the floor)
+    assert float(rm.fc2.weight.grad.norm()) < 4.0
+
+
+def test_router_teacher_paths_and_curriculum():
+    """decision_kwargs.teach: BCE of the router's own standardized score toward the probe's top k, weight
+    teach * (1 - progress / router_ramp), training only. Reaches the router and what feeds it (encoder, embeddings),
+    never the probe (its target is detached), the LM head, the decoder or the main network; scale-free."""
+    kw = {"probe_rank": 8, "feat_point": 1.0, "router_w0": 0.1, "router_ramp": 0.3, "teach": 1.0}
+    m = _model(kw).train()
+    ids = _text()
+    m.set_progress(0.0)
+    o = m(ids, labels=ids)
+    t = o.bpred[0].teach_loss
+    assert t is not None and t.requires_grad and "router_teach/s0" in o.stats
+    for name, reach in [("backbone.routing_module.", True), ("backbone.encoder.", True), ("embeddings.", True),
+                        ("backbone.decider.router_probe.", False), ("lm_head.", False), ("backbone.decoder.", False),
+                        ("backbone.main_network.", False), ("backbone.decider.feat_gain", False)]:
+        n, _ = _grads(m, t, [name])
+        assert (n > 0) == reach, name
+    w = {p: m.backbone.decider.teach_weight(p) for p in (0.0, 0.15, 0.3, 0.6)}
+    assert w == {0.0: 1.0, 0.15: 0.5, 0.3: 0.0, 0.6: 0.0}
+    m.set_progress(0.5)
+    assert m(ids, labels=ids).bpred[0].teach_loss is None
+    m.eval()
+    assert m(ids).bpred[0].teach_loss is None
+    assert QuantileDecider(4.0, d_model=8, probe_rank=4, feat_point=1.0).teach_weight(0.0) == 0.0  # default off
+    # scale-free: scaling the router's scores leaves the teacher loss unchanged
+    d = QuantileDecider(4.0, d_model=8, probe_rank=4, feat_point=1.0, router_w0=0.1, router_ramp=0.3, teach=1.0)
+    torch.manual_seed(0)
+    T = 800
+    ctx = SeqCtx.single(T)
+    s, raw = torch.randn(T), torch.rand(1, T)
+    d.train()
+    d._features = lambda h, c, i: (raw, None, raw[0])
+    a = d(router_output(torch.sigmoid(s), ctx, "end", logit=s), ctx, progress=0.0, h=torch.zeros(1)).teach_loss
+    s2 = 5 * s + 2
+    b = d(router_output(torch.sigmoid(s2), ctx, "end", logit=s2), ctx, progress=0.0, h=torch.zeros(1)).teach_loss
+    assert float(a) == pytest.approx(float(b), rel=2e-3)

@@ -1,0 +1,52 @@
+id: g3-route-01
+parents: [g2-match-mem]
+track: router
+hypothesis: >-
+  Adaptive compression at an exact FLOP budget, something only a learned segmentation can do. A BPE model's bytes per
+  token is fixed per domain by its vocabulary (on the smoke text: English 4.7, math 4.1, code 3.6, multilingual 3.3,
+  held-out code 3.2) and it spends one full forward pass on every token, including every token of an in-document repeat
+  that its copy mechanism already predicts (g2-bpe-match, the 1.460 bar). The H-Net's rank decider already ranks over
+  the whole micro-batch, so compression already differs per document (measured: the parent gives English 5.5-6.3
+  bytes per chunk and multilingual 2.8-3.4 in training mode). Nothing in that allocation, though, says "this region
+  needs more main-network positions": it falls out of local STE / EMA gradients. Here the rank is taken over the
+  router's standardized score plus a learned gain (init 0.75) times a REGION-DIFFICULTY feature: the centred log of
+  the causal 16-byte mean entropy of a rank-32 next-byte probe on the detached stage-0 encoder output. The probe sees
+  the match model's copy candidates through the encoder input, so a copy it predicts reads as low entropy. The mixed
+  score is restandardized in the graph, so the gain sets a relative weight and cannot saturate the confidences. The
+  batch total stays exactly 1/4.145 of the positions, so training FLOPs are unchanged. The log scale makes the gain an
+  elasticity of boundary density with respect to entropy rate. A first version used a z-scored region feature; it
+  inflated a 0.17-nat difference between sources into en 13.8 / ml 2.6 bytes per chunk (smoke.txt).
+  Measured on the same trained smoke model with the gain on vs set to 0: multilingual gets 17-21% more chunks, English
+  and code 1-5% fewer, in-document copies 3-7% fewer, at the same total. The router co-adapts, so the net allocation
+  vs the parent is more uniform. The LM loss pulls the gain from 0.75 to ~0.5 within 300 CPU steps, and the
+  probe has not yet learned to see copies at 300 CPU steps (2.18 vs 2.34 nats). 300-step smoke val: 2.455 / 2.436 vs
+  parent 2.444 / 2.492 (seeds 1 / 2; smoke noise ~0.02-0.03). Parent: g2-match-mem (best H-Net, 1.483). The
+  whitespace warm start is kept: this candidate changes how many boundaries each region gets, not which basin the
+  router is in (bnd_on_ws/s0 0.59-0.62 vs the parent's 0.63-0.64 in the smokes).
+prediction:
+  fitness: -0.19            # 1.479 (g2-match-mem 1.483 - 0.004); central estimate, +-0.015: a small effect
+  mechanism: >-
+    feat_gain_rg/s0 at the end in 0.2-0.6 (> 0.1: the LM loss keeps some tilt); per-source eval (per_source.py) vs
+    g2-match-mem: multilingual >= 10% more chunks per byte than with the gain zeroed on the same checkpoint, bytes
+    inside order>=16 in-document copies >= 10% fewer chunks per byte (the probe has learned the copies by then);
+    attn_ctx_ratio/s0 within 0.9-1.1; bnd_on_ws/s0 within 0.05 of the parent's.
+  falsified_if: fitness >= g2-match-mem's (-0.186) or feat_gain_rg/s0 <= 0.1 at the end (the loss rejects the tilt)
+branch: evolve/g3-route-01
+model: configs/evolve/models/g3-route-01.yaml
+set: []
+cost: >-
+  +14,593 parameters (rank-32 probe 192x32 + 32x256 + 256 bias, 1 gain), paid by n-gram buckets 4483 -> 4471:
+  20,023,020 <= BPE 20,023,040. FLOPs/byte (hnet.flops, counted, training = 3x forward): 20.477M vs hnet 20.372M
+  (+0.52%; g2-match-mem +0.07%). The probe's backward is weight-only (input detached), so the count is an upper bound.
+  Wall clock: one [T, 256] log-softmax per step (+~2%).
+checks:
+  tests: >-
+    pass: tests/test_router_features.py (27: default off and bit-identical, every other init unchanged, gradient paths
+    by autograd, exact budget, anchored scale, ugly distributions, region reallocation at a fixed total, causal and
+    packing-invariant in eval, params / FLOPs accounted, router ramp, zero-init head, router teacher) +
+    test_model_hnet / test_invariances (2 new variants) / test_flops / test_grad_audit / test_quantile_decision /
+    test_decision_explore / test_router_surprise / test_router_prior / test_match_model / test_adoption_options /
+    test_chunk_vocab_suffix / test_local_router: 238 passed, 4 skipped; full suite (tests/): 935 passed, 44 skipped
+  fairness: logbook/evolve/candidates/g3-route-01/fairness.txt   # pass (strict), +0.52% FLOPs/byte
+  grad_audit: logbook/evolve/candidates/g3-route-01/grad_audit.txt
+  smoke: logbook/evolve/candidates/g3-route-01/smoke.txt          # pass, + per-source compression tables

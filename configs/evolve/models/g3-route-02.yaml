@@ -1,9 +1,16 @@
-# g3-route-02 (evolve g3, router track): g2-match-mem made prior-free (no whitespace warm start) + a learned, prior-free
-# boundary feature. The rank decider ranks the router's standardized score plus a learned gain (init 1.0) times the
-# standardized entropy H_t of a rank-32 next-byte probe on the detached stage-0 encoder output
-# (hnet/model/routing/decide.py): under end semantics a chunk should close at t when byte t+1 is hard to predict
-# (after the space: the word basin), not where the next byte is an easy space (the suffix basin's guess). Permanent,
-# learned, names no byte class. n-gram buckets 4483 -> 4471 pay for the probe (total 20,023,020 <= BPE 20,023,040).
+# g3-route-02 (evolve g3, router track): g2-match-mem made prior-free (no whitespace warm start); the router is led into
+# the word basin by the model's own next-byte uncertainty (hnet/model/routing/decide.py, decision_kwargs):
+# * a rank-32 next-byte probe on the detached stage-0 encoder output gives H_t, the entropy of p(x_{t+1} | x_<=t); the
+#   rank is taken over the router's standardized score + a learned gain (init 1) x standardized H_t, restandardized.
+#   Under end semantics a chunk should close where the next byte is hard (after the space: word basin), not where the
+#   next byte is an easy space (the suffix basin's guess). Permanent, learned, names no byte class.
+# * the init lottery is removed: the router's output layer starts at zero (router_kwargs.init_scale 0: no byte value
+#   has a preferred score) and its standardizing std is floored (score_floor 0.1: a router with no opinion has no say,
+#   no 1/std gradient blow-up);
+# * feature-led start (a curriculum, labelled as such, on the router's weight and a teacher, not on any prior): the
+#   router's score enters the mix with weight 0.1 -> 1 over the first 30% of training, and during the same 30% its own
+#   standardized score is taught the probe's top-k (BCE, weight 1 -> 0).
+# n-gram buckets 4483 -> 4471 pay for the probe (total 20,023,020 <= BPE 20,023,040).
 model:
   type: hnet
   arch_layout:
@@ -46,11 +53,16 @@ model:
     - 4.145
     ratio_loss_alpha: 0.03
     router: end_mlp
-    router_kwargs: {}
+    router_kwargs:
+      init_scale: 0.0
     decision: quantile
     decision_kwargs:
       probe_rank: 32
       feat_point: 1.0
+      router_w0: 0.1
+      router_ramp: 0.3
+      score_floor: 0.1
+      teach: 1.0
     chunker: select
     dechunker: ema
     ste: true

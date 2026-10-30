@@ -1,0 +1,34 @@
+# python scripts/search/fairness.py <make_gen spec: bpe, hnet, g3-route-01, g3-route-02>
+# Fairness check: evolve_g3
+
+Mode: **strict** (all held-equal fields identical across every run)
+
+Held equal across all runs: **data** = `mix_v1 shards=None shuffle=0 xwin=True`; **optimizer** = `muon wd=0.1 clip=1.0 adam_betas=[0.9, 0.95] adam_eps=1e-08 adam_weight_decay=0.1 lr=0.02 lr_embed=0.003 lr_head=0.003 lr_mult_kinds=None lr_other=0.003 momentum=0.95 momentum_warmup_start=0.85 momentum_warmup_steps=90 nesterov=True ns_steps=5 residual_wd=None router=adam weight_decay=0.0`; **schedule** = `wsd warmup=0.1 decay=0.2 shape=inverse_sqrt`; **precision** = `bf16 compile=blocks`; **val** = `standard 10000000B every=90`; **downstream** = `paper7 every=0 limit=1000`
+
+| run | setting | kind | params_M | bytes_per_step | total_bytes_M | gflops_per_byte | lr | router | dechunker | ratios | alpha | lr_mult |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| bpe | - | tokens | 20.02 | 540739 | 491.0 | 0.02037 | 0.02 | - | - | - | - | - |
+| hnet | - | bytes | 20.01 | 544768 | 494.6 | 0.02037 | 0.02 | end_mlp | ema | [4.145] | 0.03 | auto |
+| g3_route_01 | - | bytes | 20.02 | 544768 | 494.6 | 0.02048 | 0.02 | end_mlp | ema | [4.145] | 0.03 | auto |
+| g3_route_02 | - | bytes | 20.02 | 544768 | 494.6 | 0.02048 | 0.02 | end_mlp | ema | [4.145] | 0.03 | auto |
+
+**Problems:** none
+
+
+
+## Accounting (hnet.flops, SPEC convention, training = 3x forward, seq 8512 bytes, target compression 4.145)
+| model | params | FLOPs/byte | vs hnet arm |
+|---|---|---|---|
+| hnet (benchmark arm) | 20,010,025 | 20,372,111 | - |
+| g2-match-mem (parent) | 20,022,251 | 20,387,225 | +0.07% |
+| g3-route-01 / g3-route-02 | 20,023,020 | 20,477,141 | +0.52% |
+
+The probe (192x32 + 32x256 + 256 bias, rank 32) and its gain are counted in hnet.flops (`router_probe`, stage 0, once per
+byte, plus softmax / entropy / region-mean elementwise ops); the n-gram tables shrink from 4483 to 4471 buckets per
+order to pay for its 14,593 parameters (<= BPE 20,023,040). The probe's backward is weight-only (its input is
+detached), so the 3x convention over-counts it. Not counted, as for every rank-decider run: the realized main-network
+attention context depends on how evenly the boundaries are spread over the packed documents; logged per step as
+attn_ctx_ratio/s0 (realized sum of squared per-document chunk counts / the uniform value); CPU smokes 0.87-1.07
+(route-01), i.e. within the noise of the base decider; the main network's attention-context term is a small share of
+L03's FLOPs/byte. The router teacher of g3-route-02 (BCE on the standardized score) and the score features add only
+elementwise work. Training compression is exactly 1/4.145 of the free positions per micro-batch by construction.

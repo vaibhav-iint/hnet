@@ -35,7 +35,8 @@ output (trained by its own CE, ``probe_loss``, on the next byte of the same segm
 p(x_{t+1} | x_<=t), detached. ``feat_point``: f = standardized Ĥ_t. Under "end" semantics a chunk should close at t
 when byte t+1 is hard to predict from the bytes so far: after "word<space>" (the next word's first letter), not on
 the last letter before the space (the suffix basin's guess; there the next byte, the space, is easy). ``feat_region``:
-f = standardized causal mean of Ĥ over the last ``region_window`` bytes of the segment: a region-level difficulty
+f = log of the causal mean of Ĥ over the last ``region_window`` bytes of the segment, centred (not divided by its
+std: a log entropy-rate ratio, so the gain acts as an elasticity of the boundary density): a region-level difficulty
 offset, so that the exact batch budget of k = n / N boundaries is spent where the text is hard (novel text, scripts
 with high entropy per byte) and not where it is predictable (in-document copies the match model already predicts,
 boilerplate). The batch total stays exactly k (training FLOPs unchanged); what varies is the compression per region
@@ -63,7 +64,9 @@ from .base import RouterOutput, router_output
 DECISIONS = ("threshold", "quantile")
 EPS = 1e-6
 H_FLOOR = 0.25  # nats: floor of the std of the entropy features (an uninformative, near-constant probe gives f ~ 0)
-F_CLIP = 3.0  # standardized features are clipped to +-F_CLIP
+F_CLIP = 3.0  # features are clipped to +-F_CLIP
+C_FLOOR = 0.1  # floor of the std of the mixed score (standardized units)
+R_EPS = 0.05  # nats added to the region mean entropy before the log (a predicted copy: H ~ 0)
 
 
 def trimmed_stats(x: torch.Tensor, trim: float):
@@ -118,7 +121,8 @@ class QuantileDecider(nn.Module):
                  robust: bool = True, z_clip: float = 4.0, trim: float = 0.01, explore: float = 0.0,
                  explore_frac: float = 0.3, d_model: int = None, probe_rank: int = 0, feat_point: float = 0.0,
                  feat_region: float = 0.0, region_window: int = 16, feat_learn: bool = True,
-                 probe_weight: float = 1.0):
+                 probe_weight: float = 1.0, router_w0: float = 1.0, router_ramp: float = 0.0,
+                 score_floor: float = 0.0, teach: float = 0.0):
         super().__init__()
         assert target_ratio > 1, target_ratio
         self.ratio = float(target_ratio)
@@ -139,6 +143,22 @@ class QuantileDecider(nn.Module):
         self.router_probe = None
         self.probe_weight = float(probe_weight)
         self.region_window = int(region_window)
+        # feature-led start (a curriculum on the ROUTER's weight in the mix, not on any prior): the router's standardized
+        # score enters with weight router_w0, rising linearly to 1 at router_ramp of training (0 = always 1)
+        self.router_w0, self.router_ramp = float(router_w0), float(router_ramp)
+        # score_floor > 0: floor of the std used to standardize the router score. With a zero-initialised router head
+        # (g3-route-02) the scores are near-constant at init; standardizing them by their own tiny std would (a) blow
+        # any init preference up to full strength (the init lottery standardization was meant to avoid) and (b) scale
+        # the gradient into the router by 1 / std (grad norm 34 at step 5 in the CPU smoke, clipping the whole model).
+        # Under the floor a router with no opinion yet has no say, and the gradient gain is at most 1 / score_floor.
+        self.score_floor = float(score_floor)
+        # teach > 0 (needs feat_point and router_ramp > 0): during the feature-led start the router's OWN standardized
+        # score is also trained (BCE, scale-free, weight teach * (1 - progress / router_ramp)) toward the top k of the
+        # probe's entropy feature. Measured reason (CPU smokes, seed 2): with the router's weight in the mix at 0.05 the
+        # decisions sat 57% on whitespace at step 35, yet the router's own top k stayed at 0% whitespace and took the
+        # decisions back as its weight rose: the router's own gradient, not its init, chose the suffix basin.
+        self.teach = float(teach)
+        assert 0.0 < self.router_w0 <= 1.0 and self.router_ramp >= 0.0
         if self.feat_names or int(probe_rank) > 0:
             assert int(probe_rank) > 0 and d_model, "score features need probe_rank > 0 and d_model"
             assert self.feat_names, "probe_rank > 0 without feat_point / feat_region does nothing"
@@ -173,6 +193,18 @@ class QuantileDecider(nn.Module):
             return self.explore
         return self.explore * max(0.0, 1.0 - float(progress) / self.explore_frac)
 
+    def router_weight(self, progress: float) -> float:
+        """Weight of the router's own standardized score in the mixed score at training progress ``progress``."""
+        if self.router_ramp <= 0 or self.router_w0 >= 1.0:
+            return 1.0
+        return self.router_w0 + (1.0 - self.router_w0) * min(1.0, float(progress) / self.router_ramp)
+
+    def teach_weight(self, progress: float) -> float:
+        """Weight of the router teacher at training progress ``progress`` (decays to 0 at router_ramp)."""
+        if self.teach <= 0 or self.router_ramp <= 0 or "pt" not in self.feat_names:
+            return 0.0
+        return self.teach * max(0.0, 1.0 - float(progress) / self.router_ramp)
+
     def _features(self, h: torch.Tensor, ctx: SeqCtx, input_ids):
         """(raw features [n_feat, T] detached, probe CE or None, probe entropy [T] detached). The probe reads h
         detached; its CE (next byte of the same segment, training only) is its only training signal."""
@@ -188,18 +220,25 @@ class QuantileDecider(nn.Module):
                 loss = F.nll_loss(logp, tgt, ignore_index=-100)
         with torch.no_grad():
             H = -(logp.exp() * logp).sum(-1)
-            raw = torch.stack([H if n == "pt" else causal_window_mean(H, ctx, self.region_window)
+            raw = torch.stack([H if n == "pt" else torch.log(causal_window_mean(H, ctx, self.region_window) + R_EPS)
                                for n in self.feat_names])
         return raw, loss, H
 
     def _standardize_features(self, raw: torch.Tensor, free: torch.Tensor, batch_stats: bool):
-        """(standardized clipped features [n_feat, T], mean, std): batch statistics over the free positions in
-        training, running ones in eval. The std is floored at H_FLOOR nats (a near-constant probe gives f ~ 0)."""
+        """(centred, scaled, clipped features [n_feat, T], mean, scale): batch statistics over the free positions in
+        training, running ones in eval. "pt": standardized, the std floored at H_FLOOR nats (a near-constant probe gives
+        f ~ 0). "rg": the log of the region's mean entropy, centred but NOT divided by its std: a fixed unit (a log
+        ratio of entropy rates), so the gain is an elasticity (density ~ entropy rate^g' with g' ~ 1.3 g near a 1/4
+        quantile of a Gaussian score) and small but real differences between regions are not inflated to +-3 sigma.
+        (Measured in the first smoke: with a standardized region feature, a 0.17-nat difference in mean entropy
+        between English and code moved English to 13.8 bytes per chunk and code to 3.1 in training mode.)"""
         if batch_stats:
             rf = raw[:, free]
             m, sd = rf.mean(1), rf.std(1)
         else:
             m, sd = self.feat_stats[:, 0], self.feat_stats[:, 1]
+        is_rg = torch.tensor([n == "rg" for n in self.feat_names], device=raw.device)
+        sd = torch.where(is_rg, torch.ones_like(sd), sd)
         f = (raw - m[:, None]) / sd.clamp(min=H_FLOOR)[:, None]
         return f.clamp(-F_CLIP, F_CLIP), m, sd
 
@@ -210,6 +249,7 @@ class QuantileDecider(nn.Module):
         n_free = int(free.sum())
         feats = self.router_probe is not None
         probe_loss = None
+        tw = 0.0
         if feats:
             raw, probe_loss, H = self._features(h, ctx, input_ids)
         if self.training and n_free >= 2:
@@ -225,7 +265,7 @@ class QuantileDecider(nn.Module):
                     keep = (sf >= lo) & (sf <= hi)
                 st = sf[keep] if int(keep.sum()) >= 2 else sf
                 mu = st.mean()
-                sigma = st.std() + 1e-3
+                sigma = (st.std().clamp(min=self.score_floor) if self.score_floor > 0 else st.std()) + 1e-3
             elif self.normalize:
                 mu, sigma = sf.mean(), sf.std() + EPS
             else:
@@ -234,10 +274,20 @@ class QuantileDecider(nn.Module):
             if feats:  # learned mix with the probe's features, restandardized in the graph (scale anchored)
                 z_router = z.detach()
                 f, f_mu, f_sd = self._standardize_features(raw, free, True)
-                c = z + (self.feat_gain.float()[:, None] * f).sum(0)
+                c = self.router_weight(progress) * z + (self.feat_gain.float()[:, None] * f).sum(0)
                 c_mu, c_sd = trimmed_stats(c[free], self.trim)
-                z = (c - c_mu) / c_sd
+                c_sd = c_sd.clamp(min=C_FLOOR)  # both parts uninformative (init): no 1 / std gradient blow-up
+                z_own, z = z, (c - c_mu) / c_sd
             k = max(1, min(n_free - 1, int(round(n_free / self.ratio))))
+            tw = self.teach_weight(progress) if feats else 0.0
+            if tw > 0:  # the router's own standardized score is also taught the probe's top k (curriculum)
+                with torch.no_grad():
+                    fi = f[self.feat_names.index("pt")][free]
+                    tgt = torch.zeros_like(fi)
+                    tgt[torch.topk(fi, k).indices] = 1.0
+                    q = torch.topk(z_own[free].detach(), k + 1).values[k - 1:].mean()
+                with torch.autocast(device_type=s.device.type, enabled=False):
+                    teach_loss = tw * F.binary_cross_entropy_with_logits(self.temp * (z_own[free] - q), tgt)
             with torch.no_grad():
                 zf = z[free]
                 top = torch.topk(zf, k + 1)  # ties broken by rank, not by a comparison with the threshold
@@ -272,7 +322,7 @@ class QuantileDecider(nn.Module):
             z = (s - self.mu) / self.sigma
             if feats:
                 f, _, _ = self._standardize_features(raw, free, False)
-                c = z + (self.feat_gain.float()[:, None] * f).sum(0)
+                c = self.router_weight(progress) * z + (self.feat_gain.float()[:, None] * f).sum(0)
                 z = (c - self.comb_stats[0]) / self.comb_stats[1]
             z_tau = self.z_tau
             mask = (z > z_tau) & free
@@ -284,6 +334,9 @@ class QuantileDecider(nn.Module):
         out.extra = dict(r.extra)
         if feats:
             out.probe_loss = probe_loss
+            if self.training and n_free >= 2 and tw > 0:
+                out.teach_loss = teach_loss
+                out.extra["router_teach"] = teach_loss.detach() / tw
         with torch.no_grad():
             out.extra["tau"] = torch.sigmoid(self.tau).float()  # threshold in p space, for the logs
             out.extra["score_mu"] = self.mu.clone()
@@ -293,6 +346,8 @@ class QuantileDecider(nn.Module):
                 out.extra["explore_swap"] = swapped if tau_x > 0 else s.new_zeros(())
             if feats:
                 out.extra.update(self._feature_stats(H, out.boundary_mask, ctx, probe_loss))
+                if self.router_ramp > 0:
+                    out.extra["router_w"] = s.new_tensor(self.router_weight(progress))
         return out
 
     def _feature_stats(self, H: torch.Tensor, mask: torch.Tensor, ctx: SeqCtx, probe_loss) -> dict:

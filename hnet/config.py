@@ -79,7 +79,12 @@ class DCConfig:
     #   f(causal mean of H over region_window bytes), restandardized, with learned gains initialized at feat_point /
     #   feat_region. Point: prior-free "close the chunk where the next byte is hard" (the word basin, not the suffix
     #   basin). Region: the exact batch budget of boundaries moves to hard regions and away from predictable ones
-    #   (copies, boilerplate): compression adapts per region / document at unchanged training FLOPs.
+    #   (copies, boilerplate): compression adapts per region / document at unchanged training FLOPs. The region feature
+    #   is the log of the region mean, centred, not divided by its std (an elasticity, not a z-score).
+    #   router_w0: 1.0, router_ramp: 0.0 -> the router's own score enters the mix with weight router_w0 rising linearly
+    #   to 1 at router_ramp of training (a feature-led start). score_floor: 0.0 -> floor of the std that standardizes
+    #   the router score (with router_kwargs.init_scale 0 the scores are constant at init: no 1/std blow-up, and a
+    #   router with no opinion yet has no say).
     # chunk_vocab: a hashed vocabulary for the learned chunks (model/chunk_vocab.py), dict or per-stage list:
     #   {buckets: 65536, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 4096}; null = off. Needs "end" routers.
     #   Optional suffix keys: suffix_lens: [2, 3, ...] (each <= max_len), suffix_gate_init: 0.0 -- the chunk vector also
