@@ -1192,3 +1192,17 @@ Generation 2 (branch evolve/g2 @ 19043df, us-central1-f): the decisive fairness 
 same copy mechanism at token level: orders 1/2/4/8 tokens ≈ 4-33 bytes; +0.96% FLOPs, +0.69% params; offline the token
 index correctly proposes 81-87% of the tokens the byte index copies whole), the match model combined with g1-arch-02 /
 g1-mem-02 / g1-opt-01 and on the prior-free parent, the fixed g1-router-01, and mem-02 × arch-02; seeds 1-2.
+
+### The fairness control decides it: BPE gains more from copying (evolve g2, seed 1)
+| | val bpb | gain from copying | gap to BPE in the same condition |
+|---|---|---|---|
+| BPE | 1.656 | | |
+| BPE + token-level match model (g2-bpe-match) | **1.460** | -0.196 | |
+| H-Net warm start | 1.827 | | +0.171 |
+| H-Net + byte-level match model (g1-wild-01) | 1.502 | -0.325 | **+0.042** |
+The match model is not an H-Net-over-BPE win: with the same mechanism BPE stays ahead by 0.042. It helps the H-Net
+more (0.325 vs 0.196; the gap shrinks 0.171 → 0.042), consistent with the byte index also copying the ~5.6% of text that
+tokenization splits differently. BPE seed 1 reproduced bit-for-bit across generations (1.656). The new bar for H-Net
+candidates is BPE + copy, 1.460.
+Seed-2 confirmations (vs hnet_ws 1.829 ± 0.002): g1-arch-02 (offset-resolved read-back) 1.797 ± 0.001, **-0.032 on two
+seeds**; g1-alloc-01 1.821 ± 0.007 (-0.008); g1-arch-01 1.825 ± 0.002 (tie); g1-alloc-02 1.865 ± 0.003 (+0.036).
