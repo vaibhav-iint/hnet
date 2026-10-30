@@ -33,6 +33,16 @@ VARIANTS = {
                          "suffix_lens": [2, 3, 4, 6, 8, 12, 16]}],
         "_model": {"trie_head": {"rows": 4099, "dim": 16, "n_hash": 2, "max_len": 8, "topk": 8},
                    "match_model": {"orders": [2, 4, 8], "enc": True, "dec": True, "gate": True}}},
+    # product-key memory in the main network on the g4-combo-02 stack (evolve g5-output-01); the 3 SGD steps of
+    # _model make its zero-init values non-zero
+    "end_mlp_quantile_suffix_match_trie_topk_memory": {
+        "router": "end_mlp", "decision": "quantile",
+        "chunk_vocab": [{"buckets": 4096, "n_hash": 2, "max_len": 16, "pred_weight": 0.5, "n_neg": 256,
+                         "suffix_lens": [2, 3, 4, 6, 8, 12, 16]}],
+        "dechunk_slots": 2,
+        "_model": {"trie_head": {"rows": 4099, "dim": 16, "n_hash": 2, "max_len": 8, "topk": 8},
+                   "match_model": {"orders": [2, 4, 8], "enc": True, "dec": True, "gate": True},
+                   "main_memory": {"n_keys": 8, "k_dim": 8, "topk": 4, "layer": 2}}},
     "end_mlp_quantile_vocab_suffix": {"router": "end_mlp", "decision": "quantile",
                                       "chunk_vocab": [{"buckets": 4096, "n_hash": 2, "max_len": 16, "pred_weight": 0.5,
                                                        "n_neg": 256, "suffix_lens": [2, 3, 4, 6, 8, 12, 16]}]},
@@ -77,6 +87,10 @@ def _model(name, ngram=False):
         opt.zero_grad()
         (o.loss + o.aux_loss).backward()
         opt.step()
+    mem = m.backbone.stages()[-1].memory
+    if mem is not None:  # 3 small SGD steps leave the zero-init values at ~1e-5: make the memory's read visible
+        with torch.no_grad():
+            mem.values.weight.normal_(std=0.5, generator=torch.Generator().manual_seed(1))
     return m.eval()
 
 

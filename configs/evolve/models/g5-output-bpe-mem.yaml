@@ -1,0 +1,26 @@
+# g5-output-bpe-mem (evolve g5, control track): g2-bpe-match (bpe_L03 + token match model; the bar, 1.461) + the
+# same product-key memory as g5-output-01 (hnet/model/memory.py: 97^2 values of width 256, read before layer 2 of 3,
+# once per token as the H-Net's is once per chunk). The H-Net funds the memory from its chunk table; BPE has no
+# FLOP-free table it could shrink without changing the tokenizer, so here the memory comes on top (+2.43M params,
+# +0.22% training FLOPs/token): an upper bound on what BPE gets from the mechanism. Zero-init values (bit-identical at
+# init to g2-bpe-match).
+model:
+  type: dense
+  variant: llama
+  vocab_size: 32768
+  d_model: 256
+  n_layers: 3
+  d_intermediate: 896
+  num_heads: 3
+  num_kv_heads: null
+  head_dim: 128
+  rope_theta: 10000.0
+  nope_every: 0
+  tie_embeddings: false
+  norm_eps: 1.0e-05
+  initializer_range: 0.02
+  match_model: {orders: [1, 2, 4, 8], enc: true, dec: true, gate: true, dec_layer: 2}
+  memory: {n_keys: 97, k_dim: 32, topk: 32, layer: 2, center: 0.99}
+# Not part of the model (scripts/flops_report.py, tests).
+matching: {seq_len_bytes: 8512, seq_len_tokens: 2048, bytes_per_token: 4.145, reference: null}
+ladder: {rung: L03, variant: bpe, bytes_per_token: 4.145, vocab: 32768}

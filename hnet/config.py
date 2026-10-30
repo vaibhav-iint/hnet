@@ -269,6 +269,13 @@ class HNetConfig:
     # "momentum": 0.99, "gain_init": 0.0}; capacity < 1 refreshes only the chunks whose first byte surprised a
     # detached next-byte probe on the main output. Needs a 1-stage H-Net with "end" stage-0 semantics. Empty = off.
     refresh: dict = field(default_factory=dict)
+    # Product-key memory in the innermost main network (hnet.model.memory, evolve g5-output-01): before layer
+    # ``layer`` of the main network's stack the residual stream x gets x + sum_k softmax(top-k scores) V[slot], slots
+    # addressed by product keys (n_keys^2 values of width d_main, zero-init): lookup parameters at chunk level for a
+    # few dot products per chunk. {"n_keys": 96, "k_dim": 32, "topk": 32, "layer": 2, "center": 0.99}. Empty = off
+    # (the default model is unchanged). ``layer`` in 1..n_layers (n_layers = after the last layer, before the final
+    # norm); ``center``: EMA momentum of the running input mean subtracted before the query (0 = off).
+    main_memory: dict = field(default_factory=dict)
 
     def attn_res_for_stage(self, s: int) -> int:
         return int(_per_stage(self.attn_res, self.n_stages + 1, "attn_res")[s])
@@ -404,6 +411,9 @@ class DenseConfig:
     # that followed the most recent earlier occurrence (same document) of the last n tokens enters as embeddings and
     # a gated logit bonus. {} = off. Keys: orders (default [1, 2, 4, 8]), enc, dec, gate (bools), dec_layer.
     match_model: dict = field(default_factory=dict)
+    # Product-key memory before layer ``layer`` of the Transformer (hnet.model.memory; the BPE control of the H-Net's
+    # HNetConfig.main_memory, logbook/evolve/candidates/g5-output-bpe-mem). {} = off.
+    memory: dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, d: dict) -> "DenseConfig":

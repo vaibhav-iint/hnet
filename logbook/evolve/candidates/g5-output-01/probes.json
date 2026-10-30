@@ -1,0 +1,53 @@
+{
+ "checkpoint": "g1-wild-01 seed 1 (hnet_ws + byte match model, L03, 908 steps; val bpb 1.502); the closest trained relative of g4-combo-02 on this box",
+ "data": "64 windows x 8512 bytes spread over mix_v1 val (first 512 bytes of each window dropped from the statistics), 512,000 scored bytes; training-side probes on 160 windows of mix_v1_small train shard 1",
+ "where_the_bits_are": {
+  "note": "per-byte CE of the trained model split by the length of the chunk-in-progress prefix (0 = predicting the first byte of the next chunk) and by whether the byte match model's candidate is right",
+  "bpb_all": 1.5253,
+  "rows": [
+   {"group": "prefix len 0 (chunk start)", "share_bytes": 0.240, "share_bits": 0.424, "bpb": 2.697, "top1": 0.510, "top16": 0.917},
+   {"group": "prefix len 1", "share_bytes": 0.155, "share_bits": 0.182, "bpb": 1.790},
+   {"group": "prefix len 2", "share_bytes": 0.140, "share_bits": 0.131, "bpb": 1.430},
+   {"group": "prefix len 3", "share_bytes": 0.111, "share_bits": 0.073, "bpb": 1.002},
+   {"group": "prefix len >= 4", "share_bytes": 0.354, "share_bits": 0.190, "bpb": 0.82},
+   {"group": "chunk start, copy wrong or none", "share_bytes": 0.167, "share_bits": 0.384, "bpb": 3.504},
+   {"group": "chunk start, copy correct", "share_bytes": 0.072, "share_bits": 0.039, "bpb": 0.828},
+   {"group": "inside chunk, copy wrong or none", "share_bytes": 0.443, "share_bits": 0.527, "bpb": 1.815}
+  ]
+ },
+ "readout_capacity_at_chunk_starts": {
+  "note": "correction head f([main_out, h_final]) added to the frozen logits at chunk starts, fitted on 302,523 training chunk starts, evaluated on 122,675 val chunk starts (best epoch)",
+  "base_bits_per_chunk_start_byte": 2.6970,
+  "linear_gain": 0.0453,
+  "mlp512_gain": 0.0560,
+  "upper_bound_bpb": 0.013,
+  "verdict": "killed: a higher-capacity chunk-start output path reading the same state can add at most ~0.01 bpb, part of which the trie's empty-prefix rows already provide"
+ },
+ "chunk_keyed_copy_at_chunk_starts": {
+  "note": "in-window match keyed by the last k chunks (variable length, the learned unit); candidate = byte after the most recent earlier chunk end with the same key; fitted logit bonus per (k, agreement with the byte match) on half the windows, evaluated on the other half",
+  "byte_match_correct_at_chunk_starts": 0.301,
+  "k1": {"coverage": 0.679, "precision": 0.379, "new_correct_where_byte_match_fails": 0.053},
+  "k2": {"coverage": 0.369, "precision": 0.534},
+  "gain_bpb": {"k1": 0.0001, "k2": 0.0001, "k1+k2": 0.0005},
+  "verdict": "killed: the trained model already predicts what a chunk-keyed copy offers"
+ },
+ "count_based_output_memories": {
+  "note": "R most frequent (key, next byte) pairs from 30 MB of mix_v1_small train (router boundaries emulated by a count model of the checkpoint's router: precision 0.92, recall 0.84 on val), mixed with the model by EM-fitted weights per (log count, chunk start); gain on the held-out half",
+  "R=77383": {"trie_prefix_key": 0.0031, "prev_chunk_plus_prefix": -0.0002, "last_4": -0.0009, "last_6": -0.0023, "last_8": -0.0014, "last_12": 0.0002},
+  "trie+prev_chunk": 0.0024,
+  "verdict": "an n-gram-count memory adds nothing to the trained model; the learned trie's measured -0.025 is 8x the count bound of its own key, so the trie works as an output embedding scored against the main network's state, not as a count memory. Cross-chunk (previous chunk) trie keys dropped: no evidence for them"
+ },
+ "frozen_backbone_trie": {
+  "note": "trie head trained on cached features of 200 training windows (1.6M positions), evaluated on 48 val windows",
+  "rank32_linear_control_gain": 0.0009,
+  "trie_gain_by_epoch": [-0.005, -0.073, -0.139],
+  "verdict": "uncalibratable at CPU data scale: 5M table parameters memorize 1.6 MB; not used for decisions"
+ },
+ "memory_slot_usage": {
+  "note": "fresh 96^2-slot product-key memory read from the residual stream before main layer 2 (2 windows); distinct slots out of 9216 vs ~9216 for uniform random reads",
+  "trained_stream": {"raw": 4510, "centered": 8119, "standardized": 8407, "mean_cos_between_chunk_states": 0.291},
+  "fresh_init_stream": {"raw": 1336, "centered": 1305, "standardized": 1860},
+  "decision": "query centering by a running mean (persistent EMA buffer, no within-batch coupling); usage at init is limited by the fresh main network's low-rank stream and is the main risk (logged as memory/slots_used)"
+ },
+ "table_ablation": "logbook/evolve/candidates/g5-output-02/budget_probe.json (mean-ablation per table on the same checkpoint)"
+}

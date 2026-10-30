@@ -105,9 +105,14 @@ class Isotropic(nn.Module):
         if self.attn_res_block > 0:  # one operator per sub-layer + one for the output
             self.attn_res = nn.ModuleList(DepthAttention(d_model, norm_eps) for _ in range(self.height + 1))
 
-    def forward(self, h: torch.Tensor, ctx: SeqCtx, inject=None) -> torch.Tensor:
+    def forward(self, h: torch.Tensor, ctx: SeqCtx, inject=None, memory=None) -> torch.Tensor:
         """``inject``: optional ``(i, x)``, x [T, D] (or [1, T, D]) added to the residual stream (fp32) right before
-        layer i, 0 < i < len(layers) (DenseConfig.match_model's decoder-side candidates)."""
+        layer i, 0 < i < len(layers) (DenseConfig.match_model's decoder-side candidates). ``memory``: optional
+        ``(i, f)``, 0 < i <= len(layers): the residual stream s right before layer i (after the last layer for
+        i = len(layers)) becomes s + f(s) (HNetConfig.main_memory / DenseConfig.memory; f returns fp32)."""
+        if memory is not None:
+            assert self.attn_res_block == 0, "memory is not combined with attn_res"
+            return self._forward_memory(h, ctx, *memory, inject=inject)
         squeeze = h.dim() == 2
         for layer in self.layers:  # shared per-stage tables (rotary, masks) built eagerly, outside compiled blocks
             prep = getattr(layer.mixer, "prepare_ctx", None)
@@ -129,6 +134,29 @@ class Isotropic(nn.Module):
             for layer in self.layers:
                 hidden, residual = layer(hidden, residual, ctx)
         residual = hidden.float() if residual is None else residual + hidden.float()
+        out = self.rmsnorm(residual, out_dtype=hidden.dtype)
+        return out.squeeze(0) if squeeze else out
+
+    def _forward_memory(self, h: torch.Tensor, ctx: SeqCtx, at: int, fn, inject=None) -> torch.Tensor:
+        """``forward`` with ``memory = (at, fn)`` (and optionally ``inject``, applied first at its layer)."""
+        assert 0 < at <= len(self.layers), at
+        for layer in self.layers:
+            prep = getattr(layer.mixer, "prepare_ctx", None)
+            if prep is not None:
+                prep(ctx)
+        squeeze = h.dim() == 2
+        hidden, residual = (h.unsqueeze(0) if squeeze else h), None
+        if inject is not None:
+            assert 0 < inject[0] < len(self.layers), inject[0]
+        for i, layer in enumerate(self.layers):
+            if inject is not None and i == inject[0]:
+                residual = residual + inject[1].float().reshape(residual.shape)
+            if i == at:  # the stream before layer i is residual + hidden; the block adds hidden itself
+                residual = residual + fn(residual + hidden.float())
+            hidden, residual = layer(hidden, residual, ctx)
+        residual = hidden.float() if residual is None else residual + hidden.float()
+        if at == len(self.layers):
+            residual = residual + fn(residual)
         out = self.rmsnorm(residual, out_dtype=hidden.dtype)
         return out.squeeze(0) if squeeze else out
 

@@ -1,0 +1,49 @@
+id: g5-output-02
+parents: [g4-combo-02]
+track: output
+hypothesis: >-
+  Reallocate the parameter budget from the input side to the output side by measurement rather than argument. A
+  mean-ablation of every FLOP-free table of the trained g1-wild-01 checkpoint (hnet_ws + byte match model;
+  budget_probe.json: each table's rows replaced by its mean row, no retraining, 24 val windows) ranks them per
+  parameter: chunk table 0.0045 bpb/M (9.88M, +0.0445), 8-gram 0.0097/M, 7-gram 0.0104/M, 6-gram 0.020/M, 5-gram
+  0.042/M, 4-gram 0.089/M, 3-gram 0.17/M; match-model input / decoder embeddings 0.50 / 0.15 /M. The chunk table is the
+  least load-bearing table per parameter in a copy model too (the g3 probe found the same on hnet_ws, 0.0036/M for
+  its halving), while the output-side memory is the loop's largest win per parameter (the fast trie: -0.025 on top of
+  copying for 4.96M in g3-mem-02, ~0.005/M, funded by the chunk table's first halving). The trie is row-starved by
+  construction: one hashed row per (chunk prefix . byte) key, 61k distinct keys in 409 KB of validation text against
+  77383 rows per table for the whole corpus (g3 probe). This candidate halves the chunk table again (12821 -> 6410
+  buckets per hash, -2.46M) and gives every freed parameter to the trie's rows (77383 -> 115849 per table): zero
+  extra FLOPs (lookups), the same parameter count as g4-combo-02. With g5-output-01 (the same 2.46M as a main-network
+  memory) and g4-combo-02 (the same 2.46M in the chunk table) it is a three-way allocation test of one budget slice:
+  input chunk identity vs byte-level output spelling vs chunk-level state memory.
+prediction:
+  fitness: "val bpb = g4-combo-02 - 0.003 +- 0.008 at equal seeds; falsified if >= g4-combo-02 + 0.006 (the chunk
+    table's second half carries more than 1.5x trie rows buy)"
+  mechanism: >-
+    trie/bonus_rms above g4-combo-02's at the same step from step 300 on (fewer collisions per row); the gain sits
+    inside chunks (prefix length >= 1, where the trie keys are non-empty), not at chunk starts; chunk_vocab_ce/s0
+    (next-chunk CE over 6410 buckets) is lower than g4-combo-02's only because the bucket space is smaller: compare
+    byte bpb, not that number; trie/topk_cov unchanged (>= 0.995).
+branch: evolve/g5-output
+model: configs/evolve/models/g5-output-02.yaml
+set: ["model.lr_multiplier_kinds=[embed,head,other]"]
+checks:
+  params: "20,022,699 <= 20,023,040 (built model == hnet.flops count; identical to g4-combo-02)"
+  flops: "0.020656 GFLOPs/byte training, identical to g4-combo-02 (+1.39% vs hnet): rows are lookups"
+  tests: "config-only candidate (no code path of its own): the trie and chunk-table code are covered by
+    tests/test_trie_topk.py, tests/test_chunk_vocab_suffix.py, tests/test_invariances.py;
+    tests/test_main_memory.py::test_candidate_configs_fit_the_budget checks its params and FLOPs. Full suite (CPU):
+    999 passed, 44 skipped, 1 deselected (tests/test_eval_smoke_gpt2.py::test_gpt2_hellaswag_50, network)"
+  grad_audit: logbook/evolve/candidates/g5-output-02/grad_audit.txt
+  smoke: logbook/evolve/candidates/g5-output-02/smoke.txt
+  budget_probe: logbook/evolve/candidates/g5-output-02/budget_probe.json
+  fairness: logbook/evolve/candidates/g5-output-01/fairness.md
+bpe_analogue: >-
+  None that changes the comparison: BPE's output-side memory is its 32768 x 256 LM head (8.4M), and enlarging it means
+  a larger vocabulary, i.e. a different tokenizer and more head FLOPs per token; it has no input-side table to take the
+  parameters from. The comparison stays against g2-bpe-match.
+author: output / parameter-budget proposer (generation 5)
+next_if_fails: >-
+  If neutral: the chunk table's second half and 1.5x trie rows are worth about the same; the next slice to try is
+  the 7/8-gram tables (0.010/M) -> trie dim 32 -> 48 (FLOPs +0.12%). If worse by > 0.006: the suffix-keyed chunk
+  memory is load-bearing at this size in the full stack (the g1-wild-01 ablation has no suffix keys), keep 12821.
