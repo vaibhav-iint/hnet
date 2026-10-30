@@ -1,0 +1,85 @@
+# evolve generation 3 (scripts/evolve/make_gen.py; benchmark: configs/search/ladder_1e16_L03.yaml)
+name: evolve_g3
+out_root: runs/search/evolve_g3
+gcs: gs://neat-dispatch-501718-a5-hnet/runs/evolve_g3
+seeds:
+- 1
+- 2
+params:
+  best_mlr:
+    bpe: 0.02
+  adam_lr: 0.003
+params_note: best_mlr.bpe = BPE's best Muon LR from ladder_lr_1e16 (report/best_params.yaml); adam_lr = Adam-part LR (embeddings,
+  heads, norms), fixed, not tuned yet
+fairness: strict
+set:
+- train.optimizer=muon
+- train.muon.lr=${best_mlr.bpe}
+- train.muon.lr_embed=${adam_lr}
+- train.muon.lr_head=${adam_lr}
+- train.muon.lr_other=${adam_lr}
+- train.muon.momentum_warmup_steps=90
+- eval.every=90
+- train.ckpt_every=227
+runs:
+- name: g3_combo_01
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g3-combo-01.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+  - model.lr_multiplier_kinds=[embed,head,other]
+- name: g3_copy_01
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g3-copy-01.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g3_copy_02
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g3-copy-02.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g3_mem_01
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g3-mem-01.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g3_mem_02
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g3-mem-02.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g3_route_01
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g3-route-01.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+- name: g3_route_02
+  config: configs/ladder/runs/ladder_hnet.yaml
+  model: configs/evolve/models/g3-route-02.yaml
+  set:
+  - data.micro_batch=8
+  - data.batch_bytes=544768
+  - train.train_bytes=494649344
+report:
+  baseline: null
+  labels:
+    g3_combo_01: Orchestrator crossover of every component confirmed on two seeds or on seed 1 on top of the match model
+    g3_copy_01: 'Chunk pointer copy: tell the main network the whole next chunk'
+    g3_copy_02: 'Copy-aware compression: the router sees the match state, and main-network positions leave text the copy index
+      already pr'
+    g3_mem_01: 'The prefix-trie output vocabulary (g1-mem-01: 1'
+    g3_mem_02: The best H-Net (g2-match-mem, 1
+    g3_route_01: Adaptive compression at an exact FLOP budget, something only a learned segmentation can do
+    g3_route_02: A prior-free router that lands in the word basin, led there by the model's own next-byte uncertainty

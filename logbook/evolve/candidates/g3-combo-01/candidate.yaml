@@ -1,0 +1,14 @@
+id: g3-combo-01
+parents: [g1-wild-01, g1-mem-02, g1-arch-02, g1-opt-01]
+track: crossover
+hypothesis: >
+  Orchestrator crossover of every component confirmed on two seeds or on seed 1 on top of the match model. Seed-1
+  stacks on the match model each gave 0.009-0.019 (match-mem 1.483, match-arch 1.491, match-opt 1.493 vs match 1.502);
+  if the three are independent their sum (~0.04) closes the 0.042 gap to BPE+match (1.460). g2-combo-02 (mem x arch
+  without the match model, 1.772) did not add up, so the prediction is that the parts overlap and the stack lands
+  between the best single stack and the sum.
+prediction: {fitness_vs_g2_bpe_match: "+0.00 to +0.025 (1.460-1.485)", mechanism: "suffix gates open > 0.3; bnd_on_ws > 0.8"}
+branch: evolve/g3
+model: configs/evolve/models/g3-combo-01.yaml
+set: ["model.lr_multiplier_kinds=[embed,head,other]"]
+checks: {params: "20,022,251 <= 20,023,040", fairness: pending, tests: pending}
