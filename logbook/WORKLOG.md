@@ -1168,3 +1168,9 @@ shows dropping them is worth ~0.03 at L03), prior-free arms in the losing basin 
 minima at the grid edge (add L02/L03 at 1e17). The ladder VM shut down after finishing its queue (4.1 h, $24.3).
 Generation 1 of the evolve loop was preempted at 23:13 UTC and stayed down during a session pause; resumed 05:10 UTC with
 a 3.5-hour cap. EXP-026 KDA abandoned (its VM stopped at its time cap; the kernel is 10× slower and it trailed SWA).
+
+### Correction: with Muon, tiny BPE is far ahead (EXP-025 bpe_muon 0.025 finished during the pause)
+BPE + Muon at LR 0.025: 1.5257 / 1.5237 / 1.5259 (1.525 ± 0.001), against BPE + AdamW 1.634 and the best tiny H-Net
+(warm start + Muon 0.025) 1.631. Every "the H-Net matches BPE at tiny scale" statement in this log compared against
+AdamW BPE at an untuned LR; against the Muon-trained BPE the tiny H-Net trails by 0.106. EXP-027 rgate seed 2: 1.653
+(arm mean 1.700 over three seeds, still a lottery). The evolve benchmark (L03, mix_v1) already uses Muon for both.
