@@ -48,6 +48,7 @@ of them was derivable from the code or from a five-minute CPU run. The list of m
 | Launcher started training before the data rsync finished | runs failed with missing files | an assertion on the data directory before `train` |
 | A loss used `F.binary_cross_entropy`, which CUDA autocast refuses: crashed on the GPU only (evolve g1-router-01) | the VM's run log | a static test for autocast-unsafe ops (`tests/test_autocast_safety.py`) |
 | A preemption mid-save left an empty `meta.json`; resume crashed instead of using the previous checkpoint (evolve g1 bpe_s2) | the run queue's failed status | a test with a half-written checkpoint (`tests/test_ckpt_incomplete.py`) |
+| The evolve loop's L03 1e16 win over BPE + copy (−0.028, 3 seeds) reversed at L05 1e17 (+0.030): the lookup components (match model, trie, tables) are worth 10x less to BPE and 4x less to the H-Net at the larger model | the transfer check, after five generations tuned on one rung | a BPE + copy run at L04/L05 1e16 (12 min each) in generation 2: the copy gain's dependence on model size was measurable before stacking more lookup components on it |
 
 The common pattern: we evaluated **outcomes** (val bpb at the end, averaged over seeds) and inferred mechanisms
 afterwards. Mechanisms must be instrumented and tested first; outcomes come last. The rules:

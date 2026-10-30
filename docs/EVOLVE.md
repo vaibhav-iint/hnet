@@ -83,6 +83,6 @@ ledger below reaches the cap and reports. Generation 1 runs seeds 1 and 2 for ca
 | 2 (7 candidates + bpe, seeds 1-2; 16 runs; branch evolve/g2 @ 19043df) | 1.08 h | $6.31 | 7 | g2-match-mem 1.486 ± 0.004; bar g2-bpe-match 1.461 ± 0.001 |
 | 3 (6 proposer candidates + orchestrator crossover g3-combo-01, seeds 1-2; 14 runs; branch evolve/g3 @ 7751276) | 1.27 h | $7.38 | 7 | g3-mem-02 1.461 ± 0.001, g3-combo-01 1.462 ± 0.003 (tie the bar); g3-route-02 prior-free 1.503 |
 | 4 (orchestrator crossovers g4-combo-02/03 + seed-3 confirmations of g3-combo-01, g3-mem-02, g2-bpe-match; 8 runs; branch evolve/g4 @ 3c7ad2f) | 0.81 h | $4.73 | 2 | **g4-combo-02 1.433 ± 0.002 (3 seeds), −0.028 vs BPE + copy 1.461 ± 0.001 (3 seeds)**; tokenizer-free g4-combo-03 1.442 ± 0.004 (−0.019) |
-| 4x transfer check at L05 1e17 (g4-combo-02 x2, g4-combo-03 x1, g2-bpe-match x2; branch evolve/g4 @ d8b7c91) | running | cap 2.5 h = $14.6 | | |
-| 5 (chunk refresh x2, main-network memory + BPE control, bigger trie; 10 runs; branch evolve/g5 @ ed87aa8) | running | cap 1.5 h = $8.8 | | |
-| **total so far** | 5.13 h + 4x + 5 | **$30.10 of $50 + 4x + 5 (projected ~$46)** | | |
+| 4x transfer check at L05 1e17 (g4-combo-02 x2, g4-combo-03 x1, g2-bpe-match x2; branch evolve/g4 @ d8b7c91) | 1.78 h | $10.37 | 2 | **does not transfer**: g4-combo-02 1.239 ± 0.013 vs BPE + copy 1.209 ± 0.002 (+0.030); g4-combo-03 1.254 |
+| 5 (chunk refresh x2, main-network memory + BPE control, bigger trie; 10 runs; branch evolve/g5 @ ed87aa8) | 1.14 h | $6.66 | 4 | none beats g4-combo-02 (best g5-compute-02 1.432 ± 0.003, neutral at −1.8% FLOPs) |
+| **total** | 8.05 h | **$47.13 of $50: loop stopped at the cap** | | |
