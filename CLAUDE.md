@@ -46,6 +46,8 @@ of them was derivable from the code or from a five-minute CPU run. The list of m
 | The next-chunk loss sends the router no gradient (computed before dechunking; the STE sits after) | reasoning during the adoption deep dive; verified by `autograd.grad` only in `tests/test_adoption_options.py` | an autograd check the day the loss was added |
 | A zero-initialised chunk table gives zero gradient to everything upstream at init | the same test failing | a step-0 gradient audit |
 | Launcher started training before the data rsync finished | runs failed with missing files | an assertion on the data directory before `train` |
+| A loss used `F.binary_cross_entropy`, which CUDA autocast refuses: crashed on the GPU only (evolve g1-router-01) | the VM's run log | a static test for autocast-unsafe ops (`tests/test_autocast_safety.py`) |
+| A preemption mid-save left an empty `meta.json`; resume crashed instead of using the previous checkpoint (evolve g1 bpe_s2) | the run queue's failed status | a test with a half-written checkpoint (`tests/test_ckpt_incomplete.py`) |
 
 The common pattern: we evaluated **outcomes** (val bpb at the end, averaged over seeds) and inferred mechanisms
 afterwards. Mechanisms must be instrumented and tested first; outcomes come last. The rules:
