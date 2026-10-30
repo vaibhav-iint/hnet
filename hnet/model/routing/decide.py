@@ -37,6 +37,8 @@ not depend on), and ranking the fp32 scores instead of thresholding p removes th
 
 from __future__ import annotations
 
+from typing import Optional
+
 import torch
 import torch.nn as nn
 
@@ -89,7 +91,11 @@ class QuantileDecider(nn.Module):
             return self.explore
         return self.explore * max(0.0, 1.0 - float(progress) / self.explore_frac)
 
-    def forward(self, r: RouterOutput, ctx: SeqCtx, progress: float = 1.0) -> RouterOutput:
+    def forward(self, r: RouterOutput, ctx: SeqCtx, progress: float = 1.0,
+                z_bias: Optional[torch.Tensor] = None) -> RouterOutput:
+        """``z_bias`` (optional, [T] fp32, standardized units; HNetConfig.copy_route) is added to the standardized
+        score before the rank decision and the confidence; the score statistics (mean, std) stay those of the raw
+        score, and the running z_tau tracks the biased scores, so training and evaluation see the same rule."""
         s = (r.logit if r.logit is not None else torch.logit(r.p.clamp(EPS, 1 - EPS))).float()
         free = ctx.position_ids != 0  # the first position of every segment is forced selected (as in router_output)
         n_free = int(free.sum())
@@ -112,6 +118,8 @@ class QuantileDecider(nn.Module):
             else:
                 mu, sigma = s.new_zeros(()), s.new_ones(())
             z = (s - mu) / sigma
+            if z_bias is not None:
+                z = z + z_bias
             k = max(1, min(n_free - 1, int(round(n_free / self.ratio))))
             with torch.no_grad():
                 zf = z[free]
@@ -134,6 +142,8 @@ class QuantileDecider(nn.Module):
                 self.initialized.fill_(True)
         else:
             z = (s - self.mu) / self.sigma
+            if z_bias is not None:
+                z = z + z_bias
             z_tau = self.z_tau
             mask = (z > z_tau) & free
         zc = z - z_tau.detach()

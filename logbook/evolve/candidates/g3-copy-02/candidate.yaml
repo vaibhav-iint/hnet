@@ -1,0 +1,68 @@
+id: g3-copy-02
+parents: [g2-match-mem]
+track: copy
+hypothesis: >-
+  Copy-aware compression: the router sees the match state, and main-network positions leave text the copy index
+  already predicts. The stage-0 rank decider's standardized score gets a bias from the byte match model's state
+  (hnet/model/chunk_copy.py CopyRoute, HNetConfig.copy_route): b_t = -kappa inside a verified copy (the last >= 4
+  bytes were predicted correctly by the longest order>=8 candidate and a candidate for the next byte exists),
+  +kappa_break at the byte where such a copy breaks, plus a learned zero-init residual per copy state (13 states: run
+  length bin x next-candidate, and "break"). kappa = 2.5, kappa_break = 1.0 standardized units. Rank decisions keep
+  exactly T/N boundaries per batch, so FLOPs/byte are unchanged; the boundaries removed from copies go to novel text
+  and to copy breaks (a copy start/end is a natural chunk boundary: the main network is consulted exactly where the
+  copy stops being informative). Measured offline (offline.md, whitespace proxy for a word-basin router, R = 4): 10%
+  of mix bytes (31% code) sit inside verified copies whose next byte the index gets right 87% (91%) of the time, and
+  14% of the boundaries (36% on code) fall there; moving them gives novel text ~11% (mix) to ~45% (code) more
+  main-network positions per byte. Why it should not repeat g1-alloc's failure (longer chunks hurt because the
+  decoder must spell more bytes per chunk state): the long chunks are only the copied ones, whose bytes the match
+  model's decoder embedding and logit gate spell; novel text gets *shorter* chunks. Why BPE cannot do it: a BPE
+  model's segmentation is a fixed function of the string, and every token costs one full-depth step whether it is a
+  verified copy or not; it cannot re-tokenize a document by what it has already seen, and it cannot add positions
+  to novel text. The nearest BPE analogue is per-token adaptive depth (mixture-of-depths keyed on the token match
+  state), a different architecture class that cannot raise the number of positions per novel byte; it is not built
+  here (no part of this mechanism transfers to the dense BPE arm as is). Not a segmentation prior (guardrail 4): the
+  bias encodes no linguistic unit (no whitespace or punctuation lists), only where the model-free exact copy index
+  is verified, an input the parent already uses permanently (match_model enc embeddings); flagged here so the
+  orchestrator can rule on it. 13 parameters, FLOPs +0.0001%.
+prediction:
+  fitness: "<= -0.181 (val bpb <= 1.475, parent g2-match-mem 1.483); central 1.476; per-source gain on code and
+    held-out code >= 3x the English gain"
+  mechanism: >-
+    copy_route/bnd_in_copy (share of boundaries inside verified copies) <= 0.03 throughout training (parent level
+    ~0.10-0.14 on the mix, measured by the same statistic with kappa = 0), copy_route/novel_comp ~3.7 vs 4.145,
+    copy_route/break_cut >= 0.5 (copy breaks are cut); copy_route/w_copy stays <= +0.5 (the learned residual does
+    not undo the policy); bnd_on_ws/s0 stays in the word basin (>= 0.8). Falsified if the gain is < 0.005 bpb (main-
+    network positions inside copies were not wasted) or if code gets worse (the decoder cannot spell long copied
+    chunks; check per-byte CE inside copies vs the parent).
+branch: evolve/g3-copy-02
+model: configs/evolve/models/g3-copy-02.yaml
+set: []
+checks:
+  tests: "pass: tests/test_copy_route.py (11: copy state vs brute force incl. segment starts and breaks; flag off = no
+    new parameters, identical state dict and RNG stream; kappa = kappa_break = 0 with the learned residual is
+    bit-identical to the parent in train and eval (logits, loss, aux loss, boundary masks); with kappa = 6 the boundary
+    count is unchanged while the share of boundaries inside verified copies drops > 4x and novel-text compression
+    falls; causality and packed == separate with the flag on and a non-zero residual; byte CE reaches the residual at
+    init for kappa 0 and 2.5; requires match_model + quantile; params / FLOPs) + tests/test_chunk_copy.py + the full
+    suite (see full_tests)"
+  full_tests: "pass: python -m pytest tests -q on evolve/g3-copy-02 (which contains both flags): 921 passed, 44
+    skipped (16:54 on the shared CPU box)"
+  fairness: "pass (scripts/search/fairness.py on make_gen's spec, fairness.md): 0.02039 GFLOPs/byte vs 0.02037 hnet
+    (+0.07%, all of it the parent's match model; copy_route adds 13 params and no counted FLOPs), params 20,022,264 <=
+    BPE 20,023,040; same data, steps, batch, optimizer, schedule, val"
+  grad_audit: "logbook/evolve/candidates/g3-copy-02/grad_audit.txt (L03 candidate model, 2 x 4096 real bytes, mix +
+    code): byte CE reaches copy_route at init (2.9e-3) and after 3 steps (1.9e-2), ratio loss too (2e-4), router prior
+    not (it acts on the raw logit, before the bias: intended). At init on real text: 12.6% of bytes in verified copies,
+    boundaries inside copies 0 (kappa 2.5 clears them), 74% of copy breaks cut (82% after 3 steps), novel-text
+    compression 3.62 vs 4.14 overall; p_mid 0.14-0.17, p_margin 0.30, compression exactly 4.14"
+  smoke: "pass (smoke.txt): tiny parent-equivalent + copy_route, 40 CPU steps on mix_v1_small: train bpb 7.18 ->
+    3.26 (parent 7.18 -> 3.32), val (64 KB) 3.454 vs parent 3.505 (same seed and data order; an early-training
+    number), no NaN, compression 5.98 (target 6.0) every step, copy_route/bnd_in_copy 0.000 at every step,
+    novel_comp 4.9-5.9 vs 5.98, break_cut 0.33-0.70, bnd_on_ws/s0 0.80-0.94 (word basin), w stays ~0 (|w| < 0.04)"
+  offline: logbook/evolve/candidates/g3-copy-01/offline.md (copy-state table; scripts/evolve/copy_probe.py)
+author: copy proposer (g3)
+next_if_fails: >-
+  If boundaries left copies but bpb did not move: the reallocation is too small on the mix (10% of bytes); try
+  run = 2 / min_order = 4 (14-50% of bytes) or cross with g3-copy-01 so the single chunk that covers a copied span
+  carries a pointer to the earlier occurrence ("a copied span costs one chunk step"). If code got worse: lower kappa
+  to 1.0 so long copies keep some boundaries, or exempt runs < 16 bytes.

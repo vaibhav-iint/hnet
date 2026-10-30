@@ -350,6 +350,14 @@ class HNetForCausalLM(nn.Module):
             assert self.backbone.routing_module.boundary_semantics == "end", "chunk_copy needs 'end' semantics"
             with torch.random.fork_rng(devices=[]):
                 self.chunk_copy = ChunkCopy(d0, **cfg.chunk_copy)
+        # copy-aware compression (evolve g3-copy-02): the match model's state biases the stage-0 rank decision
+        self.copy_route = None
+        if cfg.copy_route:
+            from .chunk_copy import CopyRoute
+
+            assert self.match_model is not None, "copy_route needs match_model (its candidates are the copy state)"
+            assert self.backbone.decider is not None, "copy_route needs the quantile decision at stage 0"
+            self.copy_route = CopyRoute(self.match_model.orders, **cfg.copy_route)
 
     @property
     def n_stages(self) -> int:
@@ -376,6 +384,9 @@ class HNetForCausalLM(nn.Module):
                 x = x + self.match_model.enc_embed(cand).to(x.dtype)
             if self.match_model.dec is not None:
                 dec_add = self.match_model.dec_embed(cand)
+        z_bias = cstate = None
+        if self.copy_route is not None:  # where a verified copy runs or breaks (no gradient but through w)
+            z_bias, cstate = self.copy_route(ids, cand, ctx)
         binfo = None
         vocab_stages = [st for st in self.backbone.stages() if getattr(st, "chunk_vocab", None) is not None]
         if vocab_stages:
@@ -385,7 +396,7 @@ class HNetForCausalLM(nn.Module):
                              max(st.chunk_vocab.max_len for st in vocab_stages))
             binfo = ByteInfo(bank, torch.arange(ids.numel(), device=ids.device))
         h, bpred = self.backbone(x, ctx, input_ids=ids, boundaries=boundaries, binfo=binfo, dec_add=dec_add,
-                                 chunk_hook=self.chunk_copy)
+                                 chunk_hook=self.chunk_copy, z_bias=z_bias)
         pstats = {}
         trie_bias = trie_len = None
         if self.trie_head is not None:
@@ -448,6 +459,20 @@ class HNetForCausalLM(nn.Module):
                 stats["trie/bonus_rms"] = trie_bias.detach().pow(2).mean().sqrt()
                 stats["trie/prefix_len"] = trie_len.float().mean()
         stats.update(pstats)
+        if cstate is not None:  # where the boundaries went: out of verified copies, onto copy breaks, into novel text
+            with torch.no_grad():
+                m0 = bpred[0].boundary_mask.reshape(-1)
+                inc, brk = cstate["in_copy"], cstate["brk"]
+                stats["copy_route/in_copy"] = inc.float().mean()
+                stats["copy_route/bnd_in_copy"] = (m0 & inc).sum().float() / m0.sum().clamp(min=1)
+                stats["copy_route/break_cut"] = (m0 & brk).sum().float() / brk.sum().clamp(min=1)
+                stats["copy_route/break_frac"] = brk.float().mean()
+                stats["copy_route/novel_comp"] = (~inc).sum().float() / (m0 & ~inc).sum().clamp(min=1)
+                if self.copy_route.resid is not None:
+                    w = self.copy_route.resid.detach().float()
+                    stats["copy_route/w_rms"] = w.pow(2).mean().sqrt()
+                    stats["copy_route/w_break"] = w[-1]
+                    stats["copy_route/w_copy"] = w[2 * 3 + 1:-1:2].mean()  # run >= 4 with a next-byte candidate
         stats.update({f"chunk_vocab_ce/s{s}": v.detach() for s, v in vocab_ce.items()})
         if dc.router_prior_weight > 0 and self.training and bpred and bpred[0].logit is not None:
             prog = self.backbone.progress
@@ -522,6 +547,8 @@ class HNetForCausalLM(nn.Module):
             self.prefix_head.reset_parameters()
         if self.chunk_copy is not None:
             self.chunk_copy.reset_parameters()
+        if self.copy_route is not None:
+            self.copy_route.reset_parameters()
 
     def _router_consistency(self, logit: torch.Tensor, ids: torch.Tensor, ctx: SeqCtx) -> torch.Tensor:
         """Within-group variance of the byte-level router logit over positions in the batch that end in the same
@@ -642,7 +669,7 @@ class HNetForCausalLM(nn.Module):
         embeddings and lm_head belong to stage 0."""
         name = name.replace("_orig_mod.", "").removeprefix("module.")
         if name.startswith(("embeddings.", "ngram_embeddings.", "lm_head.", "main_aux_head.", "chunk_pred_head.",
-                            "trie_head.", "match_model.", "prefix_head.", "chunk_copy.")):
+                            "trie_head.", "match_model.", "prefix_head.", "chunk_copy.", "copy_route.")):
             return 0
         return self._param_stage[name]
 

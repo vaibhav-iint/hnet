@@ -135,11 +135,13 @@ class HNet(nn.Module):
         binfo=None,
         dec_add: Optional[torch.Tensor] = None,
         chunk_hook=None,
+        z_bias: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, List[RouterOutput]]:
         """h [T, D_in] -> ([T, D_in], router outputs of this and all inner stages, outer first). ``dec_add``: optional
         [T, D] tensor added to this stage's decoder input (the match model's decoder-side candidates). ``chunk_hook``:
         optional ``(x [M, D], input_ids, ctx, ctx_inner) -> (x', stats)`` applied to this stage's chunk vectors just
-        before the main network (HNetConfig.chunk_copy); not passed to inner stages."""
+        before the main network (HNetConfig.chunk_copy); not passed to inner stages. ``z_bias``: optional [T] bias of
+        this stage's standardized router score (quantile decision only; HNetConfig.copy_route)."""
         D_in = h.shape[-1]
         if self.pad_dimension is not None:
             h = torch.cat((h, self.pad_dimension.to(h.dtype).expand(h.shape[0], -1)), dim=-1)
@@ -153,7 +155,10 @@ class HNet(nn.Module):
                 residual = self.fuse_bypass(residual)
         r = self.routing_module(h, ctx, input_ids=input_ids, boundaries=boundaries[0] if boundaries else None)
         if self.decider is not None:
-            r = self.decider(r, ctx, progress=self.progress)
+            r = self.decider(r, ctx, progress=self.progress) if z_bias is None else \
+                self.decider(r, ctx, progress=self.progress, z_bias=z_bias)
+        else:
+            assert z_bias is None, "z_bias (HNetConfig.copy_route) needs the quantile decision"
         x, ctx_inner = self.chunk_layer(h, r.boundary_mask, ctx)
         if self.chunk_ste:  # chunk-level losses (next-chunk CE, main_aux) reach the router through the chunk vectors
             x = x * STE.apply(r.selected_probs.index_select(0, ctx_inner.outer_index)).to(x.dtype)

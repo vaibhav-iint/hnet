@@ -1,0 +1,60 @@
+# g3-copy-02 CPU smoke (python -m hnet.train.train, fp32, no compile, 40 steps x 4 windows x 2048 bytes, mix_v1_small).
+# The L03 model OOMs on this shared CPU box (the step-3 grad audit at 2 x 4096 bytes was OOM-killed twice by other
+# agents' jobs), so per docs/EVOLVE.md the smoke uses the tiny config with the candidate's mechanisms: tiny_hnet1_2m +
+# end_mlp + quantile + chunk vocab with suffix keys (g1-mem-02) + n-grams 3..8 + match model 4/8/16/32 (g1-wild-01)
+# + whitespace warm start 10% (= the parent g2-match-mem at tiny scale), then the candidate's flag:
+#   'model.copy_route={kappa: 2.5, kappa_break: 1.0, run: 4, min_order: 8}'
+# Same seed / data order for the parent run (no flag). Command (smoke.sh):
+#   name=$1; shift   # usage: smoke.sh NAME [extra --set overrides]
+#   out=/tmp/claude-0/-home-user-hnet-smollm3/e0ec0617-4cec-5bc8-abcc-216d4a655704/scratchpad/g3copy/smoke_$name
+#   rm -rf "$out"
+#   OMP_NUM_THREADS=2 PYTHONPATH=. /home/user/.venv310/bin/python -m hnet.train.train --config configs/runs/tiny_hnet1_2m.yaml --set \
+#     model.dc.router=end_mlp model.dc.decision=quantile \
+#     'model.dc.chunk_vocab=[{buckets: 16381, n_hash: 2, max_len: 16, pred_weight: 0.5, n_neg: 1024, suffix_lens: [2, 3, 4, 6, 8, 12, 16]}]' \
+#     'model.ngram_embed={ns: [3, 4, 5, 6, 7, 8], buckets: 4093}' \
+#     'model.match_model={orders: [4, 8, 16, 32], enc: true, dec: true, gate: true}' \
+#     model.dc.router_prior_weight=1.0 model.dc.router_prior_frac=0.1 \
+#     data.dataset=mix_v1_small data.micro_batch=4 data.batch_bytes=8192 train.train_tokens=null train.train_bytes=327680 \
+#     eval.every=0 eval.at_end=true eval.val_bytes=65536 train.compile=false train.precision=fp32 log.every=4 \
+#     train.out_dir=$out "$@" > "$out.log" 2>&1
+#   echo "exit $?" >> "$out.log"
+#
+# == parent (no flag)
+step 4 | loss 8.323 | ce 4.976 | bpb 7.178 | aux_loss 3.347 | grad_norm 2.949 | lr 0.0015 | tokens_eq 7900 | bytes_per_sec 369.7 | step_time 22.15 | comp 5.98
+step 8 | loss 6.535 | ce 3.346 | bpb 4.827 | aux_loss 3.189 | grad_norm 0.797 | lr 0.0015 | tokens_eq 1.58e+04 | bytes_per_sec 415.1 | step_time 19.73 | comp 5.98
+step 12 | loss 5.909 | ce 2.807 | bpb 4.05 | aux_loss 3.101 | grad_norm 0.8262 | lr 0.0015 | tokens_eq 2.37e+04 | bytes_per_sec 375.4 | step_time 21.81 | comp 5.98
+step 16 | loss 5.375 | ce 2.61 | bpb 3.765 | aux_loss 2.765 | grad_norm 0.6934 | lr 0.0015 | tokens_eq 3.16e+04 | bytes_per_sec 399.1 | step_time 20.51 | comp 5.98
+step 20 | loss 6.062 | ce 2.99 | bpb 4.314 | aux_loss 3.072 | grad_norm 0.8351 | lr 0.0015 | tokens_eq 3.951e+04 | bytes_per_sec 405.9 | step_time 20.18 | comp 5.98
+step 24 | loss 5.758 | ce 2.673 | bpb 3.857 | aux_loss 3.085 | grad_norm 0.9021 | lr 0.0015 | tokens_eq 4.741e+04 | bytes_per_sec 428 | step_time 19.13 | comp 5.98
+step 28 | loss 5.269 | ce 2.436 | bpb 3.515 | aux_loss 2.833 | grad_norm 0.681 | lr 0.0015 | tokens_eq 5.531e+04 | bytes_per_sec 412.7 | step_time 19.84 | comp 5.98
+step 32 | loss 5.802 | ce 2.597 | bpb 3.747 | aux_loss 3.205 | grad_norm 0.4487 | lr 0.0015 | tokens_eq 6.321e+04 | bytes_per_sec 411.8 | step_time 19.88 | comp 5.98
+step 36 | loss 5.347 | ce 2.278 | bpb 3.286 | aux_loss 3.069 | grad_norm 0.4023 | lr 0.0004393 | tokens_eq 7.111e+04 | bytes_per_sec 539.8 | step_time 15.17 | comp 5.98
+step 40 | loss 5.396 | ce 2.301 | bpb 3.32 | aux_loss 3.094 | grad_norm 0.3343 | lr 0 | tokens_eq 7.901e+04 | bytes_per_sec 353.3 | step_time 23.18 | comp 5.98
+[eval] step=40 tokens_eq=7.901e+04 bytes_seen=327529 val/bpb=3.505 val/bytes=67862 val/docs=87
+exit 0
+
+# == g3-copy-02
+step 4 | loss 8.365 | ce 4.979 | bpb 7.183 | aux_loss 3.386 | grad_norm 2.939 | lr 0.0015 | tokens_eq 7900 | bytes_per_sec 1089 | step_time 7.521 | comp 5.98
+step 8 | loss 6.568 | ce 3.343 | bpb 4.823 | aux_loss 3.225 | grad_norm 0.7982 | lr 0.0015 | tokens_eq 1.58e+04 | bytes_per_sec 1082 | step_time 7.567 | comp 5.98
+step 12 | loss 5.941 | ce 2.813 | bpb 4.059 | aux_loss 3.128 | grad_norm 0.7507 | lr 0.0015 | tokens_eq 2.37e+04 | bytes_per_sec 543.8 | step_time 15.06 | comp 5.98
+step 16 | loss 5.603 | ce 2.585 | bpb 3.729 | aux_loss 3.018 | grad_norm 0.5968 | lr 0.0015 | tokens_eq 3.16e+04 | bytes_per_sec 586.7 | step_time 13.95 | comp 5.98
+step 20 | loss 5.985 | ce 2.817 | bpb 4.065 | aux_loss 3.167 | grad_norm 0.4491 | lr 0.0015 | tokens_eq 3.951e+04 | bytes_per_sec 731.5 | step_time 11.2 | comp 5.98
+step 24 | loss 5.757 | ce 2.64 | bpb 3.809 | aux_loss 3.117 | grad_norm 0.9224 | lr 0.0015 | tokens_eq 4.741e+04 | bytes_per_sec 539.1 | step_time 15.19 | comp 5.98
+step 28 | loss 5.344 | ce 2.393 | bpb 3.452 | aux_loss 2.951 | grad_norm 0.6859 | lr 0.0015 | tokens_eq 5.531e+04 | bytes_per_sec 852.2 | step_time 9.609 | comp 5.98
+step 32 | loss 5.82 | ce 2.556 | bpb 3.688 | aux_loss 3.264 | grad_norm 0.5088 | lr 0.0015 | tokens_eq 6.321e+04 | bytes_per_sec 859.3 | step_time 9.528 | comp 5.98
+step 36 | loss 5.366 | ce 2.231 | bpb 3.218 | aux_loss 3.136 | grad_norm 0.3887 | lr 0.0004393 | tokens_eq 7.111e+04 | bytes_per_sec 1586 | step_time 5.163 | comp 5.98
+step 40 | loss 5.43 | ce 2.261 | bpb 3.261 | aux_loss 3.169 | grad_norm 0.3272 | lr 0 | tokens_eq 7.901e+04 | bytes_per_sec 1434 | step_time 5.709 | comp 5.98
+[eval] step=40 tokens_eq=7.901e+04 bytes_seen=327529 val/bpb=3.454 val/bytes=67862 val/docs=87
+exit 0
+
+# == mechanism metrics per logged step (g3-copy-02)
+{"step": 4, "bnd_on_ws/s0": 0.926, "copy_route/bnd_in_copy": 0.0, "copy_route/break_cut": 0.695, "copy_route/break_frac": 0.007, "copy_route/in_copy": 0.045, "copy_route/novel_comp": 5.707, "copy_route/w_break": -0.008, "copy_route/w_copy": -0.004, "copy_route/w_rms": 0.003, "p_margin/s0": 0.374, "step_time": 7.521}
+{"step": 8, "bnd_on_ws/s0": 0.894, "copy_route/bnd_in_copy": 0.0, "copy_route/break_cut": 0.525, "copy_route/break_frac": 0.005, "copy_route/in_copy": 0.022, "copy_route/novel_comp": 5.85, "copy_route/w_break": -0.021, "copy_route/w_copy": -0.013, "copy_route/w_rms": 0.011, "p_margin/s0": 0.411, "step_time": 7.567}
+{"step": 12, "bnd_on_ws/s0": 0.994, "copy_route/bnd_in_copy": 0.0, "copy_route/break_cut": 0.1, "copy_route/break_frac": 0.005, "copy_route/in_copy": 0.034, "copy_route/novel_comp": 5.781, "copy_route/w_break": -0.029, "copy_route/w_copy": -0.016, "copy_route/w_rms": 0.015, "p_margin/s0": 0.414, "step_time": 15.06}
+{"step": 16, "bnd_on_ws/s0": 0.84, "copy_route/bnd_in_copy": 0.0, "copy_route/break_cut": 0.373, "copy_route/break_frac": 0.009, "copy_route/in_copy": 0.18, "copy_route/novel_comp": 4.899, "copy_route/w_break": -0.035, "copy_route/w_copy": -0.009, "copy_route/w_rms": 0.016, "p_margin/s0": 0.428, "step_time": 13.954}
+{"step": 20, "bnd_on_ws/s0": 0.889, "copy_route/bnd_in_copy": 0.0, "copy_route/break_cut": 0.286, "copy_route/break_frac": 0.021, "copy_route/in_copy": 0.131, "copy_route/novel_comp": 5.198, "copy_route/w_break": -0.039, "copy_route/w_copy": -0.001, "copy_route/w_rms": 0.018, "p_margin/s0": 0.418, "step_time": 11.196}
+{"step": 24, "bnd_on_ws/s0": 0.845, "copy_route/bnd_in_copy": 0.0, "copy_route/break_cut": 0.647, "copy_route/break_frac": 0.015, "copy_route/in_copy": 0.121, "copy_route/novel_comp": 5.253, "copy_route/w_break": -0.04, "copy_route/w_copy": 0.004, "copy_route/w_rms": 0.018, "p_margin/s0": 0.367, "step_time": 15.191}
+{"step": 28, "bnd_on_ws/s0": 0.955, "copy_route/bnd_in_copy": 0.0, "copy_route/break_cut": 0.583, "copy_route/break_frac": 0.004, "copy_route/in_copy": 0.059, "copy_route/novel_comp": 5.629, "copy_route/w_break": -0.04, "copy_route/w_copy": 0.005, "copy_route/w_rms": 0.018, "p_margin/s0": 0.381, "step_time": 9.609}
+{"step": 32, "bnd_on_ws/s0": 0.944, "copy_route/bnd_in_copy": 0.0, "copy_route/break_cut": 0.333, "copy_route/break_frac": 0.004, "copy_route/in_copy": 0.015, "copy_route/novel_comp": 5.889, "copy_route/w_break": -0.038, "copy_route/w_copy": 0.006, "copy_route/w_rms": 0.019, "p_margin/s0": 0.408, "step_time": 9.528}
+{"step": 36, "bnd_on_ws/s0": 0.926, "copy_route/bnd_in_copy": 0.0, "copy_route/break_cut": 0.623, "copy_route/break_frac": 0.007, "copy_route/in_copy": 0.052, "copy_route/novel_comp": 5.667, "copy_route/w_break": -0.038, "copy_route/w_copy": 0.008, "copy_route/w_rms": 0.019, "p_margin/s0": 0.416, "step_time": 5.163}
+{"step": 40, "bnd_on_ws/s0": 0.798, "copy_route/bnd_in_copy": 0.0, "copy_route/break_cut": 0.471, "copy_route/break_frac": 0.01, "copy_route/in_copy": 0.106, "copy_route/novel_comp": 5.352, "copy_route/w_break": -0.037, "copy_route/w_copy": 0.009, "copy_route/w_rms": 0.019, "p_margin/s0": 0.386, "step_time": 5.709}

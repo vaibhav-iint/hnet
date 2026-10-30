@@ -346,6 +346,11 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
                 k = len({"orders": [8, 16, 32], **cfg.chunk_copy}["orders"])
                 comp_p["chunk_copy"] = d0 * d0 + (k + 1) * d0
                 comp_f["chunk_copy"] = (2 * d0 * d0 + (2 * d0 if cv.count_elementwise else 0.0)) / bpp[1]
+            if cfg.copy_route:  # copy-aware compression (hnet.model.chunk_copy.CopyRoute): a few compares and adds
+                from hnet.model.chunk_copy import N_STATES
+
+                comp_p["copy_route"] = N_STATES if cfg.copy_route.get("learn", True) else 0
+                comp_f["copy_route"] = 8.0 if cv.count_elementwise else 0.0
             if cfg.prefix_head:  # prefix output dictionary (hnet.model.prefix_head): table lookups are free
                 from hnet.model.prefix_head import PrefixHead
 

@@ -121,7 +121,7 @@ def grad_table(model, terms: Dict[str, torch.Tensor], groups: Dict[str, List[tor
 
 def mechanism_metrics(out) -> Dict[str, float]:
     keep = ("compression/", "p_mid/", "p_margin/", "dechunk_rms/", "residual_rms/", "score_std/", "tau/", "F/", "G/",
-            "residual_gate/", "trie/", "suffix_gate", "explore_")
+            "residual_gate/", "trie/", "suffix_gate", "explore_", "chunk_copy", "copy_route/")
     m = {k: float(v) for k, v in out.stats.items() if k.startswith(keep)}
     for s, r in enumerate(out.bpred):
         m[f"boundary_frac/s{s}"] = float(r.boundary_mask.float().mean())

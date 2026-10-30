@@ -235,6 +235,14 @@ class HNetConfig:
     # projection, to the current chunk's main-network input: the main network is told the whole next chunk. {"orders":
     # [8, 16, 32]}. Empty = off (the default model is unchanged). Needs a 1+-stage H-Net with "end" stage-0 semantics.
     chunk_copy: dict = field(default_factory=dict)
+    # Copy-aware compression (hnet.model.chunk_copy.CopyRoute, evolve g3-copy-02): the stage-0 rank decider's
+    # standardized score gets a bias from the match model's state, -kappa inside a verified copy (the last ``run``
+    # bytes were predicted by the longest order>=``min_order`` candidate and a candidate for the next byte exists),
+    # +kappa_break where such a copy just broke, plus a learned zero-init per-state residual. The rank decision keeps
+    # the batch's boundary count, so boundaries leave copied spans for novel text at unchanged FLOPs. {"kappa": 2.0,
+    # "kappa_break": 1.0, "run": 4, "min_order": 8, "learn": true}. Empty = off. Needs match_model and the quantile
+    # decision.
+    copy_route: dict = field(default_factory=dict)
     # Prefix output dictionary (hnet.model.prefix_head): the k bytes ranked highest by the LM head are rescored by
     # q_t . K[hash(current chunk prefix + b)], q_t from the final hidden state and the dechunked main-network output: a
     # BPE-style output embedding over the trie of the learned chunks. {"buckets": 65536, "rank": 64, "k": 16,
