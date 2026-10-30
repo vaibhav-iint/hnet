@@ -97,8 +97,16 @@ def objective_terms(model, out, ids) -> Dict[str, torch.Tensor]:
         _, ctx, _ = pack_inputs(ids.view(shape) if shape is not None else ids.unsqueeze(0), None, None)
         r0 = out.bpred[0]
         q = r0.main_out if th.query == "main" else model._audit_h
-        bonus, _ = th(q, ids, ctx, r0.boundary_mask)
-        logits = model.lm_head(model._audit_h).float().detach() + bonus
+        base = model.lm_head(model._audit_h).float().detach()
+        if th.topk > 0:  # fast head: the trie scores of the top-k bytes of the (detached) base logits
+            mm = getattr(model, "match_model", None)
+            if mm is not None and mm.gate is not None:
+                base = base + mm.logit_bonus(model._audit_h, mm.candidates(ids, ctx), base.shape[-1]).detach()
+            cand, vals, _ = th.rescore(q, ids, ctx, r0.boundary_mask, base)
+            logits = base.scatter_add(1, cand, vals)
+        else:
+            bonus, _ = th(q, ids, ctx, r0.boundary_mask)
+            logits = base + bonus
         terms["byte_ce_via_trie"] = torch.nn.functional.cross_entropy(logits, ids)
     return terms
 

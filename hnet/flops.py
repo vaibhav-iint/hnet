@@ -363,12 +363,13 @@ def _hnet(cfg: HNetConfig, bpp, seq_len, cv: FlopsConvention):
                 comp_p["main_aux_head"] = V * d0
                 comp_f["main_aux_head"] = 2 * V * d0 if cv.count_lm_head else 0.0
             if cfg.trie_head:  # prefix-trie output vocabulary (hnet.model.trie_head), every byte, train and eval
-                th = {"dim": 32, "n_hash": 2, **cfg.trie_head}
+                th = {"dim": 32, "n_hash": 2, "topk": 0, **cfg.trie_head}
                 dim, nh = int(th["dim"]), int(th["n_hash"])
+                nc = int(th["topk"]) or V  # scored candidates per byte: the top-k of the base logits, or all V
                 comp_p["trie_head"] = nh * int(th["rows"]) * dim + d0 * dim
                 comp_f["trie_head"] = (2 * d0 * dim  # query projection
-                                       + (2 * V * dim if cv.count_lm_head else 0.0)  # V candidate scores
-                                       + (((nh - 1) * V * dim + V) if cv.count_elementwise else 0.0))  # row sums, add
+                                       + (2 * nc * dim if cv.count_lm_head else 0.0)  # candidate scores
+                                       + (((nh - 1) * nc * dim + nc) if cv.count_elementwise else 0.0))  # row sums, add
             if cfg.dc.chunk_pred_k > 0:  # training-only chunk-level head, once per innermost position
                 d_in = cfg.d_model[n - 1]
                 comp_p["chunk_pred_head"] = cfg.dc.chunk_pred_k * V * d_in

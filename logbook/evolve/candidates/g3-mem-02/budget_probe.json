@@ -1,0 +1,122 @@
+{
+ "checkpoint": "/home/user/hnet-smollm3/runs/gcp/hnet-ladder-1e16/search/ladder/1e16/L03/hnet_ws_s0",
+ "bytes": 408576,
+ "base": {
+  "bpb": 1.7415145559096854,
+  "reach": {
+   "8": {
+    "coverage": 0.9205391062546509,
+    "coverage_init": 0.770721768257558,
+    "coverage_inner": 0.9651541046933472,
+    "bits_share_outside_topk": 0.29886599251868384,
+    "bits_share_outside_topk_init": 0.1875814815672072,
+    "bits_share_outside_topk_inner": 0.11128451095147665,
+    "bpb_outside_topk": 0.5204794713418923
+   },
+   "16": {
+    "coverage": 0.9690523048603767,
+    "coverage_init": 0.9027437007958012,
+    "coverage_inner": 0.9887987394610942,
+    "bits_share_outside_topk": 0.14078402261017653,
+    "bits_share_outside_topk_init": 0.09576948538241226,
+    "bits_share_outside_topk_inner": 0.04501453722776429,
+    "bpb_outside_topk": 0.24517742230892609
+   },
+   "32": {
+    "coverage": 0.9919932048721263,
+    "coverage_init": 0.9742484692027052,
+    "coverage_inner": 0.9972775155184792,
+    "bits_share_outside_topk": 0.04642790677832988,
+    "bits_share_outside_topk_init": 0.031821723885499975,
+    "bits_share_outside_topk_inner": 0.014606182892829908,
+    "bpb_outside_topk": 0.0808548746943335
+   },
+   "64": {
+    "coverage": 0.9988397368111855,
+    "coverage_init": 0.9971197542190267,
+    "coverage_inner": 0.999351940683512,
+    "bits_share_outside_topk": 0.010572721034434752,
+    "bits_share_outside_topk_init": 0.005415181015029063,
+    "bits_share_outside_topk_inner": 0.00515754001940569,
+    "bpb_outside_topk": 0.018412547403846517
+   }
+  },
+  "trie_keys": {
+   "distinct": 61402,
+   "positions": 408528,
+   "top20000_share": 0.8798050562017781,
+   "top40000_share": 0.9476119139936553,
+   "top77383_share": 1.0
+  },
+  "ngrams": {
+   "3": {
+    "distinct": 20293,
+    "top4817_share": 0.9122718102401379,
+    "top2408_share": 0.8255180788968544
+   },
+   "4": {
+    "distinct": 55503,
+    "top4817_share": 0.6509828984485191,
+    "top2408_share": 0.516597124275192
+   },
+   "5": {
+    "distinct": 106040,
+    "top4817_share": 0.44376934681242897,
+    "top2408_share": 0.33878962423102543
+   },
+   "6": {
+    "distinct": 160849,
+    "top4817_share": 0.3174376910416177,
+    "top2408_share": 0.23628909005407947
+   },
+   "7": {
+    "distinct": 211779,
+    "top4817_share": 0.23250048990789732,
+    "top2408_share": 0.16783999608073683
+   },
+   "8": {
+    "distinct": 255566,
+    "top4817_share": 0.1754664471621198,
+    "top2408_share": 0.12495345327688931
+   }
+  }
+ },
+ "ablations": {
+  "chunk_vocab_halved": {
+   "bpb": 1.7594716680759974,
+   "delta": 0.017957112166312017,
+   "params_freed_M": 4.940544,
+   "delta_per_M": 0.003634642696494964
+  },
+  "ngram_all_orders_halved": {
+   "bpb": 2.0702565399257606,
+   "delta": 0.32874198401607524,
+   "params_freed_M": 2.774016,
+   "delta_per_M": 0.11850760198069342
+  },
+  "ngram_drop_78": {
+   "bpb": 1.7878147007826364,
+   "delta": 0.04630014487295098,
+   "params_freed_M": 1.849728,
+   "delta_per_M": 0.025030785538712165
+  },
+  "ngram_drop_678": {
+   "bpb": 1.8554132586134757,
+   "delta": 0.11389870270379032,
+   "params_freed_M": 2.774592,
+   "delta_per_M": 0.04105061310051723
+  },
+  "ngram_drop_5678": {
+   "bpb": 2.013261210787351,
+   "delta": 0.2717466548776657,
+   "params_freed_M": 3.699456,
+   "delta_per_M": 0.07345584185287396
+  },
+  "ngram_drop_3": {
+   "bpb": 1.9469177789342444,
+   "delta": 0.20540322302455905,
+   "params_freed_M": 0.924864,
+   "delta_per_M": 0.22209019166554114
+  }
+ }
+}

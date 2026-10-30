@@ -1,0 +1,50 @@
+# g3-mem-02 step-0 / step-10 gradient audit: the g2-match-mem stack at tiny scale (tiny_hnet1_2m + end_mlp + quantile +
+# suffix-keyed chunk vocab + n-grams 3..8 + ws prior + match model 4/8/16/32 with enc/dec/gate) + fast trie head
+# (rows 8191, dim 32, n_hash 2, max_len 16, query main, topk 64), real mix_v1 val bytes.
+# command: python -m hnet.analysis.grad_audit configs/runs/tiny_hnet1_2m.yaml --set model.dc.router=end_mlp
+#   --set model.dc.decision=quantile --set 'model.dc.chunk_vocab=[{buckets: 4096, n_hash: 2, max_len: 16, pred_weight: 0.5,
+#   n_neg: 256, suffix_lens: [2, 3, 4, 6, 8, 12, 16], suffix_gate_init: 0.0}]' --set 'model.ngram_embed={ns: [3,4,5,6,7,8],
+#   buckets: 1021}' --set model.dc.router_prior_weight=1.0 --set 'model.match_model={orders: [4, 8, 16, 32], enc: true,
+#   dec: true, gate: true}' --set 'model.trie_head={rows: 8191, dim: 32, n_hash: 2, max_len: 16, query: main, topk: 64}'
+#   --text data/mix_v1/bytes/mix_v1_val_000000.bytes.bin --steps 0 10
+# byte_ce_via_trie: base logits = LM head + the match model's copy bonus, both detached; trie scores added at their
+# detached top 64 (the order used by the model: hnet/model/lm.py _trie_rescore after the match bonus).
+# Verified: step 0 -> only trie_head; step 10 -> main network, encoder, router, chunk vocab (incl. suffix gates),
+# n-grams, embeddings and match_model (through its encoder-input embedding, which feeds the main network and hence
+# the trie's query); decoder / residual_proj / lm_head exactly 0. The suffix-gate "no objective at init" warning and
+# the next_chunk_ce router warning are the parent's (g2-match-mem), unchanged by this candidate.
+# Interaction with the match model: the copy candidate gets the gate's bonus before the top-k, so a copied byte is
+# always among the rescored bytes (tests/test_trie_topk.py::test_candidates_include_the_match_bonus): the trie can
+# confirm or veto a copy with its spelling prior, it can never hide one from the softmax.
+
+
+== gradient norms by (objective, parameter group) after 0 steps
+                                       embeddings             ngram_embeddings                   s0.encoder             s1.pad_dimension              s1.main_network                   s0.decoder            s0.routing_module               s0.chunk_vocab  s0.chunk_vocab.suffix_gates             s0.residual_proj                      lm_head                    trie_head                  match_model
+byte_ce                                  1.84e-01                     3.71e-01                     5.33e+00                     1.42e-02                     2.01e+00                     3.28e+00                     1.25e-02                     3.10e-01                     0 (none)                     1.12e+00                     9.49e+00                     9.48e+00                     1.83e+01
+ratio/s0                                 2.40e-03                     2.50e-02                     9.03e-02                     0 (none)                     0 (none)                     0 (none)                     2.03e-02                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     2.92e-02
+next_chunk_ce/s0                         0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     1.37e+00                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)
+router_prior/s0                          2.90e-01                     6.92e-01                     8.17e+00                     0 (none)                     0 (none)                     0 (none)                     2.49e+00                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     5.52e-01
+byte_ce_via_trie                         0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     9.48e+00                     0 (none)
+
+== mechanism metrics
+  F/s0=0.168  G/s0=0.46  boundary_frac/s0=0.168  compression/s0=5.95  dechunk_rms/s0=1.63  p_margin/s0=0.0588  p_mid/s0=0.831  residual_rms/s0=0.0637  score_std/s0=0.00687  suffix_gate/s0=0.5  suffix_gate_n12/s0=0.5  suffix_gate_n16/s0=0.5  suffix_gate_n2/s0=0.5  suffix_gate_n3/s0=0.5  suffix_gate_n4/s0=0.5  suffix_gate_n6/s0=0.5  suffix_gate_n8/s0=0.5  tau/s0=0.226  trie/bonus_rms=0  trie/prefix_len=166  trie/topk_cov=0.977
+
+== warnings
+  - s0.chunk_vocab.suffix_gates: no objective reaches it (zero gradient at init)
+  - next_chunk_ce/s0: sends the router no gradient (dc.chunk_ste=false; the STE sits after dechunking)
+  - p_mid/s0 = 0.83: most boundary decisions undecided (p in 0.4-0.6)
+
+== gradient norms by (objective, parameter group) after 10 steps
+                                       embeddings             ngram_embeddings                   s0.encoder             s1.pad_dimension              s1.main_network                   s0.decoder            s0.routing_module               s0.chunk_vocab  s0.chunk_vocab.suffix_gates             s0.residual_proj                      lm_head                    trie_head                  match_model
+byte_ce                                  7.09e-03                     1.35e-02                     2.02e-01                     6.53e-04                     7.82e-02                     8.59e-02                     9.95e-03                     1.14e-02                     2.73e-05                     2.74e-02                     4.09e-01                     5.14e-01                     2.88e-01
+ratio/s0                                 1.91e-04                     1.98e-03                     8.42e-03                     0 (none)                     0 (none)                     0 (none)                     1.66e-03                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     8.05e-03
+next_chunk_ce/s0                         9.23e-03                     1.90e-02                     2.63e-01                     9.99e-04                     1.25e-01                     0 (none)                     0 (none)                     1.29e+00                     1.87e-05                     0 (none)                     0 (none)                     0 (none)                     1.46e-02
+router_prior/s0                          3.07e-01                     7.31e-01                     8.67e+00                     0 (none)                     0 (none)                     0 (none)                     2.67e+00                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     0 (none)                     5.83e-01
+byte_ce_via_trie                         8.02e-03                     1.54e-02                     2.28e-01                     7.46e-04                     9.08e-02                     0 (none)                     1.09e-02                     1.32e-02                     1.10e-05                     0 (none)                     0 (none)                     5.14e-01                     4.50e-02
+
+== mechanism metrics
+  F/s0=0.168  G/s0=0.532  boundary_frac/s0=0.168  compression/s0=5.95  dechunk_rms/s0=1.63  p_margin/s0=0.0574  p_mid/s0=0.897  residual_rms/s0=0.0672  score_std/s0=0.00875  suffix_gate/s0=0.5  suffix_gate_n12/s0=0.5  suffix_gate_n16/s0=0.5  suffix_gate_n2/s0=0.5  suffix_gate_n3/s0=0.5  suffix_gate_n4/s0=0.5  suffix_gate_n6/s0=0.5  suffix_gate_n8/s0=0.5  tau/s0=0.226  trie/bonus_rms=0.237  trie/prefix_len=175  trie/topk_cov=0.987
+
+== warnings
+  - next_chunk_ce/s0: sends the router no gradient (dc.chunk_ste=false; the STE sits after dechunking)
+  - p_mid/s0 = 0.90: most boundary decisions undecided (p in 0.4-0.6)

@@ -20,6 +20,19 @@ VARIANTS = {
                                     "chunk_vocab": [{"buckets": 4096, "n_hash": 2, "max_len": 16, "pred_weight": 0.5,
                                                      "n_neg": 256}],
                                     "_model": {"trie_head": {"rows": 4099, "dim": 16, "n_hash": 2, "max_len": 8}}},
+    # fast trie head: top-k rescoring of the base logits (g3-mem-01), and stacked on the match model + suffix-keyed
+    # chunk memory (g3-mem-02)
+    "end_mlp_quantile_vocab_trie_topk": {"router": "end_mlp", "decision": "quantile",
+                                         "chunk_vocab": [{"buckets": 4096, "n_hash": 2, "max_len": 16,
+                                                          "pred_weight": 0.5, "n_neg": 256}],
+                                         "_model": {"trie_head": {"rows": 4099, "dim": 16, "n_hash": 2, "max_len": 8,
+                                                                  "topk": 8}}},
+    "end_mlp_quantile_suffix_match_trie_topk": {
+        "router": "end_mlp", "decision": "quantile",
+        "chunk_vocab": [{"buckets": 4096, "n_hash": 2, "max_len": 16, "pred_weight": 0.5, "n_neg": 256,
+                         "suffix_lens": [2, 3, 4, 6, 8, 12, 16]}],
+        "_model": {"trie_head": {"rows": 4099, "dim": 16, "n_hash": 2, "max_len": 8, "topk": 8},
+                   "match_model": {"orders": [2, 4, 8], "enc": True, "dec": True, "gate": True}}},
     "end_mlp_quantile_vocab_suffix": {"router": "end_mlp", "decision": "quantile",
                                       "chunk_vocab": [{"buckets": 4096, "n_hash": 2, "max_len": 16, "pred_weight": 0.5,
                                                        "n_neg": 256, "suffix_lens": [2, 3, 4, 6, 8, 12, 16]}]},

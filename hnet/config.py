@@ -218,7 +218,8 @@ class HNetConfig:
     ngram_embed: dict = field(default_factory=dict)
     # Prefix-trie output vocabulary (hnet.model.trie_head): a hashed table of chunk-prefix rows scored against the
     # main network's next-chunk prediction and added to the byte logits, {"rows": int, "dim": 32, "n_hash": 2,
-    # "max_len": 16, "query": "main" | "final"}. Empty = off. Needs a 1+-stage H-Net with an "end" stage-0 router.
+    # "max_len": 16, "query": "main" | "final", "topk": 0}. Empty = off. Needs a 1+-stage H-Net with an "end" stage-0
+    # router. "topk": k > 0 scores only the k bytes the base logits rank highest (fast head; 0 = every byte).
     trie_head: dict = field(default_factory=dict)
     # Optimizer-only (Muon), next to lr_multiplier because it is an H-Net-only LR-allocation knob: decoupled weight
     # decay of the residual bypass matrices (``residual_proj.weight``), fed to ``train.muon.residual_wd`` by

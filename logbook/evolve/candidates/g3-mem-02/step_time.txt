@@ -1,0 +1,50 @@
+# Wall-clock step time of the fast trie head (topk 64) vs the full head (g1-mem-01) and the parents, CPU, same batch.
+# The machine is a shared 4-core box with three other proposers' jobs (load average 5-13 during these runs), so every
+# comparison is interleaved (round r times one step of every arm) and reported as the median over rounds.
+#
+# Summary (median step-time ratios):
+#   L03, hnet_ws parent (load ~5, 1 x 8512 bytes, 5 rounds):  full head (g1-mem-01) 1.341x | fast head k=64 1.137x
+#                                                            (k=32 0.986x, k=16 1.001x: within noise of the parent)
+#   L03, hnet_ws parent (load ~9, 5 rounds):                 full head 1.313x | fast head k=64 (g3-mem-01) 1.100x
+#   L03, g2-match-mem parent (load ~9, 5 rounds):            g3-mem-02 (fast head k=64) 1.013x (min-to-min 1.117x)
+#   Target: < 1.3x the parent's step time on the L03 config -> met (1.10-1.14x for g3-mem-01, 1.01-1.12x for g3-mem-02).
+#
+# On the A100 the head is a larger share of the step than on CPU (the full head took 1.88 vs 1.02 s mean step, 1.84x,
+# vs 1.31-1.34x on CPU). Projection from the head-alone micro-benchmark (head time as a fraction x of the full head's,
+# A100 step = 1.02 + 0.86 x s): k=64 -> 1.18x (load ~5) to 1.25x (load ~9) of hnet_ws, k=32 -> 1.10-1.20x. The
+# projection assumes GPU cost scales like CPU cost; the full head also re-gathers under activation checkpointing
+# (3 gather passes vs 2), so it overstates the fast head's GPU cost if anything.
+
+## full training step on CPU (scripts/evolve/bench_step.py: forward + backward + AdamW, interleaved arms)
+batch 1 x 8512 bytes, 5 rounds, torch threads 2   (first run, load ~5; k variants as scratch copies of g1-mem-01)
+hnet_ws_L03                  params  20,010,025  step   3.469 s (min 3.280, max 4.009)  x1.000
+g1-mem-01                    params  20,022,761  step   4.653 s (min 4.621, max 4.713)  x1.341
+trie_k16                     params  20,022,761  step   3.473 s (min 3.231, max 3.744)  x1.001
+trie_k32                     params  20,022,761  step   3.421 s (min 3.403, max 4.043)  x0.986
+trie_k64 (= g3-mem-01)       params  20,022,761  step   3.945 s (min 3.686, max 4.258)  x1.137
+
+(second run, load ~9)
+batch 1 x 8512 bytes, 5 rounds, torch threads 2
+hnet_ws_L03                  params  20,010,025  step   5.720 s (min 5.261, max 5.822)  x1.000
+g1-mem-01                    params  20,022,761  step   7.510 s (min 7.322, max 7.939)  x1.313
+g3-mem-01                    params  20,022,761  step   6.291 s (min 5.621, max 6.635)  x1.100
+
+(g3-mem-02 vs its parent, load ~9)
+batch 1 x 8512 bytes, 5 rounds, torch threads 2
+g2-match-mem                 params  20,022,251  step   6.695 s (min 5.937, max 6.931)  x1.000
+g3-mem-02                    params  20,022,699  step   6.784 s (min 6.630, max 7.331)  x1.013
+
+## trie head alone (scripts/evolve/bench_trie_head.py: forward + backward of the head, same bytes)
+trie head alone, 8512 bytes, torch threads 2   (first run, load ~5; projections with the 1.02 / 1.88 s constants)
+full     1335.0 ms  x1.000 of full  -> projected A100 step 1.88 s = x1.843 of hnet_ws
+top16      85.4 ms  x0.064 of full  -> projected A100 step 1.08 s = x1.054 of hnet_ws
+top32     159.5 ms  x0.119 of full  -> projected A100 step 1.12 s = x1.100 of hnet_ws
+top64     291.7 ms  x0.218 of full  -> projected A100 step 1.21 s = x1.184 of hnet_ws
+
+(second run, load ~9)
+trie head alone, 8512 bytes, torch threads 2
+full     3405.9 ms  x1.000 of full  -> projected A100 step 1.88 s = x1.843 of hnet_ws
+top16     724.0 ms  x0.213 of full  -> projected A100 step 1.20 s = x1.179 of hnet_ws
+top32     804.3 ms  x0.236 of full  -> projected A100 step 1.22 s = x1.199 of hnet_ws
+top64    1004.0 ms  x0.295 of full  -> projected A100 step 1.27 s = x1.249 of hnet_ws
+top96    1215.6 ms  x0.357 of full  -> projected A100 step 1.33 s = x1.301 of hnet_ws

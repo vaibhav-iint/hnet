@@ -1,0 +1,74 @@
+id: g3-mem-02
+parents: [g2-match-mem, g3-mem-01]
+track: memory
+hypothesis: >-
+  The best H-Net (g2-match-mem, 1.483: match model + suffix-keyed chunk memory) has every FLOP-free parameter on the
+  input side; its only output-side memory is the copy bonus for in-document repeats. The prefix-trie output vocabulary
+  is the output-side memory for strings the model has seen in *other* documents: a hashed row per (chunk prefix .
+  next byte), scored against the main network's next-chunk prediction, so the main network spells a word the way a BPE
+  head scores a token, without passing through the byte decoder or competing with the residual bypass. On hnet_ws it
+  was worth -0.095 (g1-mem-01, two seeds), the largest single gain of generation 1, and it is complementary to copying
+  in kind: copying covers repeats inside the document (~18% of bytes), the trie covers the recurring spellings of
+  the corpus. The fast head (g3-mem-01: scores the top 64 bytes of the final logits, which here include the match
+  model's copy bonus, so a copied byte is always rescored) keeps the step time near the parent's.
+  Budget (params <= 20,023,040): the trie's 4.96M parameters come from the chunk-vocabulary table (25733 -> 12821
+  buckets per hash), not from the byte n-gram tables. Measured on the trained hnet_ws L03 checkpoint with the tables
+  shrunk in place (no retraining; budget_probe.json): halving the chunk table costs +0.018 bpb for 4.94M parameters
+  (0.0036 bpb/M), while dropping only the 7- and 8-gram tables costs +0.046 for 1.85M (0.025/M), the 6..8-grams
+  +0.114 for 2.77M (0.041/M), and halving every n-gram table +0.329 for 2.77M (0.119/M): per parameter the n-gram
+  tables are 7-30x more load-bearing. The structural argument agrees once read correctly: the n-gram tables give the
+  byte encoder (and through it the router and the main network's input) local identity at every byte, while the
+  chunk table is one lookup per chunk whose ablation the interpretability audit already found cheap in n-gram models
+  (+0.014-0.034, logbook/interp/REPORT.md) and whose suffix keys added only ~0.02 on top of copying (g2-match-mem vs
+  g1-wild-01). The trie's own keys are better served by rows than long n-grams are: in 409 KB of validation text the
+  model's chunk-prefix keys have 61k distinct values (the top 40k cover 95% of positions) vs 160-256k distinct 6- to
+  8-grams (the 4817 rows of one n-gram table could hold 18-32% of them collision-free).
+prediction:
+  fitness: "val bpb 1.445 +- 0.02 on seed 1 (g2-match-mem 1.483; BPE + copy 1.460): beats BPE + copy by ~0.015"
+  mechanism: >-
+    trie/topk_cov >= 0.995 from step 300; trie/bonus_rms > 1.0 by step 300; gain over g2-match-mem concentrated on
+    non-initial chunk bytes outside copy spans (per-source: largest on English and multilingual text, smallest on
+    code, where copying already covers most repeats); bnd_on_ws/s0 drops below g2-match-mem's (trie moves cuts off
+    whitespace as in g1-mem-01: 0.47 vs 0.61). Falsified if val bpb >= 1.475 (< 0.008 gain over g2-match-mem), i.e.
+    the trie's spelling memory is redundant with copying + the suffix memory.
+branch: evolve/g3-mem-02
+model: configs/evolve/models/g3-mem-02.yaml
+set: []
+checks:
+  tests: "pass: tests/test_trie_topk.py (12: topk 0 is the full head; zero tables == the model without the head bit
+    for bit, with and without the match model; topk = V == the full head in logits and gradients; rescored bytes ==
+    top-k of the base logits with the full head's scores; the copy candidate is always rescored; gradient paths;
+    only candidate rows get gradient; causality and packed == separate with N(0, 0.3) trie tables, with and
+    without the match model; params / FLOPs / training, with and without the match model) +
+    tests/test_invariances.py with two new variants (fast trie; fast trie + match model + suffix memory), causality and
+    packed == separate, with and without n-grams + tests/test_trie_head.py tests/test_prefix_head.py
+    tests/test_match_model.py tests/test_chunk_vocab_suffix.py tests/test_model_hnet.py tests/test_flops.py:
+    205 passed, 4 skipped. Full suite (python -m pytest tests, CPU): 917 passed, 44 skipped, 1 deselected
+    (tests/test_eval_smoke_gpt2.py::test_gpt2_hellaswag_50 downloads GPT-2 / HellaSwag and hangs behind this box's
+    proxy; unrelated to the change). The 2 large-table invariance tests were added after that run: 12/12 pass."
+  fairness: "pass (scripts/search/fairness.py on a make_gen spec with hnet, hnet_ws, g3-mem-01, g3-mem-02;
+    logbook/evolve/candidates/g3-mem-02/fairness.md): problems none; GFLOPs/byte 0.02043 (g3-mem-01) / 0.02044
+    (g3-mem-02) vs 0.02037 for hnet (+0.29% / +0.34%; the full trie was +0.55%); params 20,022,761 / 20,022,699 <=
+    BPE 20,023,040"
+  grad_audit: logbook/evolve/candidates/g3-mem-02/grad_audit.txt
+  bit_identity: logbook/evolve/candidates/g3-mem-02/bit_identity.txt
+  budget_probe: logbook/evolve/candidates/g3-mem-02/budget_probe.json
+  smoke: "pass: the L03 candidate model through hnet.train.train on CPU, mix_v1_small, 2 x 2048-byte windows/step,
+    30 steps, Muon 0.02 / Adam 0.003, fp32: train bpb 7.37 -> 2.84-3.20, no NaN, compression 4.14 on target,
+    trie/topk_cov 0.96-0.99, trie/bonus_rms 1.1-2.0; step-30 checkpoint on mix_v1 val: 3.050 bpb with the trie vs
+    3.461 with its tables zeroed (0.41 bpb carried next to the match model and the suffix memory)"
+  smoke_log: logbook/evolve/candidates/g3-mem-02/smoke.txt
+  step_time_log: logbook/evolve/candidates/g3-mem-02/step_time.txt
+  step_time: "CPU, L03, same batch, interleaved medians (step_time.txt): 1.013x of g2-match-mem (min-to-min 1.117x);
+    the head is the same as g3-mem-01's (1.10-1.14x of hnet_ws on CPU, A100 projection 1.18-1.25x)"
+bpe_analogue: >-
+  As for g3-mem-01: the faithful BPE analogue of a prefix-keyed output vocabulary is BPE's own LM head (every BPE
+  prediction is unit-initial, so the key is the whole token), which the BPE + copy control (g2-bpe-match, 1.460)
+  already has at 8.4M parameters; the copy half of this stack has its BPE control in g2-bpe-match. The comparison
+  that decides this candidate is therefore against g2-bpe-match, no new control needed.
+author: memory proposer (generation 3)
+next_if_fails: >-
+  If the gain over g2-match-mem is < 0.008: run the same stack funded from the n-gram tables' 7/8-grams plus a
+  quarter of the chunk table (tests whether the chunk table's suffix keys were load-bearing in the copy model, which
+  the hnet_ws probe cannot see), and an eval-time ablation of the trie (tables zeroed) to see whether the trie is
+  used at all next to the copy bonus.
