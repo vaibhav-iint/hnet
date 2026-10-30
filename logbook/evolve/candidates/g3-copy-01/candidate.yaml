@@ -1,0 +1,68 @@
+id: g3-copy-01
+parents: [g2-match-mem]
+track: copy
+hypothesis: >-
+  Chunk pointer copy: tell the main network the whole next chunk. At every stage-0 chunk end an exact index over the
+  byte n-gram hashes *at chunk ends* (orders 8/16/32 bytes, same document) finds the most recent earlier chunk end with
+  the same context; the main-network input vector of the chunk that FOLLOWED it (x_{j'+1}: encoder state at its end +
+  chunk-vocabulary identity + suffix-memory rows) is added to the current chunk's main-network input through a
+  zero-init d0 x d0 projection, plus per-order match / no-match offset rows (hnet/model/chunk_copy.py ChunkCopy,
+  HNetConfig.chunk_copy). The asymmetry it closes: in the parent, the byte match model gives the decoder candidate
+  next *bytes* and gives the main network (most of the H-Net's parameters and FLOPs) at most the candidate *first
+  byte* of the next chunk, through the boundary byte's encoder state; the BPE+copy control (g2-bpe-match, 1.460) gives
+  its whole layer stack the candidate next *token*, a whole unit. Measured offline (offline.md, whitespace proxy
+  segmentation): an o>=8 pointer exists for 28% of mix chunks (58% code) and proposes the exact next chunk for 13%
+  of chunks (42% code). The same probe killed the byte-side variant: an offset-aligned byte pointer anchored at the
+  chunk start is right where the byte index is not on only 0.06% of mix bytes, so the candidate has no byte-side term.
+  Why BPE cannot do this part, and what its analogue is: the BPE analogue of "the next unit's input vector, projected
+  into the current position" already exists and is the control, g2-bpe-match's enc site (P E[c_n] + per-order
+  offsets, same structure). What only the H-Net has: (a) the copied value is a contextual vector of a variable-length
+  learned unit, carrying its spelling (encoder state) and its identity in the suffix memory, where BPE copies a static
+  type embedding; (b) the key is the raw bytes before a learned boundary, so the pointer finds the earlier occurrence
+  however that occurrence was tokenized (BPE's key is the token ids, which differ for the same string after " ", "("
+  or "."); (c) it is added on top of the byte-level index the BPE model does not have. No new BPE control is needed:
+  g2-bpe-match is it. FLOPs +0.27% vs the parent (+0.34% vs hnet), params 20,023,019 (n-gram buckets 4483 -> 4451 pay
+  for the 37.6k new parameters).
+prediction:
+  fitness: "<= -0.181 (val bpb <= 1.475, parent g2-match-mem 1.483); central 1.472; beats BPE+copy (1.460) only if the
+    main network was the bottleneck of the H-Net's copying"
+  mechanism: >-
+    chunk_copy_cov/s0 ~0.25-0.35 on the training mix (pointer exists), chunk_copy_ptr_rms/s0 (the pointer term
+    alone, on chunks with a pointer) rises from 0 to >= 0.2 by step 300 (the main network uses the pointer; the chunk vectors are unit-RMS); the per-source gain over the
+    parent on code and held-out code >= 2x the English gain (the pointer coverage is 3x larger there). Falsified if
+    the gain is < 0.005 bpb (the whole-next-chunk information is redundant with the byte copy path at the decoder) or
+    if ptr_rms stays < 0.05 (unused).
+branch: evolve/g3-copy-01
+model: configs/evolve/models/g3-copy-01.yaml
+set: []
+checks:
+  tests: "pass: tests/test_chunk_copy.py (10: pointers vs brute-force search over chunk ends incl. two segments and
+    causality j'+1 <= j; flag off = no new parameters, identical state dict and RNG stream; zero-init is bit-identical
+    to the parent in train and eval (logits, loss, aux loss); causality with and without the chunk vocabulary and
+    packed == separate (segments that repeat each other) with non-zero copy parameters; byte CE reaches proj and
+    offset at init and, once P != 0, the earlier chunk's encoder through the copied vector; pointers carry no
+    gradient; params / FLOPs) + the full suite (see full_tests)"
+  full_tests: "pass: python -m pytest tests -q on evolve/g3-copy-02 (which contains both flags): 921 passed, 44
+    skipped (16:54 on the shared CPU box)"
+  fairness: "pass (scripts/search/fairness.py on make_gen's spec, fairness.md): 0.02044 GFLOPs/byte vs 0.02037 hnet
+    (+0.34%; the d0 x d0 projection once per chunk), params 20,023,019 <= BPE 20,023,040; same data, steps, batch,
+    optimizer, schedule, val"
+  grad_audit: "logbook/evolve/candidates/g3-copy-01/grad_audit.txt (L03 candidate model, 2 x 4096 real bytes, mix +
+    code): byte CE reaches chunk_copy at init (1.6e-1) and after 3 steps (2.5e-1); next-chunk CE reaches it after 3
+    steps (8.8e-4, through the main network); no new zero-gradient group (the suffix gates' zero at init is the
+    parent's: zero-init tables)"
+  smoke: "pass (smoke.txt): tiny parent-equivalent + chunk_copy, 40 CPU steps on mix_v1_small: train bpb 7.18 ->
+    3.32 (parent 7.18 -> 3.32), val (64 KB) 3.503 vs parent 3.505 (neutral this early), no NaN, compression 5.98;
+    chunk_copy_cov/s0 0.07-0.23 of chunks have a pointer (o8 0.06-0.14, o16 up to 0.06, o32 up to 0.04),
+    chunk_copy_add_rms/s0 (pointer + learned offset rows) 0 -> 0.99 by step 40 (the path opens immediately).
+    chunk_copy_ptr_rms/s0 (added after the smoke; the pointer term alone) on the step-40 checkpoint, 2 x 4096 bytes of
+    mix + code: 2.35 vs chunk-vector rms 1.20, pointer on 23.5% of chunks: the main network already leans on it
+    (watch for over-reliance: a wrong pointer is then a large perturbation; the per-order offsets are its only
+    confidence signal)"
+  offline: logbook/evolve/candidates/g3-copy-01/offline.md (scripts/evolve/copy_probe.py)
+author: copy proposer (g3)
+next_if_fails: >-
+  If the pointer is used (ptr_rms high) but bpb does not move, the H-Net's copy deficit vs BPE is not in the main
+  network: look at the decoder side (per-byte CE on bytes where the byte index is right vs the BPE model's per-token
+  CE on the same text). If unused, try the pointer at the decoder: dechunk P x_{j'+1} onto the bytes of chunk j+1
+  (a whole-chunk proposal for the byte decoder), or combine with g3-copy-02 so a copied span is one chunk.

@@ -83,10 +83,14 @@ class ChunkCopy(nn.Module):
         src, oi = chunk_pointers(ids, ctx, ctx_inner, self.orders)
         has = src >= 0
         v = x.index_select(0, src.clamp(min=0)) * has.unsqueeze(-1).to(x.dtype)
-        add = self.proj(v.to(self.proj.weight.dtype)) + self.offset(oi)
+        ptr = self.proj(v.to(self.proj.weight.dtype))
+        add = ptr + self.offset(oi)
         stats = {"chunk_copy_cov": has.float().mean()}
         with torch.no_grad():
             for i, n in enumerate(self.orders):
                 stats[f"chunk_copy_o{n}"] = (oi == i).float().mean()
             stats["chunk_copy_add_rms"] = add.detach().float().pow(2).mean().sqrt()
+            # the pointer term alone, over chunks that have a pointer (add_rms also holds the learned offset rows)
+            n_ptr = has.sum().clamp(min=1)
+            stats["chunk_copy_ptr_rms"] = (ptr.detach().float().pow(2).sum(-1) * has).sum().div(n_ptr * ptr.shape[-1]).sqrt()
         return x + add.to(x.dtype), stats
