@@ -150,6 +150,89 @@ def chunked_ce_sum(h: torch.Tensor, head: nn.Linear, labels: torch.Tensor) -> to
     return total
 
 
+def _bonus_logits(h: torch.Tensor, weight: torch.Tensor, cols: torch.Tensor, vals: torch.Tensor) -> torch.Tensor:
+    """fp32 logits h @ W^T with ``vals[t, j]`` added at column ``cols[t, j]`` (duplicate columns add up)."""
+    return (h @ weight.to(h.dtype).T).float().scatter_add(1, cols, vals.float())
+
+
+class _ChunkedLinearCEBonus(torch.autograd.Function):
+    """:class:`_ChunkedLinearCE` with a sparse additive logit bonus (``vals`` [T, k] at ``cols`` [T, k]): the token
+    match model's gate on a 32k vocabulary without materializing [T, V] logits. d(CE)/d(vals[t, j]) is the logit
+    gradient at column cols[t, j]."""
+
+    @staticmethod
+    def forward(ctx, h, weight, vals, labels, cols, rows: int):
+        cdt = h.dtype
+        w = weight.to(cdt)
+        need_h, need_w, need_v = ctx.needs_input_grad[0], ctx.needs_input_grad[1], ctx.needs_input_grad[2]
+        need = need_h or need_w or need_v
+        total = torch.zeros((), dtype=torch.float32, device=h.device)
+        gh = torch.empty_like(h) if need_h else None
+        gw = torch.zeros(weight.shape, dtype=torch.float32, device=h.device) if need_w else None
+        gv = torch.empty(vals.shape, dtype=torch.float32, device=h.device) if need_v else None
+        fn = _ce_chunk_fn(h.device)
+        for s in range(0, h.shape[0], rows):
+            hs, ys, cs = h[s:s + rows], labels[s:s + rows], cols[s:s + rows]
+            lf = (hs @ w.T).float().scatter_add_(1, cs, vals[s:s + rows].float())
+            loss, g = fn(lf, ys, need)  # fp32 logits in, fp32 gradient out
+            total = total + loss
+            if need_v:
+                gv[s:s + rows] = g.gather(1, cs)
+            if need_h or need_w:
+                g = g.to(cdt)
+                if need_h:
+                    gh[s:s + rows] = g @ w
+                if need_w:
+                    gw.add_(g.T @ hs)
+        ctx.save_for_backward(gh, gw, gv)
+        ctx.weight_dtype, ctx.vals_dtype = weight.dtype, vals.dtype
+        return total
+
+    @staticmethod
+    def backward(ctx, go):
+        gh, gw, gv = ctx.saved_tensors
+        return (None if gh is None else gh * go.to(gh.dtype),
+                None if gw is None else (gw * go).to(ctx.weight_dtype),
+                None if gv is None else (gv * go).to(ctx.vals_dtype), None, None, None)
+
+
+def lm_outputs_sparse_bonus(
+    h: torch.Tensor,
+    head: nn.Linear,
+    labels: Optional[torch.Tensor],
+    return_logits: bool,
+    batch_shape: Optional[Tuple[int, int]],
+    cols: torch.Tensor,
+    vals: torch.Tensor,
+) -> CausalLMOutput:
+    """``lm_outputs`` with a sparse logit bonus (``vals`` [T, k] fp32 added at columns ``cols`` [T, k]); the CE is
+    chunked like :func:`chunked_ce_sum` when the logits are not returned (DenseConfig.match_model's gate)."""
+    assert head.bias is None
+    out = CausalLMOutput()
+    logits = _bonus_logits(h, head.weight, cols, vals) if return_logits else None
+    if labels is not None:
+        labels = labels.reshape(-1)
+        rows = max(1, CE_CHUNK_ELEMENTS // head.out_features)
+        if logits is not None:
+            out.ce_sum = F.cross_entropy(logits, labels, ignore_index=IGNORE_INDEX, reduction="sum")
+        elif h.shape[0] <= rows:
+            out.ce_sum = F.cross_entropy(_bonus_logits(h, head.weight, cols, vals), labels,
+                                         ignore_index=IGNORE_INDEX, reduction="sum")
+        elif torch.is_grad_enabled() and (h.requires_grad or head.weight.requires_grad or vals.requires_grad):
+            out.ce_sum = _ChunkedLinearCEBonus.apply(h, head.weight, vals, labels, cols, rows)
+        else:  # evaluation: chunk by chunk, nothing kept
+            out.ce_sum = sum(F.cross_entropy(_bonus_logits(h[s:s + rows], head.weight, cols[s:s + rows],
+                                                           vals[s:s + rows]), labels[s:s + rows],
+                                             ignore_index=IGNORE_INDEX, reduction="sum")
+                             for s in range(0, h.shape[0], rows))
+        out.n_targets = (labels != IGNORE_INDEX).sum()
+        out.loss = out.ce_sum / out.n_targets.clamp(min=1)
+    if logits is not None and batch_shape is not None:
+        logits = logits.view(*batch_shape, -1)
+    out.logits = logits
+    return out
+
+
 def lm_outputs(
     h: torch.Tensor,
     head: nn.Linear,

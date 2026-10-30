@@ -366,6 +366,10 @@ class DenseConfig:
     mixer_kwargs: dict = field(default_factory=dict)  # extra constructor kwargs for that mixer
     attn_res: int = 0  # Block Attention Residuals block size (0 = off); see HNetConfig.attn_res
     extra: dict = field(default_factory=dict)  # variant-specific knobs
+    # In-context token match model (hnet.model.match.TokenMatchModel, "llama" variant): for each order n the token
+    # that followed the most recent earlier occurrence (same document) of the last n tokens enters as embeddings and
+    # a gated logit bonus. {} = off. Keys: orders (default [1, 2, 4, 8]), enc, dec, gate (bools), dec_layer.
+    match_model: dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, d: dict) -> "DenseConfig":

@@ -1,0 +1,58 @@
+id: g2-bpe-match
+parents: [bpe]
+track: control
+base: bpe            # scripts/evolve/make_gen.py builds this run from the benchmark's bpe arm (config, model, set)
+hypothesis: >-
+  If the byte match model's gain is a copying gain, BPE gains comparably. g1-wild-01 (hnet_ws + an in-context match
+  model) reaches BPE's final loss by step 360 of 908; copying is not specific to learned tokenization, so that counts
+  as an H-Net win only if a BPE model given the equivalent mechanism does not gain as much. This control gives the
+  dense BPE L03 model the token-level analogue (hnet/model/match.py TokenMatchModel): for orders n in {1, 2, 4, 8}
+  tokens (the byte model's 4/8/16/32 bytes at 4.145 bytes/token) the token that followed the most recent earlier
+  occurrence, in the same document, of the n tokens ending at t is a copy candidate (same exact index, same
+  document / window segmentation); candidates enter as an embedding added to the token embedding, an embedding added
+  to the residual stream before the last block (the analogue of the byte model's decoder input), and a context-gated
+  logit bonus a_n(t) = w_n . h_t + b_n on the candidate token, all zero-initialised. The candidate embedding is a
+  per-site d x d projection (zero-init) of the candidate token's own input embedding with per-order diagonal gains and
+  per-order match / no-match vectors (a per-order table over the 32k vocabulary would cost 8.4M parameters per order
+  and site). Offline on mix_v1 val with the training windowing, the token index proposes the correct next token for
+  14.2% of target tokens at order >= 2 (19.7% at order >= 1) vs 12.2% of tokens whose every byte the byte index
+  (order >= 8) copies; 81% of the tokens the byte index copies whole are also copied by the token index (85% on
+  code). Per text byte the token index covers less (11.5% of bytes correct at order >= 2 vs 17.9%): the difference is
+  mostly the rest of a token after its first bytes, which the byte index catches up on mid-token and a token model
+  gets in one prediction. So token-level matching sees most of the same repeats.
+prediction:
+  fitness: "BPE+match val bpb below bpe (mean of 3 seeds) by >= 0.05 bpb if copying is the mechanism; the H-Net's
+    margin is judged against this arm, not against plain bpe"
+  mechanism: >-
+    gate biases b_n positive and ordered b_8 > b_4 > b_2 > b_1 by step 300; per-source gain on code and held-out code
+    >= 2x the English gain (as predicted for the byte model). If BPE+match gains >= 80% of what g1-wild-01 gains over
+    hnet_ws, the byte model's win over BPE is a copying win, not a tokenization win; if BPE gains < 50% of it,
+    byte-level copying is genuinely worth more (tokenization-invariant matches, mid-token catch-up).
+branch: evolve/g2-bpe-match
+model: configs/evolve/models/g2-bpe-match.yaml
+set: []
+checks:
+  tests: "pass: tests/test_match_model_bpe.py (9: candidates vs brute-force search incl. segment boundaries and ids >
+    256, flag off = no new parameters and the same state dict / RNG stream, zero-init logits bit-identical, causality
+    with dec_layer 1 and 2, packed = separate when segments repeat each other, token CE reaches proj / offset / gate at
+    init and the gains after one step, chunked sparse-bonus CE = materialized CE in value and gradients, params /
+    FLOPs) + tests/test_match_model.py tests/test_invariances.py tests/test_flops.py tests/test_model_hnet.py
+    (174 passed, 4 skipped)"
+  fairness: "+0.96% training FLOPs/token (84.86 vs 84.05 MFLOPs/token at 2048 tokens, hnet.flops: 2 d x d projections
+    + elementwise + the k-way gate), params 20.161M vs 20.023M (+0.138M, +0.69%); same data, steps, batch, LRs as
+    the bpe arm"
+  grad_audit: logbook/evolve/candidates/g2-bpe-match/grad_audit.txt
+  coverage: logbook/evolve/candidates/g2-bpe-match/coverage.md
+  smoke: "pass: L03 control model through hnet.train.train on CPU, mix_v1_small, 4 x 512-token windows/step, 40
+    steps, Muon 0.02 / Adam 0.003, fp32, eval.downstream=null: train bpb 3.34 -> 2.32, no NaN, val 2.47; same settings
+    for plain bpe_L03: 3.34 -> 2.56, val 2.67. At step 40: match coverage o1/o2/o4/o8 = 49/14/2.4/0.1% of tokens
+    (512-token windows), accuracy 19/38/39/50%, gate biases +0.055..0.07 (all rising). As for g1-wild-01's smoke, an
+    early-training effect: it says the path works, not the size of the final gain. (With downstream on, the run ends
+    in IndexError in hnet/eval/scorers.py TokenModelScorer: it encodes with GPT-2 ids up to 50256 for a 32768-vocab
+    model; pre-existing, hits plain bpe_L03 identically.)"
+author: control (fairness) proposer
+next_if_fails: >-
+  If BPE+match gains as much as the H-Net match model, the generation's H-Net result is a copying result: compare
+  g1-wild-01 against this arm from then on and look for the H-Net's own advantage elsewhere. If BPE+match gains much
+  less, check the per-source gaps (code vs English) and the gate biases before crediting tokenization: a dead gate
+  (b_n not rising) means the control under-delivered, not that BPE cannot copy.

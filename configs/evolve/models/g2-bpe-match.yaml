@@ -1,0 +1,25 @@
+# g2-bpe-match (evolve g2, control track): bpe_L03 + the token-level in-context match model
+# (hnet/model/match.py TokenMatchModel), the fairness control for g1-wild-01's byte match model. For orders
+# n in {1, 2, 4, 8} tokens (~ the byte model's 4/8/16/32 bytes at 4.145 bytes/token) the token that followed the most
+# recent earlier occurrence (same document) of the n tokens ending at t is a copy candidate; candidates enter as a
+# projection of their own input embedding at the input and before the last block, and as a context-gated logit bonus.
+# +0.138M params (+0.69%) and +0.96% training FLOPs/token vs bpe_L03 (hnet.flops); zero-init (bit-identical at init).
+model:
+  type: dense
+  variant: llama
+  vocab_size: 32768
+  d_model: 256
+  n_layers: 3
+  d_intermediate: 896
+  num_heads: 3
+  num_kv_heads: null
+  head_dim: 128
+  rope_theta: 10000.0
+  nope_every: 0
+  tie_embeddings: false
+  norm_eps: 1.0e-05
+  initializer_range: 0.02
+  match_model: {orders: [1, 2, 4, 8], enc: true, dec: true, gate: true, dec_layer: 2}
+# Not part of the model (scripts/flops_report.py, tests).
+matching: {seq_len_bytes: 8512, seq_len_tokens: 2048, bytes_per_token: 4.145, reference: null}
+ladder: {rung: L03, variant: bpe, bytes_per_token: 4.145, vocab: 32768}

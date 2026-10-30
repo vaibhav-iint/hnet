@@ -40,7 +40,8 @@ One directory per candidate: `logbook/evolve/candidates/<id>/` with `candidate.y
 ```yaml
 id: g1-router-03                # g<generation>-<track>-<nn>
 parents: [hnet_ws]              # population ids it modifies
-track: router                   # router | architecture | optimization | memory | wildcard
+track: router                   # router | architecture | optimization | memory | wildcard | control
+base: hnet                      # optional: benchmark arm the run is built from (default hnet; bpe for BPE-side controls)
 hypothesis: one paragraph: the mechanism, why it should beat the parent, which measured fact it builds on
 prediction: {fitness: -0.02, mechanism: "bypass/hierarchy rms < 2 by step 300"}   # falsifiable numbers
 branch: evolve/g1-router-03     # git branch holding the code (local commit in the proposer's worktree)

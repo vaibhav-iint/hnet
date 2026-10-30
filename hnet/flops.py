@@ -452,6 +452,14 @@ def _dense(cfg: DenseConfig, seq_len, cv: FlopsConvention):
     ap, af = attn_res_counts(2 * cfg.n_layers if cfg.d_intermediate else cfg.n_layers, cfg.attn_res, d, cv)
     comp_p["body"] += ap
     comp_f["body"] += af
+    if cfg.match_model:  # token match model (hnet.model.match.TokenMatchModel), counted like the byte one + P_s
+        mm = {"orders": [1, 2, 4, 8], "enc": True, "dec": True, "gate": True, **cfg.match_model}
+        k = len(mm["orders"])
+        n_site = int(bool(mm["enc"])) + int(bool(mm["dec"]))
+        # per site: lookups free; d x d projection; per order a gain multiply, a sum over orders, an offset add
+        comp_p["match_model"] = n_site * (d * d + 2 * k * d + k * d) + ((d + 1) * k if mm["gate"] else 0)
+        comp_f["match_model"] = (n_site * (2 * d * d + (3 * k * d if cv.count_elementwise else 0.0))
+                                 + ((2 * d * k + (3 * k if cv.count_elementwise else 0)) if mm["gate"] else 0.0))
     return comp_p, comp_f
 
 
@@ -471,7 +479,7 @@ def count_params_nonembed(cfg) -> int:
         V, d0 = cfg.vocab_size, cfg.d_model[0]
         return count_params(cfg) - V * d0 * (1 if cfg.tie_embeddings else 2)
     p = _dense(cfg, 1, SPEC)[0]
-    return int(p["body"])
+    return int(p["body"] + p.get("match_model", 0))
 
 
 def model_flops(
@@ -540,7 +548,7 @@ def model_flops(
             flops_per_token=fpt,
             per_stage=[stage],
             params=int(sum(comp_p.values())),
-            params_nonembed=int(comp_p["body"]),
+            params_nonembed=int(comp_p["body"] + comp_p.get("match_model", 0)),
             bytes_per_position=[bpt],
             seq_len=seq_len,
             training=training,

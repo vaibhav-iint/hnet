@@ -6,6 +6,8 @@
 
 The spec is the benchmark spec (configs/search/ladder_1e16_L03.yaml) with its runs replaced by one run per candidate
 (the hnet arm's config + the candidate's model file and overrides) plus optional control arms copied verbatim.
+A candidate with ``base: <arm>`` (e.g. ``base: bpe`` for a BPE-side control such as g2-bpe-match) is built from that
+benchmark arm instead (its config, model, batch and train-length overrides); the default base is ``hnet``.
 """
 
 from __future__ import annotations
@@ -33,10 +35,11 @@ def build(gen: int, cand_paths, controls, seeds):
     for c in controls:
         runs.append(copy.deepcopy(by_name[c]))
         labels[c] = f"control: {c}"
-    base = by_name["hnet"]
     for p in cand_paths:
         c = yaml.safe_load(open(p))
-        r = copy.deepcopy(base)
+        arm = c.get("base", "hnet")
+        assert arm in by_name, f"{p}: base {arm!r} is not an arm of the benchmark ({sorted(by_name)})"
+        r = copy.deepcopy(by_name[arm])
         r["name"] = c["id"].replace("-", "_")
         if c.get("model"):
             r["model"] = c["model"]
