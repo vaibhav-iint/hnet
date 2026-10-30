@@ -1,0 +1,391 @@
+<title>H-Net vs BPE</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; the verdict first, then the two shareable images, then the compare tool, then the size ladder. */
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #121417; --ink-2: #4a505a; --muted: #7b828e; --line: #e2e5ea; --grid: #eceef2;
+  --hnet: #2a78d6; --bpe: #eb6834; --win: #1c5cab; --lose: #b8461d; --chip: #eef3fb;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  --display: "Bricolage Grotesque", "IBM Plex Sans", system-ui, sans-serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121418; --panel: #1a1d22; --ink: #eef0f3; --ink-2: #b9bfc8; --muted: #8b929d; --line: #2c3139; --grid: #23272e;
+  --hnet: #3987e5; --bpe: #d95926; --win: #86b6ef; --lose: #f0a07c; --chip: #1f2a3a;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #121418; --panel: #1a1d22; --ink: #eef0f3; --ink-2: #b9bfc8; --muted: #8b929d; --line: #2c3139; --grid: #23272e;
+  --hnet: #3987e5; --bpe: #d95926; --win: #86b6ef; --lose: #f0a07c; --chip: #1f2a3a;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  color-scheme: dark; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 1040px; margin: 0 auto; padding-block: 32px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 40px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(30px, 5vw, 48px); font-weight: 800; line-height: 1.08; }
+h2 { font-size: clamp(22px, 3vw, 28px); font-weight: 600; line-height: 1.2; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+section { display: grid; gap: 16px; min-width: 0; }
+.verdict { display: grid; gap: 18px; }
+.answers { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.answer { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 6px; }
+.answer .q { font-size: 13px; color: var(--muted); font-weight: 500; }
+.answer .a { font-family: var(--display); font-size: 22px; font-weight: 600; line-height: 1.2; }
+.answer .d { font-size: 14px; color: var(--ink-2); }
+.yes { color: var(--win); } .no { color: var(--lose); }
+.plain { display: grid; gap: 12px; color: var(--ink-2); }
+.plain strong { color: var(--ink); }
+.figs { display: grid; gap: 20px; }
+figure { margin: 0; display: grid; gap: 8px; }
+figure img { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; }
+figcaption { font-size: 13px; color: var(--muted); }
+.tool { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 16px; min-width: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { font: inherit; font-size: 14px; padding: 7px 12px; background: transparent; color: var(--ink-2); border: 0; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.btn { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--ink-2); cursor: pointer; }
+.btn:hover { border-color: var(--ink-2); color: var(--ink); }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--hnet); outline-offset: 2px; }
+.cols { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 20px; }
+@media (max-width: 760px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+.picker { display: grid; gap: 14px; max-height: 560px; overflow: auto; padding-right: 4px; }
+@media (max-width: 760px) { .picker { max-height: 300px; } }
+.group { display: grid; gap: 4px; }
+.group h3 { margin: 0; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.opt { display: grid; grid-template-columns: 18px 10px minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 14px; padding: 3px 4px; border-radius: 6px; cursor: pointer; }
+.opt:hover { background: var(--chip); }
+.opt input { margin: 0; accent-color: var(--ink); }
+.opt .sw { width: 10px; height: 10px; border-radius: 50%; background: transparent; border: 1px solid var(--line); }
+.opt .v { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.opt.full { opacity: 0.45; cursor: not-allowed; }
+.charts { display: grid; gap: 22px; min-width: 0; }
+.chart { position: relative; min-width: 0; }
+.chart svg { width: 100%; height: auto; display: block; overflow: visible; }
+.chart text { fill: var(--ink-2); font-family: var(--body); font-size: 12px; }
+.chart .tick { fill: var(--muted); font-family: var(--mono); font-size: 11px; }
+.chart .grid { stroke: var(--grid); stroke-width: 1; }
+.chart .axis { stroke: var(--line); stroke-width: 1; }
+.chart .ref { stroke: var(--muted); stroke-dasharray: 4 4; stroke-width: 1; }
+.tip { position: absolute; pointer-events: none; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.12); min-width: 200px; max-width: 300px; display: grid; gap: 3px; }
+.tip[hidden] { display: none; }
+.tip .t { font-weight: 600; color: var(--ink); }
+.tip .r { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 6px; align-items: center; color: var(--ink-2); }
+.tip .r b { font-family: var(--mono); font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
+.tip .sw { width: 8px; height: 8px; border-radius: 50%; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.note { font-size: 13px; color: var(--muted); }
+.finals { display: grid; gap: 2px; }
+.frow { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr) 92px; gap: 10px; align-items: center; font-size: 13px; padding: 4px 0; border-bottom: 1px solid var(--grid); }
+.frow .lab { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.frow .lab span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.frow .num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; color: var(--ink); }
+.frow .num small { display: block; color: var(--muted); font-size: 11px; }
+.frow svg { width: 100%; height: 22px; display: block; }
+.desc { font-size: 13px; color: var(--ink-2); min-height: 1.5em; }
+.ladder { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+.glossary { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; font-size: 14px; color: var(--ink-2); }
+.glossary b { color: var(--ink); display: block; }
+@media (prefers-reduced-motion: no-preference) { .chart path.series { transition: opacity 120ms; } }
+</style>
+
+<div class="wrap">
+  <section class="verdict">
+    <div class="eyebrow">H-Net vs BPE · small-scale replication and a search for improvements</div>
+    <h1>Can a model that reads raw bytes beat one that uses a tokenizer?</h1>
+    <div class="answers">
+      <div class="answer"><div class="q">The original H-Net, as published</div><div class="a no">No</div>
+        <div class="d">11% to 39% worse than a standard tokenizer model, at every one of the 9 sizes we tried.</div></div>
+      <div class="answer"><div class="q">Our improved H-Net, small model</div><div class="a yes">Yes, by 1.9%</div>
+        <div class="d">Beat a standard model given the same copy trick. Repeated 3 times, same result each time.</div></div>
+      <div class="answer"><div class="q">Our improved H-Net, bigger model</div><div class="a no">No, behind by 2.5%</div>
+        <div class="d">With a 2× larger model and 10× the compute, the standard model pulled ahead again.</div></div>
+    </div>
+    <div class="plain">
+      <p><strong>The short version.</strong> Most language models first chop text into tokens using a fixed dictionary (BPE). H-Net skips that and reads raw characters, learning for itself where words and pieces begin and end. Its authors reported it beating tokenizer models. At our small scale, with equal compute, equal model size and equal data, the published design did not: it needed 11–13% more bits to predict the same text.</p>
+      <p><strong>What we then tried.</strong> AI agents proposed, coded and tested 30 ideas over five rounds. The biggest single win was letting the model copy from earlier in the same document. Combining it with four smaller ideas, the byte-level model beat a standard model that had the same copy trick, by 1.9%.</p>
+      <p><strong>Why it is not a win yet.</strong> At a bigger model size the order flipped. The bigger standard model learns to copy by itself, so our add-ons help it less, and they help the byte-level model less too. Small-scale wins are cheap to find and often vanish with scale; this one did.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Images to share</div>
+    <div class="figs">
+      <figure><img src="__IMG_MAIN__" alt="Bar chart. Small model: original H-Net 13.4% worse than a standard model, standard model with copy trick 11.3% better, our best H-Net 13.0% better: byte-level model wins by 1.9%. Bigger model: original H-Net 11.1% worse, standard model with copy trick 1.2% better, our best H-Net 1.2% worse: standard model wins by 2.5%.">
+        <figcaption>The headline. Press and hold (phone) or right-click (desktop) to save.</figcaption></figure>
+      <figure><img src="__IMG_JOURNEY__" alt="Line chart of the best byte-level model per round of the search, small model: 1.827, 1.505, 1.486, 1.461, 1.433, 1.432 bits per character, against a standard model at 1.646 and a standard model with copy trick at 1.461.">
+        <figcaption>How the five rounds of search got there (small model only).</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Compare runs yourself</div>
+    <h2>Pick up to 8 runs and watch them train</h2>
+    <p class="note">Lower is better: the number is how many bits the model needs, on average, to predict each character of text it never saw in training. Each line is the average of 1–3 training runs.</p>
+    <div class="tool">
+      <div class="row">
+        <div class="seg" role="group" aria-label="Model size">
+          <button id="scale-small" aria-pressed="true">Small model · 20M params</button>
+          <button id="scale-big" aria-pressed="false">Bigger model · 38M params, 10× compute</button>
+        </div>
+        <div class="seg" role="group" aria-label="Range">
+          <button id="range-late" aria-pressed="true">Second half of training</button>
+          <button id="range-all" aria-pressed="false">Whole run</button>
+        </div>
+      </div>
+      <div class="row">
+        <button class="btn" id="preset-headline">The headline</button>
+        <button class="btn" id="preset-rounds">Best of each round</button>
+        <button class="btn" id="preset-hint">With vs without the space hint</button>
+        <button class="btn" id="preset-clear">Clear</button>
+      </div>
+      <div class="cols">
+        <div class="picker" id="picker"></div>
+        <div class="charts">
+          <div class="legend" id="legend"></div>
+          <div class="chart" id="curve"></div>
+          <div class="desc" id="desc"></div>
+          <div>
+            <div class="eyebrow" style="margin-bottom:6px">End of training, best first · dots are individual training runs</div>
+            <div class="finals" id="finals"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Does size change the picture for the original design?</div>
+    <h2>The published H-Net trailed at all 9 model sizes we tried</h2>
+    <p class="note">Without any of our add-ons. Each compute budget is split between model size and training data; left = smaller model trained on more text.</p>
+    <div class="ladder" id="ladder"></div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Words used on this page</div>
+    <div class="glossary">
+      <div><b>BPE / standard model</b>A Transformer that reads text as tokens from a fixed 32,768-entry dictionary, as most LLMs do.</div>
+      <div><b>H-Net / byte-level model</b>Reads raw bytes and learns where to group them into chunks, so it needs no dictionary.</div>
+      <div><b>Copy trick</b>Look up the last time the current text appeared in the same document and offer what came next. Both model types got it.</div>
+      <div><b>Space hint</b>Early in training, nudge the byte-level model to start chunks at spaces. The nudge fades to zero.</div>
+      <div><b>Bits per character</b>The score: how surprised the model is by each new character. Lower is better; 1.0 would mean one yes/no guess per character.</div>
+      <div><b>Fair comparison</b>Every pair used the same training compute, the same number of parameters and the same data.</div>
+    </div>
+  </section>
+</div>
+
+<script>
+const DATA = __DATA__;
+const EXP = Object.fromEntries(DATA.experiments.map(e => [e.id, e]));
+const SLOTS = 8;
+const GROUPS = [["Reference models", e => e.gen === 0 || (e.family === "bpe")], ["Round 1", e => e.gen === 1 && e.family === "hnet"],
+  ["Round 2", e => e.gen === 2 && e.family === "hnet"], ["Round 3", e => e.gen === 3 && e.family === "hnet"],
+  ["Round 4", e => e.gen === 4 && e.family === "hnet"], ["Round 5", e => e.gen === 5 && e.family === "hnet"]];
+const PRESETS = {
+  headline: { small: ["g4_combo_02", "bpe_copy", "hnet", "bpe"], big: ["big_g4_combo_02", "big_bpe_copy", "big_hnet", "big_bpe"] },
+  rounds: { small: ["g4_combo_02", "bpe_copy", "hnet_ws", "bpe", "g1_wild_01", "g2_match_mem", "g3_mem_02", "g5_compute_02"],
+            big: ["big_g4_combo_02", "big_bpe_copy", "big_hnet_ws", "big_bpe"] },
+  hint: { small: ["g4_combo_02", "bpe_copy", "g4_combo_03", "hnet_ws", "hnet", "g2_match_mem", "g2_match_pf"],
+          big: ["big_g4_combo_02", "big_bpe_copy", "big_g4_combo_03", "big_hnet_ws", "big_hnet"] },
+};
+const REF = { small: "bpe_copy", big: "big_bpe_copy" };
+const state = { scale: "small", range: "late", sel: { small: new Map(), big: new Map() }, hover: null };
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+                set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+function freeSlot(m) { const used = new Set(m.values()); for (let i = 1; i <= SLOTS; i++) if (!used.has(i)) return i; return 0; }
+function setPreset(name) { const m = new Map(); PRESETS[name][state.scale].forEach((id, i) => m.set(id, i + 1)); state.sel[state.scale] = m; render(); }
+function toggle(id) {
+  const m = state.sel[state.scale];
+  if (m.has(id)) m.delete(id); else { const s = freeSlot(m); if (!s) return; m.set(id, s); }
+  render();
+}
+
+function el(tag, attrs = {}, ...kids) {
+  const ns = ["svg", "path", "line", "text", "circle", "rect", "g"].includes(tag) ? "http://www.w3.org/2000/svg" : null;
+  const n = ns ? document.createElementNS(ns, tag) : document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) { if (k === "text") n.textContent = v; else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v); }
+  kids.forEach(k => k && n.appendChild(k));
+  return n;
+}
+
+function renderPicker() {
+  const box = document.getElementById("picker"); box.replaceChildren();
+  const m = state.sel[state.scale];
+  const list = DATA.experiments.filter(e => e.scale === state.scale);
+  for (const [name, f] of GROUPS) {
+    const items = list.filter(f); if (!items.length) continue;
+    const g = el("div", { class: "group" }, el("h3", { text: name }));
+    items.sort((a, b) => a.final - b.final).forEach(e => {
+      const on = m.has(e.id), full = !on && m.size >= SLOTS;
+      const cb = el("input", { type: "checkbox", id: "cb-" + e.id, "aria-label": e.label });
+      cb.checked = on; if (full) cb.disabled = true;
+      cb.addEventListener("change", () => toggle(e.id));
+      const sw = el("span", { class: "sw" }); if (on) { sw.style.background = css("--s" + m.get(e.id)); sw.style.borderColor = "transparent"; }
+      const lab = el("label", { class: "opt" + (full ? " full" : ""), for: "cb-" + e.id, title: e.note },
+        cb, sw, el("span", { text: e.label.replace(/^Round \d: /, "") }), el("span", { class: "v", text: e.final.toFixed(3) }));
+      g.appendChild(lab);
+    });
+    box.appendChild(g);
+  }
+}
+
+function selected() { const m = state.sel[state.scale]; return [...m.entries()].map(([id, s]) => ({ e: EXP[id], color: css("--s" + s) })); }
+
+function renderLegend() {
+  const box = document.getElementById("legend"); box.replaceChildren();
+  selected().forEach(({ e, color }) => { const i = el("i"); i.style.background = color; box.appendChild(el("span", {}, i, document.createTextNode(e.label))); });
+}
+
+function renderCurve() {
+  const box = document.getElementById("curve"); box.replaceChildren();
+  const sel = selected();
+  const W = 640, H = 330, m = { l: 46, r: 14, t: 10, b: 34 };
+  const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Validation bits per character against training step for the selected runs" });
+  box.appendChild(svg);
+  if (!sel.length) { svg.appendChild(el("text", { x: W / 2, y: H / 2, "text-anchor": "middle", text: "Pick runs on the left, or press a preset." })); return; }
+  const total = Math.max(...sel.map(s => s.e.steps_total));
+  const x0 = state.range === "late" ? total / 2 : 0;
+  const pts = s => s.e.curve.filter(p => p[0] >= x0 - 1);
+  let ys = sel.flatMap(s => pts(s).map(p => p[1]));
+  let y0 = Math.min(...ys), y1 = Math.max(...ys); const pad = (y1 - y0) * 0.08 || 0.02; y0 -= pad; y1 += pad;
+  const X = v => m.l + (v - x0) / (total - x0) * (W - m.l - m.r), Y = v => m.t + (y1 - v) / (y1 - y0) * (H - m.t - m.b);
+  const step = niceStep((y1 - y0) / 5);
+  for (let v = Math.ceil(y0 / step) * step; v <= y1; v += step) {
+    svg.appendChild(el("line", { class: "grid", x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v) }));
+    svg.appendChild(el("text", { class: "tick", x: m.l - 6, y: Y(v) + 4, "text-anchor": "end", text: v.toFixed(step < 0.05 ? 2 : 1) }));
+  }
+  (state.range === "late" ? [50, 60, 70, 80, 90, 100] : [0, 25, 50, 75, 100]).forEach(pc => { const v = pc / 100 * total;
+    svg.appendChild(el("text", { class: "tick", x: X(v), y: H - m.b + 18, "text-anchor": v === x0 ? "start" : pc === 100 ? "end" : "middle", text: pc + "%" })); });
+  svg.appendChild(el("text", { x: W - m.r, y: H - 2, "text-anchor": "end", text: "share of training done" }));
+  svg.appendChild(el("line", { class: "axis", x1: m.l, x2: W - m.r, y1: H - m.b, y2: H - m.b }));
+  sel.forEach(({ e, color }) => {
+    const p = pts({ e }); const d = p.map((q, i) => (i ? "L" : "M") + X(q[0]).toFixed(1) + " " + Y(q[1]).toFixed(1)).join("");
+    const path = el("path", { d, class: "series", fill: "none", stroke: color, "stroke-width": 2, "stroke-linejoin": "round", "data-id": e.id });
+    if (state.hover && state.hover !== e.id) path.style.opacity = 0.25;
+    svg.appendChild(path);
+    const last = p[p.length - 1]; svg.appendChild(el("circle", { cx: X(last[0]), cy: Y(last[1]), r: 4, fill: color, stroke: css("--panel"), "stroke-width": 2 }));
+  });
+  // hover: crosshair + tooltip at the nearest eval step
+  const steps = [...new Set(sel.flatMap(s => pts(s).map(p => p[0])))].sort((a, b) => a - b);
+  const cross = el("line", { class: "axis", y1: m.t, y2: H - m.b, visibility: "hidden" }); svg.appendChild(cross);
+  const tip = el("div", { class: "tip", hidden: "" }); box.appendChild(tip);
+  const hit = el("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: "transparent" }); svg.appendChild(hit);
+  const move = ev => {
+    const r = svg.getBoundingClientRect(); const px = (ev.clientX - r.left) / r.width * W;
+    let best = steps[0]; steps.forEach(s => { if (Math.abs(X(s) - px) < Math.abs(X(best) - px)) best = s; });
+    cross.setAttribute("x1", X(best)); cross.setAttribute("x2", X(best)); cross.setAttribute("visibility", "visible");
+    const rows = sel.map(({ e, color }) => ({ e, color, v: (e.curve.find(p => p[0] === best) || [])[1] })).filter(o => o.v != null).sort((a, b) => a.v - b.v);
+    tip.replaceChildren(el("div", { class: "t", text: `${Math.round(best / total * 100)}% of training (step ${best})` }),
+      ...rows.map(o => { const sw = el("span", { class: "sw" }); sw.style.background = o.color; return el("div", { class: "r" }, sw, el("span", { text: o.e.label }), el("b", { text: o.v.toFixed(3) })); }));
+    tip.hidden = false;
+    const bx = box.getBoundingClientRect(); const left = ev.clientX - bx.left;
+    tip.style.top = "8px"; tip.style.left = (left > bx.width / 2 ? Math.max(0, left - tip.offsetWidth - 14) : left + 14) + "px";
+  };
+  hit.addEventListener("pointermove", move); hit.addEventListener("pointerdown", move);
+  hit.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); });
+}
+
+function niceStep(raw) { const p = Math.pow(10, Math.floor(Math.log10(raw))); const f = raw / p; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * p; }
+
+function renderFinals() {
+  const box = document.getElementById("finals"); box.replaceChildren();
+  const sel = selected().sort((a, b) => a.e.final - b.e.final);
+  if (!sel.length) return;
+  const vals = sel.flatMap(s => s.e.per_seed.concat(s.e.final));
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * 0.1 || 0.01; lo -= pad; hi += pad;
+  const ref = EXP[REF[state.scale]];
+  sel.forEach(({ e, color }) => {
+    const W = 300, X = v => 6 + (v - lo) / (hi - lo) * (W - 12);
+    const svg = el("svg", { viewBox: `0 0 ${W} 22`, preserveAspectRatio: "none", "aria-hidden": "true" });
+    svg.appendChild(el("line", { x1: 0, x2: W, y1: 11, y2: 11, stroke: css("--grid"), "stroke-width": 1 }));
+    if (ref && ref.id !== e.id) svg.appendChild(el("line", { x1: X(ref.final), x2: X(ref.final), y1: 2, y2: 20, stroke: css("--muted"), "stroke-dasharray": "2 2" }));
+    e.per_seed.forEach(v => svg.appendChild(el("circle", { cx: X(v), cy: 11, r: 3, fill: "none", stroke: color, "stroke-width": 1.5 })));
+    svg.appendChild(el("rect", { x: X(e.final) - 1.5, y: 3, width: 3, height: 16, rx: 1, fill: color }));
+    const sw = el("span", { class: "sw" }); sw.style.cssText = `width:10px;height:10px;border-radius:50%;flex:none;background:${color}`;
+    const rel = ref && ref.id !== e.id ? ((e.final - ref.final) / ref.final * 100) : null;
+    const num = el("div", { class: "num", text: e.final.toFixed(3) });
+    num.appendChild(el("small", { text: rel == null ? "the fair bar" : (rel < 0 ? `${(-rel).toFixed(1)}% better than bar` : `${rel.toFixed(1)}% worse than bar`) }));
+    const row = el("div", { class: "frow", title: e.note }, el("div", { class: "lab" }, sw, el("span", { text: e.label })), svg, num);
+    row.addEventListener("pointerenter", () => { state.hover = e.id; document.getElementById("desc").textContent = e.label + ": " + e.note; renderCurveOnly(); });
+    row.addEventListener("pointerleave", () => { state.hover = null; renderCurveOnly(); });
+    box.appendChild(row);
+  });
+  box.appendChild(el("div", { class: "note", text: `Dashed line: ${ref.label} (${ref.final.toFixed(3)}), the fair bar at this size. Axis zoomed to the selected runs.` }));
+}
+
+function renderCurveOnly() { renderCurve(); }
+
+function renderLadder() {
+  const box = document.getElementById("ladder"); box.replaceChildren();
+  const SIZES = { L03: "20M", L04: "22M", L05: "38M", L06: "60M", L07: "66M", L08: "98M", L09: "108M" };
+  const arms = [["bpe", "Standard model (BPE)", "--bpe"], ["hnet", "H-Net as published", "--hnet"]];
+  for (const [bud, title] of [["1e16", "Small compute budget"], ["1e17", "10× compute budget"]]) {
+    const rungs = Object.keys(DATA.ladder[bud]);
+    const W = 340, H = 220, m = { l: 40, r: 12, t: 26, b: 40 };
+    const vals = rungs.flatMap(r => arms.map(a => DATA.ladder[bud][r][a[0]]));
+    let y0 = Math.min(...vals) - 0.05, y1 = Math.max(...vals) + 0.05;
+    const X = i => m.l + (rungs.length === 1 ? 0.5 : i / (rungs.length - 1)) * (W - m.l - m.r), Y = v => m.t + (y1 - v) / (y1 - y0) * (H - m.t - m.b);
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `${title}: bits per character by model size for BPE and H-Net` });
+    svg.appendChild(el("text", { x: 0, y: 14, text: title, style: "font-weight:600;fill:var(--ink)" }));
+    const step = niceStep((y1 - y0) / 4);
+    for (let v = Math.ceil(y0 / step) * step; v <= y1; v += step) {
+      svg.appendChild(el("line", { class: "grid", x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v) }));
+      svg.appendChild(el("text", { class: "tick", x: m.l - 6, y: Y(v) + 4, "text-anchor": "end", text: v.toFixed(1) }));
+    }
+    rungs.forEach((r, i) => svg.appendChild(el("text", { class: "tick", x: X(i), y: H - m.b + 16, "text-anchor": "middle", text: SIZES[r] })));
+    svg.appendChild(el("text", { x: (m.l + W - m.r) / 2, y: H - 4, "text-anchor": "middle", text: "model size (parameters)" }));
+    arms.forEach(([a, lab, col]) => {
+      const d = rungs.map((r, i) => (i ? "L" : "M") + X(i) + " " + Y(DATA.ladder[bud][r][a])).join("");
+      svg.appendChild(el("path", { d, fill: "none", stroke: css(col), "stroke-width": 2 }));
+      rungs.forEach((r, i) => { const c = el("circle", { cx: X(i), cy: Y(DATA.ladder[bud][r][a]), r: 4, fill: css(col), stroke: css("--panel"), "stroke-width": 2 });
+        c.appendChild(el("title", { text: `${lab}, ${SIZES[r]}: ${DATA.ladder[bud][r][a].toFixed(3)}` })); svg.appendChild(c); });
+    });
+    const fig = el("div", { class: "chart" }, svg);
+    const lg = el("div", { class: "legend" });
+    arms.forEach(([a, lab, col]) => { const i = el("i"); i.style.background = css(col); lg.appendChild(el("span", {}, i, document.createTextNode(lab))); });
+    box.appendChild(el("div", { class: "tool" }, fig, lg));
+  }
+}
+
+function render() {
+  document.getElementById("scale-small").setAttribute("aria-pressed", state.scale === "small");
+  document.getElementById("scale-big").setAttribute("aria-pressed", state.scale === "big");
+  document.getElementById("range-late").setAttribute("aria-pressed", state.range === "late");
+  document.getElementById("range-all").setAttribute("aria-pressed", state.range === "all");
+  renderPicker(); renderLegend(); renderCurve(); renderFinals();
+  document.getElementById("desc").textContent = "Hover a row below to highlight its line and read what it changed.";
+  store.set("hnet-tldr", JSON.stringify({ scale: state.scale, range: state.range,
+    sel: { small: [...state.sel.small], big: [...state.sel.big] } }));
+}
+
+document.getElementById("scale-small").onclick = () => { state.scale = "small"; render(); };
+document.getElementById("scale-big").onclick = () => { state.scale = "big"; render(); };
+document.getElementById("range-late").onclick = () => { state.range = "late"; render(); };
+document.getElementById("range-all").onclick = () => { state.range = "all"; render(); };
+document.getElementById("preset-headline").onclick = () => setPreset("headline");
+document.getElementById("preset-rounds").onclick = () => setPreset("rounds");
+document.getElementById("preset-hint").onclick = () => setPreset("hint");
+document.getElementById("preset-clear").onclick = () => { state.sel[state.scale] = new Map(); render(); };
+
+(function init() {
+  ["small", "big"].forEach(s => PRESETS.headline[s].forEach((id, i) => state.sel[s].set(id, i + 1)));
+  try { const saved = JSON.parse(store.get("hnet-tldr") || "null");
+    if (saved) { state.scale = saved.scale || "small"; state.range = saved.range || "late";
+      ["small", "big"].forEach(s => { const m = new Map((saved.sel && saved.sel[s] || []).filter(([id]) => EXP[id])); if (m.size) state.sel[s] = m; }); } } catch (e) {}
+  render(); renderLadder();
+  const mq = window.matchMedia("(prefers-color-scheme: dark)");
+  const redraw = () => { render(); renderLadder(); };
+  mq.addEventListener && mq.addEventListener("change", redraw);
+  new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+})();
+</script>

@@ -1,0 +1,2320 @@
+{
+ "experiments": [
+  {
+   "id": "bpe",
+   "label": "BPE (standard tokenizer)",
+   "family": "bpe",
+   "scale": "small",
+   "gen": 0,
+   "note": "The usual Transformer with a fixed 32k-token vocabulary.",
+   "seeds": 3,
+   "final": 1.6463,
+   "sd": 0.0545,
+   "per_seed": [
+    1.6952,
+    1.656,
+    1.5876
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.3804
+    ],
+    [
+     180,
+     2.0804
+    ],
+    [
+     270,
+     1.9698
+    ],
+    [
+     360,
+     1.9241
+    ],
+    [
+     450,
+     1.8749
+    ],
+    [
+     540,
+     1.8403
+    ],
+    [
+     630,
+     1.7952
+    ],
+    [
+     720,
+     1.7651
+    ],
+    [
+     810,
+     1.6786
+    ],
+    [
+     908,
+     1.6463
+    ]
+   ]
+  },
+  {
+   "id": "bpe_copy",
+   "label": "BPE + copying",
+   "family": "bpe",
+   "scale": "small",
+   "gen": 2,
+   "note": "BPE given the same copy-from-earlier-in-the-document trick our H-Nets use. The fair bar.",
+   "seeds": 3,
+   "final": 1.461,
+   "sd": 0.0009,
+   "per_seed": [
+    1.4602,
+    1.4619,
+    1.4609
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.0503
+    ],
+    [
+     180,
+     1.78
+    ],
+    [
+     270,
+     1.6778
+    ],
+    [
+     360,
+     1.6321
+    ],
+    [
+     450,
+     1.5923
+    ],
+    [
+     540,
+     1.5656
+    ],
+    [
+     630,
+     1.5392
+    ],
+    [
+     720,
+     1.5326
+    ],
+    [
+     810,
+     1.4799
+    ],
+    [
+     908,
+     1.461
+    ]
+   ]
+  },
+  {
+   "id": "bpe_copy_mem",
+   "label": "BPE + copying + extra memory",
+   "family": "bpe",
+   "scale": "small",
+   "gen": 5,
+   "note": "BPE + copying with the generation-5 memory bolted on (more parameters than allowed, to be generous).",
+   "seeds": 2,
+   "final": 1.4603,
+   "sd": 0.0008,
+   "per_seed": [
+    1.4597,
+    1.4608
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.0491
+    ],
+    [
+     180,
+     1.7796
+    ],
+    [
+     270,
+     1.677
+    ],
+    [
+     360,
+     1.6326
+    ],
+    [
+     450,
+     1.5921
+    ],
+    [
+     540,
+     1.5656
+    ],
+    [
+     630,
+     1.5388
+    ],
+    [
+     720,
+     1.5301
+    ],
+    [
+     810,
+     1.4791
+    ],
+    [
+     908,
+     1.4603
+    ]
+   ]
+  },
+  {
+   "id": "hnet",
+   "label": "H-Net as published",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 0,
+   "note": "Byte-level model that learns its own chunks. No hints.",
+   "seeds": 3,
+   "final": 1.8663,
+   "sd": 0.0363,
+   "per_seed": [
+    1.8789,
+    1.8255,
+    1.8946
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.484
+    ],
+    [
+     180,
+     2.2146
+    ],
+    [
+     270,
+     2.1299
+    ],
+    [
+     360,
+     2.0867
+    ],
+    [
+     450,
+     2.0423
+    ],
+    [
+     540,
+     2.0154
+    ],
+    [
+     630,
+     1.9801
+    ],
+    [
+     720,
+     1.9765
+    ],
+    [
+     810,
+     1.9041
+    ],
+    [
+     908,
+     1.8663
+    ]
+   ]
+  },
+  {
+   "id": "hnet_ws",
+   "label": "H-Net + space hint",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 0,
+   "note": "Same, nudged early in training to cut words at spaces (the hint fades out).",
+   "seeds": 3,
+   "final": 1.827,
+   "sd": 0.0041,
+   "per_seed": [
+    1.8227,
+    1.8274,
+    1.8308
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.442
+    ],
+    [
+     180,
+     2.1867
+    ],
+    [
+     270,
+     2.1029
+    ],
+    [
+     360,
+     2.0607
+    ],
+    [
+     450,
+     2.0115
+    ],
+    [
+     540,
+     1.9755
+    ],
+    [
+     630,
+     1.9422
+    ],
+    [
+     720,
+     1.9478
+    ],
+    [
+     810,
+     1.8673
+    ],
+    [
+     908,
+     1.827
+    ]
+   ]
+  },
+  {
+   "id": "g1_wild_01",
+   "label": "Round 1: copying",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 1,
+   "note": "Copy the byte that followed the last time this context appeared in the document.",
+   "seeds": 2,
+   "final": 1.5046,
+   "sd": 0.0033,
+   "per_seed": [
+    1.5023,
+    1.5069
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     1.9849
+    ],
+    [
+     180,
+     1.7742
+    ],
+    [
+     270,
+     1.7125
+    ],
+    [
+     360,
+     1.6659
+    ],
+    [
+     450,
+     1.6417
+    ],
+    [
+     540,
+     1.6054
+    ],
+    [
+     630,
+     1.5835
+    ],
+    [
+     720,
+     1.5876
+    ],
+    [
+     810,
+     1.5297
+    ],
+    [
+     908,
+     1.5046
+    ]
+   ]
+  },
+  {
+   "id": "g1_mem_01",
+   "label": "Round 1: word-completion memory (trie)",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 1,
+   "note": "A lookup table that scores the next byte given the start of the current chunk.",
+   "seeds": 2,
+   "final": 1.734,
+   "sd": 0.0049,
+   "per_seed": [
+    1.7375,
+    1.7305
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.3754
+    ],
+    [
+     180,
+     2.1373
+    ],
+    [
+     270,
+     2.0397
+    ],
+    [
+     360,
+     2.0037
+    ],
+    [
+     450,
+     1.9497
+    ],
+    [
+     540,
+     1.9055
+    ],
+    [
+     630,
+     1.8718
+    ],
+    [
+     720,
+     1.8724
+    ],
+    [
+     810,
+     1.7816
+    ],
+    [
+     908,
+     1.734
+    ]
+   ]
+  },
+  {
+   "id": "g1_mem_02",
+   "label": "Round 1: suffix memory",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 1,
+   "note": "Chunk embeddings keyed by the chunk's last few bytes.",
+   "seeds": 2,
+   "final": 1.7554,
+   "sd": 0.0336,
+   "per_seed": [
+    1.7791,
+    1.7316
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.4805
+    ],
+    [
+     180,
+     2.2213
+    ],
+    [
+     270,
+     2.1277
+    ],
+    [
+     360,
+     2.0802
+    ],
+    [
+     450,
+     2.0174
+    ],
+    [
+     540,
+     1.9744
+    ],
+    [
+     630,
+     1.9073
+    ],
+    [
+     720,
+     1.9001
+    ],
+    [
+     810,
+     1.8059
+    ],
+    [
+     908,
+     1.7554
+    ]
+   ]
+  },
+  {
+   "id": "g1_wild_02",
+   "label": "Round 1: prefix dictionary",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 1,
+   "note": "A cheaper word-completion head over the top-16 bytes.",
+   "seeds": 2,
+   "final": 1.7709,
+   "sd": 0.0016,
+   "per_seed": [
+    1.7697,
+    1.772
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.3863
+    ],
+    [
+     180,
+     2.1381
+    ],
+    [
+     270,
+     2.0436
+    ],
+    [
+     360,
+     2.005
+    ],
+    [
+     450,
+     1.9577
+    ],
+    [
+     540,
+     1.9162
+    ],
+    [
+     630,
+     1.8793
+    ],
+    [
+     720,
+     1.8895
+    ],
+    [
+     810,
+     1.8093
+    ],
+    [
+     908,
+     1.7709
+    ]
+   ]
+  },
+  {
+   "id": "g1_arch_02",
+   "label": "Round 1: position-aware read-back",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 1,
+   "note": "Bytes inside a chunk read the chunk summary differently depending on their position.",
+   "seeds": 2,
+   "final": 1.7972,
+   "sd": 0.0011,
+   "per_seed": [
+    1.798,
+    1.7965
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.4479
+    ],
+    [
+     180,
+     2.1848
+    ],
+    [
+     270,
+     2.0975
+    ],
+    [
+     360,
+     2.0468
+    ],
+    [
+     450,
+     1.9839
+    ],
+    [
+     540,
+     1.9508
+    ],
+    [
+     630,
+     1.9142
+    ],
+    [
+     720,
+     1.925
+    ],
+    [
+     810,
+     1.8362
+    ],
+    [
+     908,
+     1.7972
+    ]
+   ]
+  },
+  {
+   "id": "g1_opt_01",
+   "label": "Round 1: learning-rate fix",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 1,
+   "note": "Remove a learning-rate multiplier that double-counted with the optimizer.",
+   "seeds": 2,
+   "final": 1.7983,
+   "sd": 0.0023,
+   "per_seed": [
+    1.7967,
+    1.7999
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.5388
+    ],
+    [
+     180,
+     2.1887
+    ],
+    [
+     270,
+     2.0852
+    ],
+    [
+     360,
+     2.0375
+    ],
+    [
+     450,
+     1.9822
+    ],
+    [
+     540,
+     1.9483
+    ],
+    [
+     630,
+     1.9097
+    ],
+    [
+     720,
+     1.9077
+    ],
+    [
+     810,
+     1.8332
+    ],
+    [
+     908,
+     1.7983
+    ]
+   ]
+  },
+  {
+   "id": "g1_router_02",
+   "label": "Round 1: router tweak",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 1,
+   "note": "A different way of deciding where chunks end.",
+   "seeds": 2,
+   "final": 1.8189,
+   "sd": 0.0466,
+   "per_seed": [
+    1.8519,
+    1.7859
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.4424
+    ],
+    [
+     180,
+     2.1953
+    ],
+    [
+     270,
+     2.1151
+    ],
+    [
+     360,
+     2.0762
+    ],
+    [
+     450,
+     2.037
+    ],
+    [
+     540,
+     1.9949
+    ],
+    [
+     630,
+     1.9584
+    ],
+    [
+     720,
+     1.9484
+    ],
+    [
+     810,
+     1.8587
+    ],
+    [
+     908,
+     1.8189
+    ]
+   ]
+  },
+  {
+   "id": "g1_alloc_01",
+   "label": "Round 1: compute reallocation A",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 1,
+   "note": "Move compute between the byte layers and the chunk layers.",
+   "seeds": 2,
+   "final": 1.8211,
+   "sd": 0.0066,
+   "per_seed": [
+    1.8258,
+    1.8165
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.4352
+    ],
+    [
+     180,
+     2.1901
+    ],
+    [
+     270,
+     2.1051
+    ],
+    [
+     360,
+     2.063
+    ],
+    [
+     450,
+     2.0092
+    ],
+    [
+     540,
+     1.9719
+    ],
+    [
+     630,
+     1.938
+    ],
+    [
+     720,
+     1.9506
+    ],
+    [
+     810,
+     1.8674
+    ],
+    [
+     908,
+     1.8211
+    ]
+   ]
+  },
+  {
+   "id": "g1_alloc_02",
+   "label": "Round 1: compute reallocation B",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 1,
+   "note": "Another split of compute between levels.",
+   "seeds": 2,
+   "final": 1.8651,
+   "sd": 0.0029,
+   "per_seed": [
+    1.8671,
+    1.863
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.48
+    ],
+    [
+     180,
+     2.2127
+    ],
+    [
+     270,
+     2.1279
+    ],
+    [
+     360,
+     2.0879
+    ],
+    [
+     450,
+     2.0429
+    ],
+    [
+     540,
+     2.0084
+    ],
+    [
+     630,
+     1.9735
+    ],
+    [
+     720,
+     1.9938
+    ],
+    [
+     810,
+     1.9056
+    ],
+    [
+     908,
+     1.8651
+    ]
+   ]
+  },
+  {
+   "id": "g1_arch_01",
+   "label": "Round 1: architecture tweak",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 1,
+   "note": "A small architecture change to the chunk path.",
+   "seeds": 2,
+   "final": 1.8245,
+   "sd": 0.0015,
+   "per_seed": [
+    1.8256,
+    1.8234
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.4297
+    ],
+    [
+     180,
+     2.1949
+    ],
+    [
+     270,
+     2.1061
+    ],
+    [
+     360,
+     2.0627
+    ],
+    [
+     450,
+     2.0133
+    ],
+    [
+     540,
+     1.9707
+    ],
+    [
+     630,
+     1.9349
+    ],
+    [
+     720,
+     1.9369
+    ],
+    [
+     810,
+     1.8612
+    ],
+    [
+     908,
+     1.8245
+    ]
+   ]
+  },
+  {
+   "id": "g1_opt_02",
+   "label": "Round 1: optimizer tweak",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 1,
+   "note": "A second optimizer change.",
+   "seeds": 2,
+   "final": 1.8336,
+   "sd": 0.0029,
+   "per_seed": [
+    1.8357,
+    1.8316
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.4681
+    ],
+    [
+     180,
+     2.206
+    ],
+    [
+     270,
+     2.1242
+    ],
+    [
+     360,
+     2.079
+    ],
+    [
+     450,
+     2.0248
+    ],
+    [
+     540,
+     1.9841
+    ],
+    [
+     630,
+     1.9556
+    ],
+    [
+     720,
+     1.9613
+    ],
+    [
+     810,
+     1.8795
+    ],
+    [
+     908,
+     1.8336
+    ]
+   ]
+  },
+  {
+   "id": "g2_match_mem",
+   "label": "Round 2: copying + suffix memory",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 2,
+   "note": "Two gen-1 winners combined.",
+   "seeds": 2,
+   "final": 1.4857,
+   "sd": 0.0038,
+   "per_seed": [
+    1.4829,
+    1.4884
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     1.9714
+    ],
+    [
+     180,
+     1.7645
+    ],
+    [
+     270,
+     1.6932
+    ],
+    [
+     360,
+     1.642
+    ],
+    [
+     450,
+     1.6252
+    ],
+    [
+     540,
+     1.586
+    ],
+    [
+     630,
+     1.5692
+    ],
+    [
+     720,
+     1.5712
+    ],
+    [
+     810,
+     1.5101
+    ],
+    [
+     908,
+     1.4857
+    ]
+   ]
+  },
+  {
+   "id": "g2_match_arch",
+   "label": "Round 2: copying + read-back",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 2,
+   "note": "Two gen-1 winners combined.",
+   "seeds": 2,
+   "final": 1.4916,
+   "sd": 0.0007,
+   "per_seed": [
+    1.4911,
+    1.4921
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     1.9899
+    ],
+    [
+     180,
+     1.7817
+    ],
+    [
+     270,
+     1.7095
+    ],
+    [
+     360,
+     1.6626
+    ],
+    [
+     450,
+     1.6342
+    ],
+    [
+     540,
+     1.595
+    ],
+    [
+     630,
+     1.5721
+    ],
+    [
+     720,
+     1.5728
+    ],
+    [
+     810,
+     1.5159
+    ],
+    [
+     908,
+     1.4916
+    ]
+   ]
+  },
+  {
+   "id": "g2_match_opt",
+   "label": "Round 2: copying + LR fix",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 2,
+   "note": "Two gen-1 winners combined.",
+   "seeds": 2,
+   "final": 1.4932,
+   "sd": 0.0003,
+   "per_seed": [
+    1.4934,
+    1.4929
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.0505
+    ],
+    [
+     180,
+     1.7817
+    ],
+    [
+     270,
+     1.7019
+    ],
+    [
+     360,
+     1.6505
+    ],
+    [
+     450,
+     1.6263
+    ],
+    [
+     540,
+     1.5899
+    ],
+    [
+     630,
+     1.5701
+    ],
+    [
+     720,
+     1.5738
+    ],
+    [
+     810,
+     1.5156
+    ],
+    [
+     908,
+     1.4932
+    ]
+   ]
+  },
+  {
+   "id": "g2_match_pf",
+   "label": "Round 2: copying, no space hint",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 2,
+   "note": "Copying on the hint-free H-Net. Learned to cut before spaces instead of at them.",
+   "seeds": 2,
+   "final": 1.5546,
+   "sd": 0.0042,
+   "per_seed": [
+    1.5576,
+    1.5517
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.019
+    ],
+    [
+     180,
+     1.8073
+    ],
+    [
+     270,
+     1.7473
+    ],
+    [
+     360,
+     1.6992
+    ],
+    [
+     450,
+     1.6795
+    ],
+    [
+     540,
+     1.6439
+    ],
+    [
+     630,
+     1.6272
+    ],
+    [
+     720,
+     1.6354
+    ],
+    [
+     810,
+     1.5766
+    ],
+    [
+     908,
+     1.5546
+    ]
+   ]
+  },
+  {
+   "id": "g2_combo_02",
+   "label": "Round 2: suffix memory + read-back (no copying)",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 2,
+   "note": "These two did not add up without copying.",
+   "seeds": 2,
+   "final": 1.7598,
+   "sd": 0.0172,
+   "per_seed": [
+    1.7719,
+    1.7476
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.4284
+    ],
+    [
+     180,
+     2.1684
+    ],
+    [
+     270,
+     2.0687
+    ],
+    [
+     360,
+     2.015
+    ],
+    [
+     450,
+     1.9646
+    ],
+    [
+     540,
+     1.9239
+    ],
+    [
+     630,
+     1.8865
+    ],
+    [
+     720,
+     1.8833
+    ],
+    [
+     810,
+     1.797
+    ],
+    [
+     908,
+     1.7598
+    ]
+   ]
+  },
+  {
+   "id": "g3_mem_02",
+   "label": "Round 3: + fast word-completion memory",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 3,
+   "note": "Copying + suffix memory + the trie, made fast. First tie with BPE + copying.",
+   "seeds": 3,
+   "final": 1.4613,
+   "sd": 0.0008,
+   "per_seed": [
+    1.4617,
+    1.4604,
+    1.4618
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     1.942
+    ],
+    [
+     180,
+     1.7357
+    ],
+    [
+     270,
+     1.6594
+    ],
+    [
+     360,
+     1.6174
+    ],
+    [
+     450,
+     1.5975
+    ],
+    [
+     540,
+     1.5621
+    ],
+    [
+     630,
+     1.5479
+    ],
+    [
+     720,
+     1.5526
+    ],
+    [
+     810,
+     1.4878
+    ],
+    [
+     908,
+     1.4613
+    ]
+   ]
+  },
+  {
+   "id": "g3_combo_01",
+   "label": "Round 3: + read-back + LR fix",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 3,
+   "note": "Copying + suffix memory + read-back + LR fix. Second tie.",
+   "seeds": 3,
+   "final": 1.4614,
+   "sd": 0.002,
+   "per_seed": [
+    1.4636,
+    1.4595,
+    1.4612
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.0231
+    ],
+    [
+     180,
+     1.762
+    ],
+    [
+     270,
+     1.6792
+    ],
+    [
+     360,
+     1.6271
+    ],
+    [
+     450,
+     1.599
+    ],
+    [
+     540,
+     1.566
+    ],
+    [
+     630,
+     1.5436
+    ],
+    [
+     720,
+     1.5449
+    ],
+    [
+     810,
+     1.4848
+    ],
+    [
+     908,
+     1.4614
+    ]
+   ]
+  },
+  {
+   "id": "g3_route_02",
+   "label": "Round 3: self-taught chunking (no hint)",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 3,
+   "note": "A small predictor teaches the chunker where text is surprising. Finds word boundaries without a space hint.",
+   "seeds": 2,
+   "final": 1.5029,
+   "sd": 0.0001,
+   "per_seed": [
+    1.5029,
+    1.5028
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.1302
+    ],
+    [
+     180,
+     1.8369
+    ],
+    [
+     270,
+     1.7396
+    ],
+    [
+     360,
+     1.6812
+    ],
+    [
+     450,
+     1.6472
+    ],
+    [
+     540,
+     1.6087
+    ],
+    [
+     630,
+     1.5852
+    ],
+    [
+     720,
+     1.588
+    ],
+    [
+     810,
+     1.5278
+    ],
+    [
+     908,
+     1.5029
+    ]
+   ]
+  },
+  {
+   "id": "g3_copy_01",
+   "label": "Round 3: whole-chunk copying",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 3,
+   "note": "Copy whole chunks, not bytes. No gain.",
+   "seeds": 2,
+   "final": 1.4882,
+   "sd": 0.0022,
+   "per_seed": [
+    1.4897,
+    1.4866
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     1.9739
+    ],
+    [
+     180,
+     1.7592
+    ],
+    [
+     270,
+     1.692
+    ],
+    [
+     360,
+     1.644
+    ],
+    [
+     450,
+     1.6221
+    ],
+    [
+     540,
+     1.586
+    ],
+    [
+     630,
+     1.569
+    ],
+    [
+     720,
+     1.5732
+    ],
+    [
+     810,
+     1.5137
+    ],
+    [
+     908,
+     1.4882
+    ]
+   ]
+  },
+  {
+   "id": "g3_copy_02",
+   "label": "Round 3: longer chunks inside copies",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 3,
+   "note": "Spend fewer chunks on copied text. No gain.",
+   "seeds": 2,
+   "final": 1.4851,
+   "sd": 0.005,
+   "per_seed": [
+    1.4816,
+    1.4886
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     1.9691
+    ],
+    [
+     180,
+     1.764
+    ],
+    [
+     270,
+     1.691
+    ],
+    [
+     360,
+     1.6421
+    ],
+    [
+     450,
+     1.6228
+    ],
+    [
+     540,
+     1.5845
+    ],
+    [
+     630,
+     1.5659
+    ],
+    [
+     720,
+     1.5745
+    ],
+    [
+     810,
+     1.5109
+    ],
+    [
+     908,
+     1.4851
+    ]
+   ]
+  },
+  {
+   "id": "g3_route_01",
+   "label": "Round 3: more chunks on hard text",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 3,
+   "note": "Shift chunks toward unpredictable regions. No gain.",
+   "seeds": 2,
+   "final": 1.4854,
+   "sd": 0.0043,
+   "per_seed": [
+    1.4885,
+    1.4824
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     1.9912
+    ],
+    [
+     180,
+     1.7648
+    ],
+    [
+     270,
+     1.6965
+    ],
+    [
+     360,
+     1.649
+    ],
+    [
+     450,
+     1.6281
+    ],
+    [
+     540,
+     1.5909
+    ],
+    [
+     630,
+     1.5723
+    ],
+    [
+     720,
+     1.5706
+    ],
+    [
+     810,
+     1.5111
+    ],
+    [
+     908,
+     1.4854
+    ]
+   ]
+  },
+  {
+   "id": "g4_combo_02",
+   "label": "Round 4: best H-Net",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 4,
+   "note": "Everything that worked, combined: copying, suffix memory, fast trie, read-back, LR fix.",
+   "seeds": 3,
+   "final": 1.4328,
+   "sd": 0.0017,
+   "per_seed": [
+    1.4316,
+    1.432,
+    1.4347
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     1.9568
+    ],
+    [
+     180,
+     1.7228
+    ],
+    [
+     270,
+     1.6425
+    ],
+    [
+     360,
+     1.594
+    ],
+    [
+     450,
+     1.566
+    ],
+    [
+     540,
+     1.5336
+    ],
+    [
+     630,
+     1.515
+    ],
+    [
+     720,
+     1.5202
+    ],
+    [
+     810,
+     1.4578
+    ],
+    [
+     908,
+     1.4328
+    ]
+   ]
+  },
+  {
+   "id": "g4_combo_03",
+   "label": "Round 4: best H-Net, no space hint",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 4,
+   "note": "The same with self-taught chunking: fully tokenizer-free.",
+   "seeds": 2,
+   "final": 1.4425,
+   "sd": 0.0041,
+   "per_seed": [
+    1.4396,
+    1.4454
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     2.1594
+    ],
+    [
+     180,
+     1.8057
+    ],
+    [
+     270,
+     1.7038
+    ],
+    [
+     360,
+     1.6267
+    ],
+    [
+     450,
+     1.5836
+    ],
+    [
+     540,
+     1.5487
+    ],
+    [
+     630,
+     1.5297
+    ],
+    [
+     720,
+     1.5323
+    ],
+    [
+     810,
+     1.4686
+    ],
+    [
+     908,
+     1.4425
+    ]
+   ]
+  },
+  {
+   "id": "g5_compute_02",
+   "label": "Round 5: extra thinking on surprising chunks",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 5,
+   "note": "Re-run the deep layers once a chunk's first byte is known, for the 50% most surprising chunks.",
+   "seeds": 2,
+   "final": 1.4318,
+   "sd": 0.0027,
+   "per_seed": [
+    1.4337,
+    1.4298
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     1.9879
+    ],
+    [
+     180,
+     1.7196
+    ],
+    [
+     270,
+     1.6452
+    ],
+    [
+     360,
+     1.5908
+    ],
+    [
+     450,
+     1.5709
+    ],
+    [
+     540,
+     1.5318
+    ],
+    [
+     630,
+     1.5181
+    ],
+    [
+     720,
+     1.5208
+    ],
+    [
+     810,
+     1.4565
+    ],
+    [
+     908,
+     1.4318
+    ]
+   ]
+  },
+  {
+   "id": "g5_compute_01",
+   "label": "Round 5: extra thinking on every chunk",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 5,
+   "note": "The same on every chunk, paid for with one fewer deep layer.",
+   "seeds": 2,
+   "final": 1.438,
+   "sd": 0.0014,
+   "per_seed": [
+    1.439,
+    1.4371
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     1.949
+    ],
+    [
+     180,
+     1.7241
+    ],
+    [
+     270,
+     1.642
+    ],
+    [
+     360,
+     1.5945
+    ],
+    [
+     450,
+     1.5707
+    ],
+    [
+     540,
+     1.5379
+    ],
+    [
+     630,
+     1.5208
+    ],
+    [
+     720,
+     1.5261
+    ],
+    [
+     810,
+     1.4623
+    ],
+    [
+     908,
+     1.438
+    ]
+   ]
+  },
+  {
+   "id": "g5_output_02",
+   "label": "Round 5: bigger word-completion memory",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 5,
+   "note": "Move parameters into the trie.",
+   "seeds": 2,
+   "final": 1.4368,
+   "sd": 0.0004,
+   "per_seed": [
+    1.4371,
+    1.4365
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     1.9518
+    ],
+    [
+     180,
+     1.7259
+    ],
+    [
+     270,
+     1.6437
+    ],
+    [
+     360,
+     1.5947
+    ],
+    [
+     450,
+     1.5741
+    ],
+    [
+     540,
+     1.5353
+    ],
+    [
+     630,
+     1.5178
+    ],
+    [
+     720,
+     1.5231
+    ],
+    [
+     810,
+     1.4622
+    ],
+    [
+     908,
+     1.4368
+    ]
+   ]
+  },
+  {
+   "id": "g5_output_01",
+   "label": "Round 5: memory inside the deep layers",
+   "family": "hnet",
+   "scale": "small",
+   "gen": 5,
+   "note": "A large lookup memory read by the chunk layers.",
+   "seeds": 2,
+   "final": 1.4414,
+   "sd": 0.0013,
+   "per_seed": [
+    1.4405,
+    1.4423
+   ],
+   "steps_total": 908,
+   "curve": [
+    [
+     90,
+     1.9646
+    ],
+    [
+     180,
+     1.7311
+    ],
+    [
+     270,
+     1.649
+    ],
+    [
+     360,
+     1.6014
+    ],
+    [
+     450,
+     1.5723
+    ],
+    [
+     540,
+     1.5438
+    ],
+    [
+     630,
+     1.5245
+    ],
+    [
+     720,
+     1.5289
+    ],
+    [
+     810,
+     1.4675
+    ],
+    [
+     908,
+     1.4414
+    ]
+   ]
+  },
+  {
+   "id": "big_bpe",
+   "label": "BPE (standard tokenizer)",
+   "family": "bpe",
+   "scale": "big",
+   "gen": 0,
+   "note": "Bigger model, 10x the compute.",
+   "seeds": 1,
+   "final": 1.2242,
+   "sd": null,
+   "per_seed": [
+    1.2242
+   ],
+   "steps_total": 1974,
+   "curve": [
+    [
+     197,
+     1.9638
+    ],
+    [
+     394,
+     1.7416
+    ],
+    [
+     591,
+     1.4993
+    ],
+    [
+     788,
+     1.4185
+    ],
+    [
+     985,
+     1.3739
+    ],
+    [
+     1182,
+     1.3459
+    ],
+    [
+     1379,
+     1.3101
+    ],
+    [
+     1576,
+     1.3055
+    ],
+    [
+     1773,
+     1.2438
+    ],
+    [
+     1974,
+     1.2242
+    ]
+   ]
+  },
+  {
+   "id": "big_bpe_copy",
+   "label": "BPE + copying",
+   "family": "bpe",
+   "scale": "big",
+   "gen": 4,
+   "note": "The fair bar at the bigger size.",
+   "seeds": 2,
+   "final": 1.2095,
+   "sd": 0.0019,
+   "per_seed": [
+    1.2081,
+    1.2108
+   ],
+   "steps_total": 1974,
+   "curve": [
+    [
+     197,
+     1.679
+    ],
+    [
+     394,
+     1.5004
+    ],
+    [
+     591,
+     1.4233
+    ],
+    [
+     788,
+     1.3795
+    ],
+    [
+     985,
+     1.3449
+    ],
+    [
+     1182,
+     1.3194
+    ],
+    [
+     1379,
+     1.2902
+    ],
+    [
+     1576,
+     1.2873
+    ],
+    [
+     1773,
+     1.2278
+    ],
+    [
+     1974,
+     1.2095
+    ]
+   ]
+  },
+  {
+   "id": "big_hnet",
+   "label": "H-Net as published",
+   "family": "hnet",
+   "scale": "big",
+   "gen": 0,
+   "note": "",
+   "seeds": 1,
+   "final": 1.36,
+   "sd": null,
+   "per_seed": [
+    1.36
+   ],
+   "steps_total": 1974,
+   "curve": [
+    [
+     197,
+     2.1788
+    ],
+    [
+     394,
+     1.9906
+    ],
+    [
+     591,
+     1.8975
+    ],
+    [
+     788,
+     1.8239
+    ],
+    [
+     985,
+     1.7114
+    ],
+    [
+     1182,
+     1.595
+    ],
+    [
+     1379,
+     1.5132
+    ],
+    [
+     1576,
+     1.4972
+    ],
+    [
+     1773,
+     1.3936
+    ],
+    [
+     1974,
+     1.36
+    ]
+   ]
+  },
+  {
+   "id": "big_hnet_ws",
+   "label": "H-Net + space hint",
+   "family": "hnet",
+   "scale": "big",
+   "gen": 0,
+   "note": "",
+   "seeds": 1,
+   "final": 1.3527,
+   "sd": null,
+   "per_seed": [
+    1.3527
+   ],
+   "steps_total": 1974,
+   "curve": [
+    [
+     197,
+     2.1312
+    ],
+    [
+     394,
+     1.9368
+    ],
+    [
+     591,
+     1.8459
+    ],
+    [
+     788,
+     1.7695
+    ],
+    [
+     985,
+     1.6814
+    ],
+    [
+     1182,
+     1.571
+    ],
+    [
+     1379,
+     1.503
+    ],
+    [
+     1576,
+     1.4674
+    ],
+    [
+     1773,
+     1.3837
+    ],
+    [
+     1974,
+     1.3527
+    ]
+   ]
+  },
+  {
+   "id": "big_g4_combo_02",
+   "label": "Round 4: best H-Net",
+   "family": "hnet",
+   "scale": "big",
+   "gen": 4,
+   "note": "The small-scale winner, scaled up.",
+   "seeds": 2,
+   "final": 1.2393,
+   "sd": 0.0128,
+   "per_seed": [
+    1.2483,
+    1.2303
+   ],
+   "steps_total": 1974,
+   "curve": [
+    [
+     197,
+     1.6879
+    ],
+    [
+     394,
+     1.5163
+    ],
+    [
+     591,
+     1.4539
+    ],
+    [
+     788,
+     1.4087
+    ],
+    [
+     985,
+     1.3777
+    ],
+    [
+     1182,
+     1.3501
+    ],
+    [
+     1379,
+     1.3291
+    ],
+    [
+     1576,
+     1.3175
+    ],
+    [
+     1773,
+     1.2615
+    ],
+    [
+     1974,
+     1.2393
+    ]
+   ]
+  },
+  {
+   "id": "big_g4_combo_03",
+   "label": "Round 4: best H-Net, no space hint",
+   "family": "hnet",
+   "scale": "big",
+   "gen": 4,
+   "note": "",
+   "seeds": 1,
+   "final": 1.2535,
+   "sd": null,
+   "per_seed": [
+    1.2535
+   ],
+   "steps_total": 1974,
+   "curve": [
+    [
+     197,
+     1.8034
+    ],
+    [
+     394,
+     1.581
+    ],
+    [
+     591,
+     1.4803
+    ],
+    [
+     788,
+     1.4236
+    ],
+    [
+     985,
+     1.3844
+    ],
+    [
+     1182,
+     1.3598
+    ],
+    [
+     1379,
+     1.3396
+    ],
+    [
+     1576,
+     1.325
+    ],
+    [
+     1773,
+     1.272
+    ],
+    [
+     1974,
+     1.2535
+    ]
+   ]
+  }
+ ],
+ "ladder": {
+  "1e16": {
+   "L03": {
+    "bpe": 1.6952,
+    "hnet": 1.8789,
+    "hnet_ws": 1.8227
+   },
+   "L04": {
+    "bpe": 1.6224,
+    "hnet": 1.9068,
+    "hnet_ws": 1.8639
+   },
+   "L05": {
+    "bpe": 1.7557,
+    "hnet": 1.9846,
+    "hnet_ws": 1.9389
+   },
+   "L06": {
+    "bpe": 1.8411,
+    "hnet": 2.0832,
+    "hnet_ws": 2.0352
+   }
+  },
+  "1e17": {
+   "L05": {
+    "bpe": 1.2242,
+    "hnet": 1.36,
+    "hnet_ws": 1.3527
+   },
+   "L06": {
+    "bpe": 1.2464,
+    "hnet": 1.4735,
+    "hnet_ws": 1.5668
+   },
+   "L07": {
+    "bpe": 1.2672,
+    "hnet": 1.6238,
+    "hnet_ws": 1.6269
+   },
+   "L08": {
+    "bpe": 1.3118,
+    "hnet": 1.7886,
+    "hnet_ws": 1.6834
+   },
+   "L09": {
+    "bpe": 1.3333,
+    "hnet": 1.8529,
+    "hnet_ws": 1.7528
+   }
+  }
+ }
+}
