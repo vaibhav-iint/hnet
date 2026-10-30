@@ -18,6 +18,10 @@ budget, the population database and every GPU launch. Proposer agents own ideas 
 * **Seeds**: 2 per candidate; a candidate whose mean beats its parent by more than the larger seed spread gets a 3rd
   seed and a transfer check at L05 1e17 before it is promoted to the ladder default.
 
+* **Scaling and modality filter** (proposed 2026-10-30, docs/SCALING_CRITERIA.md): keep only ideas that are fixes to how
+  the model learns or decides and are not tied to text; no exact-match lookups (copy indexes, tries, suffix memories,
+  new n-gram tables) in the next round; add a non-text benchmark (raw audio or image bytes vs a patch Transformer).
+
 ## Guardrails (the fairness contract; a candidate that breaks one is rejected without a GPU run)
 
 1. Same data, same steps, same batch in bytes, same validation set, same evaluation code. No change to the BPE arm,

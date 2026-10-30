@@ -1206,3 +1206,18 @@ tokenization splits differently. BPE seed 1 reproduced bit-for-bit across genera
 candidates is BPE + copy, 1.460.
 Seed-2 confirmations (vs hnet_ws 1.829 ± 0.002): g1-arch-02 (offset-resolved read-back) 1.797 ± 0.001, **-0.032 on two
 seeds**; g1-alloc-01 1.821 ± 0.007 (-0.008); g1-arch-01 1.825 ± 0.002 (tie); g1-alloc-02 1.865 ± 0.003 (+0.036).
+
+## 2026-10-30: evolve loop closed; TL;DR assets; scaling criteria; project paused
+
+- Evolve loop stopped at the cap: $47.13 of $50 (docs/EVOLVE.md ledger). Generation 4's g4-combo-02 beat BPE + copy at
+  L03 1e16 (1.433 ± 0.002 vs 1.461 ± 0.001, 3 seeds each) but lost at L05 1e17 (1.239 ± 0.013 vs 1.209 ± 0.002);
+  generation 5 found nothing better (logbook/evolve/notes_g4.md, notes_g5.md). CLAUDE.md miss row and the
+  second-rung rule added.
+- Shareable TL;DR: logbook/tldr/ (tldr_main.png, tldr_journey.png, page.html; rebuilt by make_data.py, make_images.py,
+  build_page.py). Interactive page published as an artifact.
+- docs/SCALING_CRITERIA.md: which ideas should survive to 100B and to images/video. Almost all of the loop's gain came
+  from exact-match lookups (copying, trie, suffix memory), which shrink with scale and are text-only; kept: self-taught
+  (entropy-led) chunking, Muon-native LR transfer, rank decider + fp32 router, position-aware read-back.
+- Paused at the user's request. No compute running: no GCP VMs or disks (hnet-*/hx-*), no Prime pods, no local jobs.
+  Next step when resuming: SmolLM2-135M/360M bpb on the mix_v1 validation set as a reference line (CPU, free), then an
+  evolve round under the scaling/modality filter. Rotate the Prime and GCP keys.
